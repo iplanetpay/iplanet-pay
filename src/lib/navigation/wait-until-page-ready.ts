@@ -88,8 +88,9 @@ function mediaStillLoading(root: HTMLElement) {
   }
   for (const video of root.querySelectorAll("video")) {
     if (video.error) continue;
-    if (video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA) return true;
-    if (video.networkState === HTMLMediaElement.NETWORK_LOADING) return true;
+    // Playable buffer is enough. Waiting for NETWORK_LOADING to go idle
+    // holds the gate until the whole file arrives.
+    if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return true;
   }
   return false;
 }

@@ -2,21 +2,18 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ExperiencePreloader } from "@/components/ui/experience-preloader";
-import {
-  LANDING_PRELOAD_URLS,
-  waitUntilPageReady,
-} from "@/lib/navigation/wait-until-page-ready";
+import { waitUntilPageReady } from "@/lib/navigation/wait-until-page-ready";
 
-/** Keep the overlay up until the hero video, Duo canvases and 3D stage exist. */
+/** Keep the overlay up until the landing media, Duo canvases and 3D stage exist. */
 function landingStillLoading(root: HTMLElement) {
   const video = root.querySelector<HTMLVideoElement>("#hero video");
   if (!video) return true;
-  if (
-    !video.error &&
-    (video.readyState < HTMLMediaElement.HAVE_ENOUGH_DATA ||
-      video.networkState === HTMLMediaElement.NETWORK_LOADING)
-  ) {
+  if (!video.error && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
     return true;
+  }
+  for (const img of root.querySelectorAll("img")) {
+    if (!img.getAttribute("src") && !img.currentSrc) continue;
+    if (!img.complete) return true;
   }
   if (root.querySelectorAll("[data-duo-step] canvas").length < 3) return true;
   const stage = root.querySelector("#experiencia-3d");
@@ -34,13 +31,28 @@ export function HomeBootGate({ children }: { children: ReactNode }) {
   const [percent, setPercent] = useState(0);
 
   useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtml = html.style.overflow;
+    const prevBody = body.style.overflow;
+    html.dataset.landingBoot = "1";
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    window.dispatchEvent(new Event("iplanet:landing-boot"));
+
+    const release = () => {
+      delete html.dataset.landingBoot;
+      html.style.overflow = prevHtml;
+      body.style.overflow = prevBody;
+      window.dispatchEvent(new Event("iplanet:landing-boot"));
+    };
+
     let cancelled = false;
 
     void (async () => {
       await waitUntilPageReady(contentRef.current, {
-        minVisibleMs: 900,
-        maxReadyMs: 180_000,
-        preloadUrls: LANDING_PRELOAD_URLS,
+        minVisibleMs: 700,
+        maxReadyMs: 45_000,
         watchMedia: true,
         isPending: landingStillLoading,
         onProgress: (value) => {
@@ -50,11 +62,13 @@ export function HomeBootGate({ children }: { children: ReactNode }) {
       if (!cancelled) {
         setPercent(100);
         setShowBoot(false);
+        release();
       }
     })();
 
     return () => {
       cancelled = true;
+      release();
     };
   }, []);
 
@@ -62,13 +76,13 @@ export function HomeBootGate({ children }: { children: ReactNode }) {
     <>
       {showBoot ? (
         <div
-          className="fixed inset-0 z-[200] flex flex-col bg-[var(--bg)]"
+          className="experience-preloader-overlay fixed inset-0 z-[200] flex h-dvh flex-col overflow-hidden overscroll-none bg-[var(--bg)]"
           aria-busy="true"
           aria-live="polite"
         >
           <ExperiencePreloader
             variant="landing"
-            className="min-h-screen"
+            className="h-dvh"
             percent={percent}
           />
         </div>

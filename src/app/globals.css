@@ -119,17 +119,13 @@ body {
   }
 }
 
-.experience-progress-bar {
-  animation: experience-progress 1.1s ease-in-out infinite;
-  will-change: transform;
+.experience-spinner {
+  animation: experience-spin 0.75s linear infinite;
 }
 
-@keyframes experience-progress {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(420%);
+@keyframes experience-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 

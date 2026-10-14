@@ -95,34 +95,24 @@ function AdminPageSkeleton() {
   );
 }
 
-function LoadingExperienceBar({ percent }: { percent?: number }) {
+function LoadingSpinner({ percent }: { percent?: number }) {
   const known = typeof percent === "number";
-  const value = known ? Math.max(0, Math.min(100, Math.round(percent))) : 0;
+  const value = known ? Math.max(0, Math.min(100, Math.round(percent))) : undefined;
 
   return (
-    <div className="mx-auto w-full max-w-md px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-2">
-      <p className="mb-3 text-center text-sm font-medium tracking-tight text-[var(--ink-muted)]">
-        {known ? `Carregando experiência ${value}%` : "Carregando experiência"}
-      </p>
+    <div className="pointer-events-none fixed inset-0 z-[260] flex items-center justify-center">
       <div
-        className="h-1.5 overflow-hidden rounded-full bg-[var(--line)]"
+        className="experience-spinner h-12 w-12 rounded-full border-[3px] border-[var(--line)] border-t-[var(--accent)]"
         role="progressbar"
         aria-valuemin={0}
         aria-valuemax={100}
-        aria-valuenow={known ? value : undefined}
-        aria-valuetext={
-          known ? `Carregando experiência ${value}%` : "Carregando experiência"
+        aria-valuenow={value}
+        aria-label={
+          value != null
+            ? `Carregando experiência ${value}%`
+            : "Carregando experiência"
         }
-      >
-        <div
-          className={
-            known
-              ? "h-full rounded-full bg-[var(--accent)] transition-[width] duration-200"
-              : "experience-progress-bar h-full w-1/3 rounded-full bg-[var(--accent)]"
-          }
-          style={known ? { width: `${value}%` } : undefined}
-        />
-      </div>
+      />
     </div>
   );
 }
@@ -147,7 +137,7 @@ export function ExperiencePreloader({
   return (
     <div
       className={cn(
-        "flex min-h-0 flex-1 flex-col justify-between bg-[var(--bg)]",
+        "relative flex h-dvh max-h-dvh min-h-0 flex-1 flex-col overflow-hidden bg-[var(--bg)]",
         className,
       )}
       aria-busy="true"
@@ -157,7 +147,7 @@ export function ExperiencePreloader({
       <div className="min-h-0 flex-1 overflow-hidden py-2">
         <PageSkeleton variant={variant} />
       </div>
-      <LoadingExperienceBar percent={percent} />
+      <LoadingSpinner percent={percent} />
     </div>
   );
 }
@@ -182,7 +172,7 @@ export function ExperiencePreloaderOverlay({
     >
       <ExperiencePreloader
         variant={variant}
-        className="min-h-screen"
+        className="h-dvh"
         percent={percent}
       />
     </div>,

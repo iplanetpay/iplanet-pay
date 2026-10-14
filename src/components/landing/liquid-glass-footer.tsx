@@ -179,6 +179,11 @@ export function LiquidGlassFooter() {
               </p>
               <ul className="mt-4 space-y-2.5 text-sm font-medium text-[var(--ink)]">
                 <li>
+                  <Link href="/ajuda" className="hover:text-[var(--accent)]">
+                    Guia
+                  </Link>
+                </li>
+                <li>
                   <button
                     type="button"
                     onClick={openFaqChat}

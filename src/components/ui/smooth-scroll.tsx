@@ -52,13 +52,22 @@ export function SmoothScroll() {
     raf = requestAnimationFrame(frame);
 
     const onChange = () => {
-      if (reduce.matches) lenis.stop();
-      else lenis.start();
+      if (
+        reduce.matches ||
+        document.documentElement.dataset.landingBoot === "1"
+      ) {
+        lenis.stop();
+      } else {
+        lenis.start();
+      }
     };
+    onChange();
     reduce.addEventListener("change", onChange);
+    window.addEventListener("iplanet:landing-boot", onChange);
 
     return () => {
       reduce.removeEventListener("change", onChange);
+      window.removeEventListener("iplanet:landing-boot", onChange);
       cancelAnimationFrame(raf);
       lenis.destroy();
     };
