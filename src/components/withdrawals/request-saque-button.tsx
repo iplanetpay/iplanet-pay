@@ -1,34 +1,23 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { MotionModal } from "@/components/ui/motion";
-import { formatCentsBRL } from "@/lib/utils";
 import {
-  calcWithdrawalAmounts,
   PIX_KEY_TYPE_LABEL,
-  WITHDRAWAL_FEE_PCT_DEFAULT,
   type PixKeyType,
 } from "@/lib/withdrawals/types";
-import { WithdrawalFeeBreakdown } from "@/components/withdrawals/withdrawal-fee-breakdown";
 import { Wallet } from "lucide-react";
 
 export function RequestSaqueButton({
   reservationId,
-  totalPaidCents,
-  feePct = WITHDRAWAL_FEE_PCT_DEFAULT,
   size = "md",
-  showPreview = true,
 }: {
   reservationId: string;
-  totalPaidCents: number;
-  feePct?: number;
   size?: "sm" | "md" | "lg";
-  /** Resumo da taxa acima do botão (histórico de aportes). */
-  showPreview?: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -38,11 +27,6 @@ export function RequestSaqueButton({
   const [holderCpf, setHolderCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-
-  const amounts = useMemo(
-    () => calcWithdrawalAmounts(totalPaidCents, feePct),
-    [totalPaidCents, feePct],
-  );
 
   async function submit() {
     setLoading(true);
@@ -82,9 +66,6 @@ export function RequestSaqueButton({
   return (
     <>
       <div className="flex w-full flex-col items-center gap-3">
-        {showPreview ? (
-          <WithdrawalFeeBreakdown totalPaidCents={totalPaidCents} feePct={feePct} compact />
-        ) : null}
         <Button
           type="button"
           variant="outline"
@@ -119,8 +100,6 @@ export function RequestSaqueButton({
             O Pix do reembolso é efetuado em até <strong>24h</strong> após a
             aprovação no Financeiro.
           </p>
-
-          <WithdrawalFeeBreakdown totalPaidCents={totalPaidCents} feePct={feePct} />
 
           <Select
             label="Tipo da chave Pix"
@@ -173,9 +152,7 @@ export function RequestSaqueButton({
             disabled={!canSubmit}
             onClick={() => void submit()}
           >
-            {loading
-              ? "Enviando..."
-              : `Confirmar saque · receber ${formatCentsBRL(amounts.refund_amount_cents)}`}
+            {loading ? "Enviando..." : "Confirmar saque"}
           </Button>
         </div>
       </MotionModal>

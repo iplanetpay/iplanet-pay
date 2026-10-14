@@ -48,53 +48,70 @@ export function ActiveHeroCarousel({ items }: { items: ActiveHeroItem[] }) {
   if (count === 0) return null;
 
   const safeIndex = ((index % count) + count) % count;
-  const hero = items[safeIndex]!;
 
   return (
     <div className="space-y-3">
-      <ProductHeroCard
-        key={hero.id}
-        badge="Reserva ativa"
-        title={hero.title}
-        subtitle={hero.subtitle}
-        priceLabel={hero.priceLabel}
-        imageSlot={
-          <ProductImage
-            src={hero.imageUrl}
-            alt={hero.title}
-            size="hero"
-            className="h-full w-full bg-transparent"
-          />
-        }
-        footer={
-          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
-            <ProgressRing value={hero.progress} label="quitado" />
-            <div className="flex-1 space-y-4">
-              <ProgressBar
-                value={hero.progress}
-                label="Progresso da reserva"
+      <div className="grid">
+        {items.map((hero, i) => {
+          const active = i === safeIndex;
+          return (
+            <div
+              key={hero.id}
+              className={cn(
+                "col-start-1 row-start-1 transition-[opacity,transform] duration-500 ease-out motion-reduce:transition-none",
+                active
+                  ? "z-10 translate-y-0 opacity-100"
+                  : "pointer-events-none z-0 translate-y-2 opacity-0",
+              )}
+              aria-hidden={!active}
+              inert={!active}
+            >
+              <ProductHeroCard
+                badge="Reserva ativa"
+                title={hero.title}
+                subtitle={hero.subtitle}
+                priceLabel={hero.priceLabel}
+                imageSlot={
+                  <ProductImage
+                    src={hero.imageUrl}
+                    alt={hero.title}
+                    size="hero"
+                    className="h-full w-full bg-transparent"
+                  />
+                }
+                footer={
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+                    <ProgressRing value={hero.progress} label="quitado" />
+                    <div className="flex-1 space-y-4">
+                      <ProgressBar
+                        value={hero.progress}
+                        label="Progresso da reserva"
+                      />
+                      <div className="flex flex-wrap gap-2">
+                        <Link href={`/app/reserva/${hero.id}`} prefetch>
+                          <Button size="sm">
+                            Ver reserva
+                            <ArrowRight className="h-4 w-4" />
+                          </Button>
+                        </Link>
+                        <Link href={`/app/reserva/${hero.id}`} prefetch>
+                          <Button
+                            size="sm"
+                            variant="accent"
+                            leftIcon={<QrCode className="h-4 w-4" />}
+                          >
+                            Gerar aporte Pix
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                }
               />
-              <div className="flex flex-wrap gap-2">
-                <Link href={`/app/reserva/${hero.id}`} prefetch>
-                  <Button size="sm">
-                    Ver reserva
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </Link>
-                <Link href={`/app/reserva/${hero.id}`} prefetch>
-                  <Button
-                    size="sm"
-                    variant="accent"
-                    leftIcon={<QrCode className="h-4 w-4" />}
-                  >
-                    Gerar aporte Pix
-                  </Button>
-                </Link>
-              </div>
             </div>
-          </div>
-        }
-      />
+          );
+        })}
+      </div>
 
       {count > 1 ? (
         <div

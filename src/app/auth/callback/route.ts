@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { avatarFromAuthMetadata } from "@/lib/auth/avatar";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { homeForRole, roleAllowedForPath } from "@/lib/auth/roles";
@@ -33,9 +34,11 @@ export async function GET(request: Request) {
       if (user) {
         const { data: profile } = await supabase
           .from("profiles")
-          .select("id, role")
+          .select("id, role, avatar_url")
           .eq("id", user.id)
           .maybeSingle();
+
+        const avatarUrl = avatarFromAuthMetadata(user);
 
         if (!profile) {
           // Safety net if trigger missed (should be rare). Never overwrite admins.
@@ -49,10 +52,19 @@ export async function GET(request: Request) {
             id: user.id,
             full_name: fullName,
             role: "cliente",
+            avatar_url: avatarUrl,
           });
           role = "cliente";
         } else {
           role = (profile.role ?? "cliente") as UserRole;
+          const stored =
+            typeof profile.avatar_url === "string" ? profile.avatar_url.trim() : "";
+          if (!stored && avatarUrl) {
+            await supabase
+              .from("profiles")
+              .update({ avatar_url: avatarUrl })
+              .eq("id", user.id);
+          }
         }
       }
 

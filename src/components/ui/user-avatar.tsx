@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { cn } from "@/lib/utils";
 
 function initialsFromName(name: string): string {
@@ -30,13 +29,14 @@ export function UserAvatar({
         )}
         style={{ width: size, height: size }}
       >
-        <Image
+        {/* Native img: Google profile photos are on lh3.googleusercontent.com. */}
+        <img
           src={avatarUrl}
           alt={name}
           width={size}
           height={size}
+          referrerPolicy="no-referrer"
           className="h-full w-full object-cover"
-          unoptimized
         />
       </span>
     );

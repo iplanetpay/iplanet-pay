@@ -91,6 +91,28 @@ export async function listWithdrawalRequests(limit = 80): Promise<{
   }
 }
 
+export async function getPaidWithdrawalForReservation(
+  reservationId: string,
+): Promise<WithdrawalRequest | null> {
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("withdrawal_requests")
+      .select(WITHDRAWAL_SELECT)
+      .eq("reservation_id", reservationId)
+      .eq("status", "approved")
+      .eq("payout_status", "sent")
+      .order("processed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return data as WithdrawalRequest;
+  } catch {
+    return null;
+  }
+}
+
 export async function getConfirmedAportesCents(
   reservationId: string,
 ): Promise<number> {
