@@ -11,7 +11,8 @@ import {
   type HTMLMotionProps,
 } from "framer-motion";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 
 const spring = { type: "spring" as const, stiffness: 380, damping: 32 };
@@ -162,6 +163,12 @@ export function MotionModal({
   className?: string;
   labelledBy?: string;
 }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -176,38 +183,43 @@ export function MotionModal({
     };
   }, [open, onClose]);
 
-  return (
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center sm:p-6">
+        <div className="fixed inset-0 z-[80] h-dvh w-dvw">
           <motion.button
             type="button"
             aria-label="Fechar"
-            className="absolute inset-0 bg-black/30 backdrop-blur-md"
+            className="fixed inset-0 h-dvh w-dvw bg-black/40 backdrop-blur-md"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.2 }}
             onClick={onClose}
           />
-          <motion.div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={labelledBy}
-            data-lenis-prevent-touch
-            className={cn(
-              "relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[var(--line)] bg-white shadow-[0_24px_80px_rgba(17,17,17,0.18)] sm:rounded-[28px]",
-              className,
-            )}
-            initial={{ opacity: 0, y: 40, scale: 0.96 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 24, scale: 0.98 }}
-            transition={modalSpring}
-          >
-            {children}
-          </motion.div>
+          <div className="pointer-events-none fixed inset-0 flex items-end justify-center sm:items-center sm:p-6">
+            <motion.div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby={labelledBy}
+              data-lenis-prevent-touch
+              className={cn(
+                "pointer-events-auto relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[var(--line)] bg-white shadow-[0_24px_80px_rgba(17,17,17,0.18)] sm:rounded-[28px]",
+                className,
+              )}
+              initial={{ opacity: 0, y: 40, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 24, scale: 0.98 }}
+              transition={modalSpring}
+            >
+              {children}
+            </motion.div>
+          </div>
         </div>
       ) : null}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }

@@ -6,6 +6,7 @@ import {
   USE_MOCK_AUTH,
   parseMockSession,
 } from "@/lib/auth/mock";
+import { avatarFromAuthMetadata, resolveProfileAvatar } from "@/lib/auth/avatar";
 import type { AuthUser, PixKeyType } from "@/types/auth";
 
 const PIX_TYPES: PixKeyType[] = ["cpf", "cnpj", "email", "phone", "random"];
@@ -39,6 +40,16 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     .eq("id", user.id)
     .maybeSingle();
 
+  const fromProvider = avatarFromAuthMetadata(user);
+  const avatar_url = resolveProfileAvatar(profile?.avatar_url, fromProvider);
+
+  if (!profile?.avatar_url?.trim() && fromProvider) {
+    await supabase
+      .from("profiles")
+      .update({ avatar_url: fromProvider })
+      .eq("id", user.id);
+  }
+
   return {
     id: user.id,
     email: user.email ?? "",
@@ -46,7 +57,7 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     phone: profile?.phone ?? null,
     role: profile?.role ?? "cliente",
     store_id: profile?.store_id ?? null,
-    avatar_url: profile?.avatar_url ?? user.user_metadata?.avatar_url ?? null,
+    avatar_url,
     pix_key: profile?.pix_key ?? null,
     pix_key_type: asPixKeyType(profile?.pix_key_type),
     referral_bonus_balance_cents:

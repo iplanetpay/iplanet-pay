@@ -19,7 +19,10 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getReservationById } from "@/lib/reservations/queries";
 import { listCatalogProducts } from "@/lib/catalog/products";
 import { listContributionsForReservation } from "@/lib/wallet/queries";
-import { getConfirmedAportesCents } from "@/lib/withdrawals/queries";
+import {
+  getConfirmedAportesCents,
+  getPaidWithdrawalForReservation,
+} from "@/lib/withdrawals/queries";
 import {
   productSubtitle,
   reservationProgress,
@@ -69,6 +72,9 @@ export default async function ReservaDetailPage({
   const title = reservation.product?.name ?? "Reserva";
   const subtitle = productSubtitle(reservation.product, reservation.store);
   const isOwner = user?.id === reservation.user_id;
+  const paidWithdrawal = isOwner
+    ? await getPaidWithdrawalForReservation(id)
+    : null;
   const { offer: usedDeviceOffer } =
     isOwner && user
       ? await getLatestUsedDeviceOfferForReservation(id, user.id)
@@ -201,8 +207,7 @@ export default async function ReservaDetailPage({
               Reserva sacada
             </p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
-              Os aportes foram reembolsados (70% líquido). Esta reserva não
-              aceita novos aportes.
+              Esta reserva não aceita novos aportes.
             </p>
           </div>
         ) : null}
@@ -294,7 +299,16 @@ export default async function ReservaDetailPage({
         contributions={contributions}
         showSaque={canRequestSaque}
         reservationId={reservation.id}
-        totalPaidCents={confirmedAportesCents}
+        paidWithdrawal={
+          paidWithdrawal
+            ? {
+                totalPaidCents: paidWithdrawal.total_paid_cents,
+                feePct: paidWithdrawal.fee_percentage,
+                feeAmountCents: paidWithdrawal.fee_amount_cents,
+                refundAmountCents: paidWithdrawal.refund_amount_cents,
+              }
+            : null
+        }
         emptyLabel="Nenhum aporte nesta reserva ainda."
       />
     </div>

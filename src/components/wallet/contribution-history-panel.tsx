@@ -7,40 +7,49 @@ import { Button } from "@/components/ui/button";
 import { ContributionList } from "@/components/wallet/contribution-list";
 import type { Contribution } from "@/lib/wallet/types";
 import { RequestSaqueButton } from "@/components/withdrawals/request-saque-button";
+import { WithdrawalFeeBreakdown } from "@/components/withdrawals/withdrawal-fee-breakdown";
 import { MotionModal } from "@/components/ui/motion";
 
 export function ContributionHistoryPanel({
   contributions,
   showSaque,
   reservationId,
-  totalPaidCents,
+  paidWithdrawal = null,
   emptyLabel = "Nenhum aporte nesta reserva ainda.",
 }: {
   contributions: Contribution[];
   showSaque: boolean;
   reservationId: string;
-  totalPaidCents: number;
+  paidWithdrawal?: {
+    totalPaidCents: number;
+    feePct: number;
+    feeAmountCents: number;
+    refundAmountCents: number;
+  } | null;
   emptyLabel?: string;
 }) {
   const [fullscreen, setFullscreen] = useState(false);
 
-  const body = (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="min-h-0 flex-1 overflow-y-auto">
-        <ContributionList contributions={contributions} emptyLabel={emptyLabel} />
+  function historyList() {
+    return (
+      <ContributionList contributions={contributions} emptyLabel={emptyLabel} />
+    );
+  }
+
+  function paidBreakdown() {
+    if (!paidWithdrawal) return null;
+    return (
+      <div className="mt-4 border-t border-[var(--line)] pt-4">
+        <WithdrawalFeeBreakdown
+          totalPaidCents={paidWithdrawal.totalPaidCents}
+          feePct={paidWithdrawal.feePct}
+          feeAmountCents={paidWithdrawal.feeAmountCents}
+          refundAmountCents={paidWithdrawal.refundAmountCents}
+          settled
+        />
       </div>
-      {showSaque ? (
-        <div className="mt-4 border-t border-[var(--line)] pt-4">
-          <RequestSaqueButton
-            reservationId={reservationId}
-            totalPaidCents={totalPaidCents}
-            size="sm"
-            showPreview
-          />
-        </div>
-      ) : null}
-    </div>
-  );
+    );
+  }
 
   return (
     <>
@@ -58,7 +67,8 @@ export function ContributionHistoryPanel({
             Tela cheia
           </Button>
         </div>
-        {body}
+        <div className="min-h-0 flex-1 overflow-y-auto">{historyList()}</div>
+        {paidBreakdown()}
       </Card>
 
       <MotionModal
@@ -82,7 +92,13 @@ export function ContributionHistoryPanel({
               Fechar
             </Button>
           </div>
-          {body}
+          <div className="min-h-0 flex-1 overflow-y-auto">{historyList()}</div>
+          {paidBreakdown()}
+          {showSaque ? (
+            <div className="mt-4 border-t border-[var(--line)] pt-4">
+              <RequestSaqueButton reservationId={reservationId} size="sm" />
+            </div>
+          ) : null}
         </div>
       </MotionModal>
     </>
