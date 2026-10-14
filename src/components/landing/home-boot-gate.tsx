@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ExperiencePreloader } from "@/components/ui/experience-preloader";
 import { waitUntilPageReady } from "@/lib/navigation/wait-until-page-ready";
 
-/** Keep the overlay up until the landing media, Duo canvases and 3D stage exist. */
+/** Keep the overlay up until landing media, Fold models and the 3D stage are ready. */
 function landingStillLoading(root: HTMLElement) {
   const video = root.querySelector<HTMLVideoElement>("#hero video");
   if (!video) return true;
@@ -15,7 +15,14 @@ function landingStillLoading(root: HTMLElement) {
     if (!img.getAttribute("src") && !img.currentSrc) continue;
     if (!img.complete) return true;
   }
-  if (root.querySelectorAll("[data-duo-step] canvas").length < 3) return true;
+  const steps = root.querySelectorAll("[data-duo-step]");
+  if (steps.length < 3) return true;
+  if (root.querySelector('[aria-label="Carregando iPhone Duo"]')) return true;
+  if (root.querySelector('[aria-label="Loading iPhone Duo"]')) return true;
+  if (root.querySelector(".iphone-duo-loading-mark")) return true;
+  for (const step of steps) {
+    if (!step.querySelector("canvas")) return true;
+  }
   const stage = root.querySelector("#experiencia-3d");
   if (!stage?.querySelector("canvas")) return true;
   if (stage.textContent?.includes("Carregando modelo")) return true;
