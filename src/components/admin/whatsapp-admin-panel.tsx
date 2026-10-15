@@ -168,8 +168,8 @@ export function WhatsappAdminPanel({
       setMessage(
         `Enfileiradas ${data.enqueued ?? 0} mensagens` +
           (data.api_configured
-            ? " (WAHA)."
-            : " (sem WAHA; só fila)."),
+            ? " (Evolution)."
+            : " (sem Evolution; só fila)."),
       );
     } catch {
       setError("Erro de rede.");
@@ -192,12 +192,12 @@ export function WhatsappAdminPanel({
             </span>
           </p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            Defina WAHA_API_URL, WAHA_API_KEY e WAHA_SESSION.
+            Defina EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE.
             Sem essas variáveis, as mensagens ficam só na fila.
           </p>
         </div>
         <Pill tone={apiConfigured ? "accent" : "neutral"}>
-          {apiConfigured ? "WAHA pronta" : "Só fila"}
+          {apiConfigured ? "Evolution pronta" : "Só fila"}
         </Pill>
       </Card>
 
@@ -319,7 +319,7 @@ export function WhatsappAdminPanel({
       <Card>
         <h2 className="text-xl font-bold tracking-tight">Broadcast</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Disparar grava em whatsapp_dispatch_queue e envia pela WAHA
+          Disparar grava em whatsapp_dispatch_queue e envia pela Evolution
           quando ela está configurada.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
@@ -373,9 +373,9 @@ export function WhatsappAdminPanel({
       <Card>
         <h2 className="text-xl font-bold tracking-tight">Configuração</h2>
         <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--ink-muted)]">
-          <li>WAHA_API_URL — endereço da WAHA, sem barra no final</li>
-          <li>WAHA_API_KEY — header X-Api-Key</li>
-          <li>WAHA_SESSION — sessão. No WAHA Core o nome é default</li>
+          <li>EVOLUTION_API_URL — endereço da Evolution, sem barra no final</li>
+          <li>EVOLUTION_API_KEY — header apikey</li>
+          <li>EVOLUTION_INSTANCE — nome da instância conectada</li>
           <li>whatsapp_support (já em Config) — WhatsApp da loja no FAQ</li>
           <li>
             Cron: GET/POST /api/cron/whatsapp-goals com Bearer CRON_SECRET

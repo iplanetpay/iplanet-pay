@@ -220,12 +220,12 @@ export function SupportAndAgentSettingsForm({
           whatsapp_admin_channel:{" "}
           <strong>
             {whatsappAdminConfigured
-              ? "configurado (número e/ou WAHA)"
+              ? "configurado (número e/ou Evolution)"
               : "não"}
           </strong>
         </p>
         <p className="rounded-2xl bg-[var(--bg-subtle)] px-4 py-3 text-sm text-[var(--ink-muted)]">
-          Conecte WAHA_API_* / AGENT_API_KEY / Resend quando o produto estiver
+          Conecte EVOLUTION_API_* / AGENT_API_KEY / Resend quando o produto estiver
           100%. Telegram foi removido — o agente usa WhatsApp com o admin.
           Rotas respondem 503 com mensagem clara até as chaves existirem.
         </p>

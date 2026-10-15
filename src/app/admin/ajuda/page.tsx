@@ -157,7 +157,7 @@ export default function AdminAjudaPage() {
       <GuideSection id="comunicacao" title="WhatsApp e config">
         <p>
           WhatsApp guarda templates e a fila de disparo. O envio sai pela
-          WAHA quando a sessão está configurada. Em Config ficam o WhatsApp de suporte, o
+          Evolution quando a instância está configurada. Em Config ficam o WhatsApp de suporte, o
           número do admin, o bônus de indicação e o estado dos gateways de
           pagamento e de login.
         </p>

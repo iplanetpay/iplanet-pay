@@ -1,28 +1,27 @@
 /**
- * WhatsApp via WAHA (WEBJS).
- * Sem WAHA_API_URL / WAHA_API_KEY / WAHA_SESSION → só enfileira.
+ * WhatsApp via Evolution API 2.3.7.
+ * Sem EVOLUTION_API_URL / EVOLUTION_API_KEY / EVOLUTION_INSTANCE → só enfileira.
  *
- * POST {base}/api/sendText
- * Header X-Api-Key. Corpo: { session, chatId, text }.
- * WAHA Core só aceita a sessão "default".
+ * POST {base}/message/sendText/{instance}
+ * Header apikey. Corpo: { number, text }.
  */
 
 export function whatsappConfigured(): boolean {
-  return wahaConfig() !== null;
+  return evolutionConfig() !== null;
 }
 
-type WahaConfig = {
+type EvolutionConfig = {
   baseUrl: string;
   apiKey: string;
-  session: string;
+  instance: string;
 };
 
-function wahaConfig(): WahaConfig | null {
-  const baseUrl = process.env.WAHA_API_URL?.trim().replace(/\/+$/, "");
-  const apiKey = process.env.WAHA_API_KEY?.trim();
-  const session = process.env.WAHA_SESSION?.trim();
-  if (!baseUrl || !apiKey || !session) return null;
-  return { baseUrl, apiKey, session };
+function evolutionConfig(): EvolutionConfig | null {
+  const baseUrl = process.env.EVOLUTION_API_URL?.trim().replace(/\/+$/, "");
+  const apiKey = process.env.EVOLUTION_API_KEY?.trim();
+  const instance = process.env.EVOLUTION_INSTANCE?.trim();
+  if (!baseUrl || !apiKey || !instance) return null;
+  return { baseUrl, apiKey, instance };
 }
 
 export type EnqueueWhatsappInput = {
@@ -59,7 +58,7 @@ type QueueRow = {
   media_url?: string | null;
 };
 
-function wahaError(status: number, raw: string): string {
+function evolutionError(status: number, raw: string): string {
   try {
     const data = JSON.parse(raw) as {
       message?: string | string[];
@@ -79,7 +78,7 @@ function wahaError(status: number, raw: string): string {
   } catch {
     // keep raw body
   }
-  return (raw || `WAHA HTTP ${status}`).slice(0, 500);
+  return (raw || `Evolution HTTP ${status}`).slice(0, 500);
 }
 
 function mediaKind(url: string): "image" | "video" | "audio" | "document" {
@@ -90,62 +89,56 @@ function mediaKind(url: string): "image" | "video" | "audio" | "document" {
   return "document";
 }
 
-async function postWaha(
-  cfg: WahaConfig,
+async function postEvolution(
+  cfg: EvolutionConfig,
   path: string,
   body: Record<string, unknown>,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const res = await fetch(`${cfg.baseUrl}${path}`, {
+  const instance = encodeURIComponent(cfg.instance);
+  const res = await fetch(`${cfg.baseUrl}/message/${path}/${instance}`, {
     method: "POST",
     headers: {
-      "X-Api-Key": cfg.apiKey,
+      apikey: cfg.apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
     const errText = await res.text();
-    return { ok: false, error: wahaError(res.status, errText) };
+    return { ok: false, error: evolutionError(res.status, errText) };
   }
   return { ok: true };
 }
 
-function wahaFile(url: string) {
-  const filename = url.split("?")[0]?.split("/").pop() || "arquivo";
-  return { url, filename };
-}
-
-async function sendWahaMessage(
+async function sendEvolutionMessage(
   to: string,
   body: string,
   mediaUrl?: string | null,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
-  const cfg = wahaConfig();
-  if (!cfg) return { ok: false, error: "WAHA não configurada." };
+  const cfg = evolutionConfig();
+  if (!cfg) return { ok: false, error: "Evolution não configurada." };
 
-  const chatId = `${to}@c.us`;
   const media = mediaUrl?.trim();
   if (media) {
     const kind = mediaKind(media);
-    const path =
-      kind === "image"
-        ? "/api/sendImage"
-        : kind === "video"
-          ? "/api/sendVideo"
-          : kind === "audio"
-            ? "/api/sendVoice"
-            : "/api/sendFile";
-    return postWaha(cfg, path, {
-      session: cfg.session,
-      chatId,
+    if (kind === "audio") {
+      return postEvolution(cfg, "sendWhatsAppAudio", {
+        number: to,
+        audio: media,
+      });
+    }
+    const filename = media.split("?")[0]?.split("/").pop() || "arquivo";
+    return postEvolution(cfg, "sendMedia", {
+      number: to,
+      mediatype: kind === "document" ? "document" : kind,
+      media,
       caption: body,
-      file: wahaFile(media),
+      fileName: filename,
     });
   }
 
-  return postWaha(cfg, "/api/sendText", {
-    session: cfg.session,
-    chatId,
+  return postEvolution(cfg, "sendText", {
+    number: to,
     text: body,
   });
 }
@@ -164,14 +157,14 @@ async function deliverQueueRow(row: QueueRow): Promise<boolean> {
   if (!whatsappConfigured()) {
     await markQueue(row.id, {
       status: "skipped",
-      error: "WAHA não configurada",
+      error: "Evolution não configurada",
       sent_at: new Date().toISOString(),
     });
     return false;
   }
 
   try {
-    const sent = await sendWahaMessage(to, row.body, row.media_url);
+    const sent = await sendEvolutionMessage(to, row.body, row.media_url);
     if (!sent.ok) {
       await markQueue(row.id, { status: "failed", error: sent.error });
       return false;
@@ -253,12 +246,12 @@ export async function enqueueWhatsapp(
     }
 
     if (!whatsappConfigured()) {
-      console.info("[whatsapp] sem WAHA; fila apenas", {
+      console.info("[whatsapp] sem Evolution; fila apenas", {
         queue_id: queueId,
       });
       await markQueue(queueId, {
         status: "skipped",
-        error: "WAHA não configurada",
+        error: "Evolution não configurada",
         sent_at: new Date().toISOString(),
       });
       return { ok: true, queue_id: queueId, sent: false, skipped_api: true };

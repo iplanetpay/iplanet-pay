@@ -11,7 +11,7 @@ import { advanceReminderAt, nextReminderAt } from "@/lib/goals/reminder";
 /**
  * Cron: process due goal reminders.
  * Authorization: Bearer $CRON_SECRET
- * Without WAHA keys → due messages are marked skipped.
+ * Without Evolution keys → due messages are marked skipped.
  * Pix stub text when MP missing.
  */
 async function run(request: Request) {
@@ -141,7 +141,7 @@ async function run(request: Request) {
       goals_enqueued: enqueued,
       api_configured: whatsappConfigured(),
       message:
-        "Lembretes processados (WAHA quando WAHA_API_* está definido).",
+        "Lembretes processados (Evolution quando EVOLUTION_API_* está definido).",
     });
   } catch (err) {
     const message =
