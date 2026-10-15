@@ -49,13 +49,31 @@ const STORES = [
     mapLink:
       "https://www.google.com/maps/search/?api=1&query=quiosque+iPlanet+São+Caetano+do+Sul",
   },
+  {
+    name: "Restaura Phone Brasil",
+    city: "Petrolina · PE",
+    address: "Av. Pref. José Francisco de Albuquerque Cavalcante — Santa Luzia, 56300-000",
+    mapSrc:
+      "https://maps.google.com/maps?q=Av.%20Pref.%20Jos%C3%A9%20Francisco%20de%20Albuquerque%20Cavalcante%20Santa%20Luzia%20Petrolina%20PE%2056300-000&t=&z=16&ie=UTF8&iwloc=&output=embed",
+    mapLink:
+      "https://www.google.com/maps/search/?api=1&query=Av.+Pref.+Jos%C3%A9+Francisco+de+Albuquerque+Cavalcante+Santa+Luzia+Petrolina+PE+56300-000",
+  },
+  {
+    name: "Restaura Phone Brasil",
+    city: "São Caetano do Sul · SP",
+    address: "R. Santa Catarina, 40 — Quiosque 1, Centro, 09510-120",
+    mapSrc:
+      "https://maps.google.com/maps?q=R.%20Santa%20Catarina%2040%20Quiosque%201%20Centro%20S%C3%A3o%20Caetano%20do%20Sul%20SP%2009510-120&t=&z=16&ie=UTF8&iwloc=&output=embed",
+    mapLink:
+      "https://www.google.com/maps/search/?api=1&query=R.+Santa+Catarina+40+Quiosque+1+Centro+S%C3%A3o+Caetano+do+Sul+SP+09510-120",
+  },
 ] as const;
 
 const STATS = [
   { value: "10", label: "anos de lojas físicas" },
   { value: "15", label: "anos de experiência" },
   { value: "18x", label: "nos seminovos" },
-  { value: "2", label: "unidades: Itaim e São Caetano" },
+  { value: "4", label: "unidades" },
 ] as const;
 
 const HERO_PRODUCT_SLUG = "iphone-18-pro-256";
@@ -391,13 +409,13 @@ export function LandingCatalog({
             Nossas lojas
           </h3>
           <p className="mt-2 text-[var(--ink-muted)]">
-            Atendimento iPlanet em Itaim Bibi e São Caetano.
+            iPlanet em Itaim Bibi e São Caetano, e Restaura Phone Brasil em Petrolina e São Caetano.
           </p>
 
           <div className="mt-8 grid gap-6 lg:grid-cols-2">
             {STORES.map((s) => (
               <div
-                key={s.name}
+                key={`${s.name}-${s.city}`}
                 className="overflow-hidden rounded-[28px] border border-[var(--line)] bg-[var(--bg-subtle)] shadow-[0_12px_40px_rgba(17,17,17,0.04)]"
               >
                 <div className="relative aspect-[16/10] w-full bg-[var(--line)]">

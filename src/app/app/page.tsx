@@ -31,7 +31,7 @@ export default async function ClienteHomePage() {
   const heroItems: ActiveHeroItem[] = active.map((hero) => ({
     id: hero.id,
     title: hero.product?.name ?? "Reserva",
-    subtitle: productSubtitle(hero.product, hero.store),
+    subtitle: productSubtitle(hero.product),
     priceLabel: `${formatCentsBRL(reservationRemainingCents(hero))} restantes`,
     imageUrl: hero.product?.image_url ?? null,
     progress: reservationProgress(hero),

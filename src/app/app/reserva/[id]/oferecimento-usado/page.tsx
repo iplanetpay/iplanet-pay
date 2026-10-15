@@ -11,8 +11,11 @@ export default async function OferecimentoUsadoPage({
   params,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ reavaliar?: string }>;
 }) {
   const { id } = await params;
+  const query = await searchParams;
+  const reavaliar = query.reavaliar === "1";
   const user = await getCurrentUser();
   if (!user) redirect(`/entrar?next=/app/reserva/${id}/oferecimento-usado`);
 
@@ -34,8 +37,12 @@ export default async function OferecimentoUsadoPage({
         showBack
         backForceHref={`/app/reserva/${id}`}
         eyebrow="Reserva"
-        title="Oferecimento de usado"
-        description="Use seu aparelho atual como parte do pagamento."
+        title={reavaliar ? "Reavaliar aparelho" : "Oferecimento de usado"}
+        description={
+          reavaliar
+            ? "Envie novas fotos e informe um novo valor proposto."
+            : "Use seu aparelho atual como parte do pagamento."
+        }
       />
       <UsedDeviceOfferForm
         reservationId={id}

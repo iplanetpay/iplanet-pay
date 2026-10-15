@@ -29,7 +29,7 @@ export function PickupQueue({
     <div className="grid gap-4 md:grid-cols-2">
       {reservations.map((r) => {
         const title = r.product?.name ?? "Produto";
-        const subtitle = productSubtitle(r.product, r.store);
+        const subtitle = productSubtitle(r.product);
         return (
           <Card key={r.id} className="space-y-3">
             <div className="flex flex-wrap items-center gap-2">

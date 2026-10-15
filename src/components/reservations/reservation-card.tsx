@@ -19,7 +19,7 @@ export function ReservationCard({
   href?: string | null;
 }) {
   const title = reservation.product?.name ?? "Produto";
-  const subtitle = productSubtitle(reservation.product, reservation.store);
+  const subtitle = productSubtitle(reservation.product);
   const progress = reservationProgress(reservation);
   const body = (
     <Card className="space-y-3">

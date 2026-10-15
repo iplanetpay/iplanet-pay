@@ -18,6 +18,16 @@ const STORES = [
     mapLink:
       "https://www.google.com/maps/search/?api=1&query=quiosque+iPlanet+São+Caetano+do+Sul",
   },
+  {
+    name: "Restaura Phone Brasil · Petrolina",
+    mapLink:
+      "https://www.google.com/maps/search/?api=1&query=Av.+Pref.+Jos%C3%A9+Francisco+de+Albuquerque+Cavalcante+Santa+Luzia+Petrolina+PE+56300-000",
+  },
+  {
+    name: "Restaura Phone Brasil · São Caetano",
+    mapLink:
+      "https://www.google.com/maps/search/?api=1&query=R.+Santa+Catarina+40+Quiosque+1+Centro+S%C3%A3o+Caetano+do+Sul+SP+09510-120",
+  },
 ] as const;
 
 function openFaqChat() {

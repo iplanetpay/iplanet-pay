@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { normalizeBrazilPhone } from "../src/lib/phone.ts";
 import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy.ts";
 import { referralActivated } from "../src/lib/referrals/status.ts";
-import { tradeInVisual } from "../src/lib/trade-in/offer-state.ts";
+import { tradeInDaysRemaining, tradeInDecisionValue, tradeInVisual } from "../src/lib/trade-in/offer-state.ts";
+import { productSubtitle } from "../src/lib/reservations/types.ts";
 
 function ticketsFromContributedCents(cents, perTicket = 10_000) {
   return Math.floor(cents / perTicket);
@@ -93,6 +94,52 @@ test("referral stays pending until R$100 and turns active at the threshold", () 
   assert.equal(referralActivated(9999, false), false);
   assert.equal(referralActivated(10000, false), true);
   assert.equal(referralActivated(0, true), true);
+});
+
+test("reservation subtitle leaves the store unit out", () => {
+  const text = productSubtitle({
+    id: "p",
+    name: "iPhone 16",
+    slug: "iphone-16",
+    brand: "Apple",
+    model: "iPhone 16",
+    storage: "128 GB",
+    color: "Azul",
+    list_price_cents: 460000,
+    image_url: null,
+  });
+  assert.equal(text, "128 GB · Azul");
+  assert.equal(text.includes("Itaim"), false);
+});
+
+test("trade-in expiry counts down and reaches zero after 90 days", () => {
+  const reviewed = new Date("2026-01-01T00:00:00.000Z").toISOString();
+  const offer = {
+    id: "o",
+    user_id: "u",
+    reservation_id: "r",
+    device_model: "iPhone",
+    imei: "1",
+    expected_value_cents: 200000,
+    minimum_value_cents: 200000,
+    maintenance_options: [],
+    liquid_exposure: false,
+    photo_paths: [],
+    status: "approved",
+    admin_message: null,
+    approved_value_cents: 200000,
+    reviewed_at: reviewed,
+    created_at: reviewed,
+  };
+  assert.equal(tradeInDaysRemaining(offer, new Date("2026-01-01T00:00:00.000Z").getTime()), 90);
+  assert.equal(tradeInDaysRemaining(offer, new Date("2026-04-02T00:00:00.000Z").getTime()), 0);
+});
+
+test("approve uses the value the client informed and counter uses the admin value", () => {
+  assert.equal(tradeInDecisionValue("approve", 200000, 150000), 200000);
+  assert.equal(tradeInDecisionValue("approve", 200000, null), 200000);
+  assert.equal(tradeInDecisionValue("counter", 200000, 150000), 150000);
+  assert.equal(tradeInDecisionValue("reject", 200000, 150000), null);
 });
 
 test("approved trade-in credit expires after 90 days and stays hidden once discarded", () => {

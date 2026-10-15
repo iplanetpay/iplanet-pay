@@ -143,10 +143,7 @@ export function shortReservationId(id: string) {
   return id.replace(/-/g, "").slice(0, 8);
 }
 
-export function productSubtitle(
-  product: ReservationProduct | null,
-  store: ReservationStore | null,
-) {
-  const bits = [product?.storage, product?.color, store?.name].filter(Boolean);
+export function productSubtitle(product: ReservationProduct | null) {
+  const bits = [product?.storage, product?.color].filter(Boolean);
   return bits.join(" · ");
 }

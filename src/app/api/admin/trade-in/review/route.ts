@@ -33,6 +33,21 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+    if (action === "approve") {
+      const { data: offer, error: offerError } = await admin
+        .from("used_device_offers")
+        .select("expected_value_cents")
+        .eq("id", offerId)
+        .maybeSingle();
+      if (offerError || !offer) {
+        return NextResponse.json(
+          { ok: false, error: offerError?.message ?? "Solicitação não encontrada." },
+          { status: 400 },
+        );
+      }
+      body.approvedValueCents = offer.expected_value_cents;
+    }
+
     if (action === "counter") {
       const { sendCounterOffer } = await import("@/lib/trade-in/workflow");
       const result = await sendCounterOffer({

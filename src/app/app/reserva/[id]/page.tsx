@@ -4,7 +4,6 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
-import { Pill } from "@/components/ui/pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ReservationStatusPill } from "@/components/reservations/status-pill";
 import { CancelReservationButton } from "@/components/reservations/cancel-button";
@@ -70,7 +69,7 @@ export default async function ReservaDetailPage({
   const confirmedAportesCents = await getConfirmedAportesCents(id);
   const pickupRequest = await getLatestPickupRequest(id);
   const title = reservation.product?.name ?? "Reserva";
-  const subtitle = productSubtitle(reservation.product, reservation.store);
+  const subtitle = productSubtitle(reservation.product);
   const isOwner = user?.id === reservation.user_id;
   const paidWithdrawal = isOwner
     ? await getPaidWithdrawalForReservation(id)
@@ -166,9 +165,6 @@ export default async function ReservaDetailPage({
           <div className="min-w-0 flex-1 space-y-2">
             <div className="flex flex-wrap items-center gap-2">
               <ReservationStatusPill status={reservation.status} />
-              {reservation.store ? (
-                <Pill tone="lavender">{reservation.store.name}</Pill>
-              ) : null}
             </div>
             <h2 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
               {title}

@@ -89,11 +89,7 @@ export function ReserveForm({ product }: ReserveFormProps) {
         <input type="hidden" name="store_id" value={storeId} />
       )}
       <Button type="submit" variant="accent" fullWidth disabled={loading || !storeId}>
-        {loading
-          ? "Reservando..."
-          : stores.length === 1
-            ? `Reservar em ${stores[0].store!.name.replace("iPlanet ", "")}`
-            : "Reservar"}
+        {loading ? "Reservando..." : "Reservar"}
       </Button>
       {message ? (
         <p className="text-sm text-[var(--danger)]">{message}</p>

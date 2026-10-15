@@ -12,6 +12,7 @@ import { Pill } from "@/components/ui/pill";
 import { MotionModal } from "@/components/ui/motion";
 import { formatCentsBRL } from "@/lib/utils";
 import { USED_DEVICE_STATUS_LABEL } from "@/lib/trade-in/constants";
+import { tradeInDecisionValue } from "@/lib/trade-in/offer-state";
 import type { UsedDeviceOfferWithProfile } from "@/lib/trade-in/types";
 import { maintenanceLabels } from "@/components/trade-in/used-device-offer-status";
 
@@ -87,7 +88,7 @@ export function AdminUsedDevicePanel() {
     }
     setDecision(null);
     setAdminMessage("");
-    setApprovedBrl((row.expected_value_cents / 100).toFixed(2));
+    setApprovedBrl("");
     setPhotoUrls({});
     if (row.photo_paths.length === 0) return;
     try {
@@ -112,16 +113,23 @@ export function AdminUsedDevicePanel() {
     setLoading(true);
     setError(null);
     try {
-      let approvedValueCents: number | undefined;
-      if (decision === "approve" || decision === "counter") {
-        const n = Number(approvedBrl.replace(",", "."));
+      let proposedCents: number | null = null;
+      if (decision === "counter") {
+        const raw = approvedBrl.trim();
+        const normalized = raw.includes(",") ? raw.replace(/\./g, "").replace(",", ".") : raw;
+        const n = Number(normalized);
         if (!Number.isFinite(n) || n <= 0) {
-          setError("Valor aprovado inválido.");
+          setError("Informe o valor da contra-proposta.");
           setLoading(false);
           return;
         }
-        approvedValueCents = Math.round(n * 100);
+        proposedCents = Math.round(n * 100);
       }
+      const approvedValueCents = tradeInDecisionValue(
+        decision,
+        active.expected_value_cents,
+        proposedCents,
+      );
 
       const res = await fetch("/api/admin/trade-in/review", {
         method: "POST",
@@ -361,16 +369,29 @@ export function AdminUsedDevicePanel() {
                     <Button
                       type="button"
                       variant={decision === "counter" ? "accent" : "outline"}
-                      onClick={() => setDecision("counter")}
+                      onClick={() => {
+                        setDecision("counter");
+                        setApprovedBrl("");
+                      }}
                     >
                       Contra-proposta
                     </Button>
                   </div>
-                  {decision === "approve" || decision === "counter" ? (
+                  {decision === "approve" ? (
+                    <p className="text-sm text-[var(--ink)]">
+                      Valor aprovado:{" "}
+                      <span className="font-semibold">
+                        {formatCentsBRL(active.expected_value_cents)}
+                      </span>
+                      . É o valor informado pelo cliente.
+                    </p>
+                  ) : null}
+                  {decision === "counter" ? (
                     <Input
-                      label={decision === "counter" ? "Valor proposto (R$)" : "Valor aprovado (R$)"}
+                      label="Valor proposto (R$)"
                       value={approvedBrl}
                       onChange={(e) => setApprovedBrl(e.target.value)}
+                      placeholder="0,00"
                     />
                   ) : null}
                   <Textarea
