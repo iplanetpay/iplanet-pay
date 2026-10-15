@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import {
   useCallback,
   useEffect,
@@ -14,18 +13,70 @@ import {
   animate,
   type PanInfo,
 } from "framer-motion";
-import { formatCentsBRL } from "@/lib/utils";
 import type { Product } from "@/types/database";
+import {
+  CatalogProductCard,
+  conditionFromName,
+} from "@/components/catalog/catalog-product-card";
 
 const GAP = 28;
 const AUTOPLAY_MS = 5000;
 
+function groupProducts(products: Product[]) {
+  const groups: Array<{
+    key: string;
+    name: string;
+    storage: string;
+    priceCents: number;
+    images: string[];
+    colors: string[];
+    category: string | null;
+    product: Product;
+  }> = [];
+  const indexByKey = new Map<string, number>();
+  for (const product of products) {
+    const key = (product.model || product.name).trim().toLowerCase();
+    const images = [product.image_url, ...(product.product_images ?? [])].filter(
+      (url): url is string => Boolean(url),
+    );
+    const color = product.color?.trim();
+    const existing = indexByKey.get(key);
+    if (existing == null) {
+      indexByKey.set(key, groups.length);
+      groups.push({
+        key,
+        name: product.model || product.name,
+        storage: product.storage,
+        priceCents: product.list_price_cents,
+        images,
+        colors: color ? [color] : [],
+        category: product.category ?? null,
+        product,
+      });
+      continue;
+    }
+    const group = groups[existing]!;
+    if (product.list_price_cents < group.priceCents) {
+      group.priceCents = product.list_price_cents;
+      group.product = product;
+      group.storage = product.storage;
+    }
+    for (const image of images) {
+      if (!group.images.includes(image)) group.images.push(image);
+    }
+    if (color && !group.colors.includes(color)) group.colors.push(color);
+  }
+  return groups;
+}
+
 export function VelocityCatalogCarousel({
   products,
   onSelect,
+  swatches = {},
 }: {
   products: Product[];
   onSelect: (p: Product) => void;
+  swatches?: Record<string, string[]>;
 }) {
   const viewportRef = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
@@ -72,21 +123,22 @@ export function VelocityCatalogCarousel({
     return () => controls.stop();
   }, [index, offsetFor, viewportW, x]);
 
+  const slideCount = Math.max(groupProducts(products).length, 1);
+
   function goTo(i: number) {
     if (products.length === 0) return;
-    const next =
-      ((i % products.length) + products.length) % products.length;
+    const next = ((i % slideCount) + slideCount) % slideCount;
     setIndex(next);
   }
 
   // Autoplay every 5s; pause while dragging; reset on index change
   useEffect(() => {
-    if (products.length < 2 || paused) return;
+    if (slideCount < 2 || paused) return;
     const id = window.setInterval(() => {
-      setIndex((prev) => (prev + 1) % products.length);
+      setIndex((prev) => (prev + 1) % slideCount);
     }, AUTOPLAY_MS);
     return () => window.clearInterval(id);
-  }, [products.length, paused, index]);
+  }, [slideCount, paused, index]);
 
   function onDragEnd(_: unknown, info: PanInfo) {
     setPaused(false);
@@ -98,7 +150,21 @@ export function VelocityCatalogCarousel({
     goTo(next);
   }
 
-  if (products.length === 0) {
+  const groups = groupProducts(products).map((group) => {
+    const extra = swatches[group.product.id] ?? [];
+    const colors = [...group.colors];
+    for (const color of extra) {
+      if (color && !colors.includes(color)) colors.push(color);
+    }
+    const colorLabel = colors.length === 1 ? "1 cor" : `${colors.length} cores`;
+    return {
+      ...group,
+      colors,
+      meta: [group.storage, colorLabel].filter(Boolean).join(" · "),
+    };
+  });
+
+  if (groups.length === 0) {
     return (
       <p className="px-4 py-12 text-center text-[var(--ink-muted)]">
         Nenhum produto nesta categoria.
@@ -123,7 +189,7 @@ export function VelocityCatalogCarousel({
           style={{ x, gap: GAP }}
           drag="x"
           dragConstraints={{
-            left: offsetFor(products.length - 1) - 40,
+            left: offsetFor(groups.length - 1) - 40,
             right: offsetFor(0) + 40,
           }}
           dragElastic={0.12}
@@ -133,73 +199,47 @@ export function VelocityCatalogCarousel({
           onDragStart={() => setPaused(true)}
           onDragEnd={onDragEnd}
         >
-          {products.map((p, i) => {
+          {groups.map((group, i) => {
             const dist = Math.abs(i - index);
             const scale = dist === 0 ? 1 : dist === 1 ? 0.9 : 0.82;
             const opacity = dist === 0 ? 1 : dist === 1 ? 0.72 : 0.45;
             const z = 20 - dist;
 
             return (
-              <motion.button
-                key={p.id}
-                type="button"
-                onClick={() => {
-                  if (i !== index) {
-                    goTo(i);
-                    return;
-                  }
-                  onSelect(p);
-                }}
+              <motion.div
+                key={group.key}
                 animate={{ scale, opacity }}
                 transition={{ type: "spring", stiffness: 320, damping: 30 }}
                 style={{ width: cardW, zIndex: z }}
-                className="relative shrink-0 overflow-hidden rounded-[32px] border border-white/80 bg-white text-left shadow-[0_20px_60px_rgba(17,17,17,0.12)] outline-none"
+                className="relative shrink-0"
               >
-                <div className="relative flex aspect-[1/1.05] items-center justify-center bg-gradient-to-b from-[#f4f4f6] to-white p-7">
-                  {p.image_url ? (
-                    <Image
-                      src={p.image_url}
-                      alt={p.name}
-                      width={340}
-                      height={340}
-                      className="h-full w-auto max-h-[260px] object-contain mix-blend-multiply"
-                      draggable={false}
-                    />
-                  ) : (
-                    <div className="h-40 w-40 rounded-full bg-[var(--line)]" />
-                  )}
-                  {dist === 0 ? (
-                    <span className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-white px-5 py-2 text-sm font-semibold text-[var(--ink)] shadow-[0_8px_24px_rgba(17,17,17,0.12)]">
-                      Ver detalhes
-                    </span>
-                  ) : null}
-                </div>
-                <div className="space-y-1 px-6 pb-6 pt-1">
-                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
-                    {p.category ?? "Apple"}
-                  </p>
-                  <h3 className="text-xl font-bold tracking-tight text-[var(--ink)] md:text-2xl">
-                    {p.name}
-                  </h3>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    {[p.storage, p.color].filter(Boolean).join(" · ")}
-                  </p>
-                  <p className="pt-1 text-lg font-semibold text-[var(--ink)]">
-                    {formatCentsBRL(p.list_price_cents)}
-                  </p>
-                </div>
-              </motion.button>
+                <CatalogProductCard
+                  name={group.name}
+                  meta={group.meta}
+                  condition={conditionFromName(group.name, group.category)}
+                  priceCents={group.priceCents}
+                  images={group.images}
+                  colors={group.colors}
+                  onDetails={() => {
+                    if (i !== index) {
+                      goTo(i);
+                      return;
+                    }
+                    onSelect(group.product);
+                  }}
+                />
+              </motion.div>
             );
           })}
         </motion.div>
       </div>
 
       <div className="mt-5 flex items-center justify-center gap-2">
-        {products.map((p, i) => (
+        {groups.map((group, i) => (
           <button
-            key={p.id}
+            key={group.key}
             type="button"
-            aria-label={`Ir para ${p.name}`}
+            aria-label={`Ir para ${group.name}`}
             onClick={() => goTo(i)}
             className={`h-1.5 rounded-full transition-all ${
               i === index

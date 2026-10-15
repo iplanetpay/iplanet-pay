@@ -13,8 +13,18 @@ export default async function AdminWhatsappPage() {
       <PageHeader
         eyebrow="Comunicação"
         title="WhatsApp"
-        description="Templates, broadcast e fila de disparo (stub sem chaves Meta)."
+        description="Templates, leads e disparo em massa."
         backFallback="/admin"
+        titleAddon={
+          <svg viewBox="0 0 24 24" className="h-8 w-8" aria-label={whatsappConfigured() ? "API ligada" : "API desligada"}>
+            <path
+              fill="none"
+              stroke={whatsappConfigured() ? "#25D366" : "#e11d48"}
+              strokeWidth="1.7"
+              d="M12.04 4.2A7.3 7.3 0 0 0 5.6 16.2L4.4 19.6l3.5-1.1A7.3 7.3 0 1 0 12.04 4.2Z"
+            />
+          </svg>
+        }
       />
       {error ? (
         <p className="text-sm text-[var(--danger)]">{error}</p>

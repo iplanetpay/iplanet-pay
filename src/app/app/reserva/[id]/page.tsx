@@ -12,10 +12,14 @@ import { SwitchDeviceButton } from "@/components/reservations/switch-device-butt
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
+import { TradeInClientActions } from "@/components/trade-in/trade-in-actions";
+import { isDiscardedOffer, isExpiredOffer, tradeInVisual } from "@/lib/trade-in/offer-state";
+import { syncTradeInExpiry } from "@/lib/trade-in/workflow";
 import { getLatestUsedDeviceOfferForReservation } from "@/lib/trade-in/queries";
 import { ContributionHistoryPanel } from "@/components/wallet/contribution-history-panel";
 import { SolicitarRetiradaWizard } from "@/components/pickup/solicitar-retirada-wizard";
 import { getCurrentUser } from "@/lib/auth/session";
+import { ownerCanCancelReservation } from "@/lib/reservations/cancel-policy";
 import { getReservationById } from "@/lib/reservations/queries";
 import { listCatalogProducts } from "@/lib/catalog/products";
 import { listContributionsForReservation } from "@/lib/wallet/queries";
@@ -25,8 +29,6 @@ import {
 } from "@/lib/withdrawals/queries";
 import {
   productSubtitle,
-  reservationProgress,
-  reservationRemainingCents,
   shortReservationId,
 } from "@/lib/reservations/types";
 import { formatCentsBRL } from "@/lib/utils";
@@ -67,23 +69,54 @@ export default async function ReservaDetailPage({
   const { contributions } = await listContributionsForReservation(id);
   const confirmedAportesCents = await getConfirmedAportesCents(id);
   const pickupRequest = await getLatestPickupRequest(id);
-  const progress = reservationProgress(reservation);
-  const remaining = reservationRemainingCents(reservation);
   const title = reservation.product?.name ?? "Reserva";
   const subtitle = productSubtitle(reservation.product, reservation.store);
   const isOwner = user?.id === reservation.user_id;
   const paidWithdrawal = isOwner
     ? await getPaidWithdrawalForReservation(id)
     : null;
-  const { offer: usedDeviceOffer } =
+  const loadedOffer =
     isOwner && user
-      ? await getLatestUsedDeviceOfferForReservation(id, user.id)
-      : { offer: null };
+      ? (await getLatestUsedDeviceOfferForReservation(id, user.id)).offer
+      : null;
+  let paidCents = reservation.amount_paid_cents;
+  let usedDeviceOffer = loadedOffer;
+  if (usedDeviceOffer && isOwner) {
+    const before = tradeInVisual(usedDeviceOffer);
+    if (before.expired && !isExpiredOffer(usedDeviceOffer) && !isDiscardedOffer(usedDeviceOffer)) {
+      await syncTradeInExpiry({
+        offer: usedDeviceOffer,
+        amountPaidCents: paidCents,
+        listPriceCents: reservation.list_price_cents,
+        reservationStatus: reservation.status,
+      });
+      paidCents = Math.max(0, paidCents - before.creditCents);
+      usedDeviceOffer = {
+        ...usedDeviceOffer,
+        admin_message: `EXPIRADA|${usedDeviceOffer.admin_message ?? ""}`,
+      };
+    }
+  }
+  const tradeVisual = tradeInVisual(usedDeviceOffer);
+  const tradeCents = tradeVisual.discarded ? 0 : tradeVisual.creditCents;
+  const cashCents =
+    tradeVisual.expired || tradeVisual.discarded
+      ? paidCents
+      : Math.max(0, paidCents - tradeCents);
+  const cashProgress = reservation.list_price_cents
+    ? Math.max(0, Math.min(100, Math.round((cashCents / reservation.list_price_cents) * 100)))
+    : 0;
+  const tradeProgress = reservation.list_price_cents
+    ? Math.max(0, Math.min(100, Math.round((tradeCents / reservation.list_price_cents) * 100)))
+    : 0;
   const canOfferUsedDevice =
     isOwner &&
     reservation.status === "ativa" &&
-    (!usedDeviceOffer || usedDeviceOffer.status === "rejected");
-  const canCancel = isOwner && reservation.status === "ativa";
+    (!usedDeviceOffer ||
+      usedDeviceOffer.status === "rejected" ||
+      isDiscardedOffer(usedDeviceOffer) ||
+      isExpiredOffer(usedDeviceOffer));
+  const canCancel = ownerCanCancelReservation(isOwner, reservation.status, cashCents);
   const canRequestSaque =
     isOwner &&
     reservation.status === "ativa" &&
@@ -91,7 +124,12 @@ export default async function ReservaDetailPage({
   const canSwitchDevice =
     reservation.status === "ativa" &&
     (isOwner || user?.role === "staff" || user?.role === "admin");
-  const canAportar = isOwner && reservation.status === "ativa" && remaining > 0;
+  const effectiveRemaining = Math.max(
+    0,
+    reservation.list_price_cents - cashCents - (tradeVisual.expired ? 0 : tradeCents),
+  );
+  const effectiveProgress = cashProgress + (tradeVisual.expired ? 0 : tradeProgress);
+  const canAportar = isOwner && reservation.status === "ativa" && effectiveRemaining > 0;
   const canConfirmRetirada =
     reservation.status === "quitada" &&
     (user?.role === "staff" ||
@@ -213,11 +251,33 @@ export default async function ReservaDetailPage({
         ) : null}
 
 
-        <ProgressBar value={progress} label="Aportes" />
+        <ProgressBar
+          value={cashProgress}
+          extra={tradeProgress}
+          extraTone={tradeVisual.tone}
+          label="Aportes"
+        />
         <div className="grid gap-3 text-sm text-[var(--ink-muted)] sm:grid-cols-2">
           <p>Total: {formatCentsBRL(reservation.list_price_cents)}</p>
-          <p>Pago: {formatCentsBRL(reservation.amount_paid_cents)}</p>
-          <p>Restante: {formatCentsBRL(remaining)}</p>
+          <p>
+            Pago: {formatCentsBRL(cashCents)}
+            {tradeCents > 0 ? (
+              <span className={tradeVisual.tone === "red" ? "font-semibold text-[#e11d48]" : "font-semibold text-[#e0a100]"}>
+                {" "}+ {formatCentsBRL(tradeCents)}
+              </span>
+            ) : null}
+          </p>
+          <p>
+            Restante:{" "}
+            {formatCentsBRL(
+              Math.max(
+                0,
+                reservation.list_price_cents -
+                  cashCents -
+                  (tradeVisual.expired ? 0 : tradeCents),
+              ),
+            )}
+          </p>
           <p>
             Criada em{" "}
             {new Date(reservation.created_at).toLocaleDateString("pt-BR")}
@@ -227,7 +287,7 @@ export default async function ReservaDetailPage({
         {canAportar ? (
           <GerarPixForm
             reservationId={reservation.id}
-            remainingCents={remaining}
+            remainingCents={effectiveRemaining}
           />
         ) : (
           <p className="text-sm text-[var(--ink-muted)]">
@@ -248,11 +308,16 @@ export default async function ReservaDetailPage({
         )}
 
         {isOwner && (canOfferUsedDevice || usedDeviceOffer) ? (
-          <UsedDeviceOfferStatus
-            reservationId={reservation.id}
-            offer={usedDeviceOffer}
-            canSubmitNew={canOfferUsedDevice}
-          />
+          <div className="space-y-3">
+            <UsedDeviceOfferStatus
+              reservationId={reservation.id}
+              offer={usedDeviceOffer}
+              canSubmitNew={canOfferUsedDevice}
+            />
+            {usedDeviceOffer ? (
+              <TradeInClientActions offer={usedDeviceOffer} amountPaidCents={paidCents} />
+            ) : null}
+          </div>
         ) : null}
 
         {canSwitchDevice ? (
@@ -266,14 +331,14 @@ export default async function ReservaDetailPage({
         ) : null}
 
 
-        {(progress >= 70 || reservation.status === "quitada") &&
+        {(effectiveProgress >= 70 || reservation.status === "quitada") &&
         isOwner &&
         !pickupRequest &&
         reservation.status !== "retirada" &&
         reservation.status !== "sacada" ? (
           <SolicitarRetiradaWizard
             reservationId={reservation.id}
-            progressPct={progress}
+            progressPct={Math.min(100, effectiveProgress)}
             storeName={storeName}
           />
         ) : null}
@@ -281,8 +346,8 @@ export default async function ReservaDetailPage({
         {canCancel ? (
           <CancelReservationButton
             reservationId={reservation.id}
-            amountPaidCents={reservation.amount_paid_cents}
-            canCancel={reservation.amount_paid_cents === 0}
+            amountPaidCents={cashCents}
+            canCancel
           />
         ) : null}
 

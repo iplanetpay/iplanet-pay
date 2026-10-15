@@ -2,7 +2,7 @@ import Link from "next/link";
 import { SignupForm } from "@/components/auth/signup-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { HomeLogo } from "@/components/ui/home-logo";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 
 export const metadata = { title: "Criar conta" };
@@ -20,7 +20,7 @@ export default async function CriarContaPage({
     <div className="min-h-screen bg-[var(--bg-subtle)] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-md">
         <div className="mb-8 flex justify-center">
-          <BrandLogo variant="wordmark" height={52} priority />
+          <HomeLogo href="/" height={52} />
         </div>
         <PageHeader
           eyebrow="Comece agora"

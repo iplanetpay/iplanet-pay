@@ -7,7 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthDivider, GoogleAuthButton } from "@/components/auth/google-auth-button";
 import { MotionModal } from "@/components/ui/motion";
+import { SignupSuccessOverlay } from "@/components/auth/signup-success";
 import { trackEvent } from "@/lib/analytics/track";
+import { normalizeBrazilPhone } from "@/lib/phone";
 import { TERMS_OF_USE_PT, TERMS_VERSION } from "@/lib/withdrawals/types";
 
 export function SignupForm({
@@ -31,6 +33,7 @@ export function SignupForm({
   const [termsOpen, setTermsOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
 
   const oauthNext = productSlug
     ? `/app/catalogo?product=${encodeURIComponent(productSlug)}`
@@ -51,7 +54,7 @@ export function SignupForm({
         body: JSON.stringify({
           full_name: fullName,
           email,
-          phone,
+          phone: normalizeBrazilPhone(phone) ?? phone,
           password,
           referral_code: referralCode || undefined,
           product: productSlug,
@@ -68,8 +71,11 @@ export function SignupForm({
       const dest = productSlug
         ? `/app/catalogo?product=${encodeURIComponent(productSlug)}`
         : (data.redirectTo ?? "/app");
-      router.push(dest);
-      router.refresh();
+      setSuccess(true);
+      window.setTimeout(() => {
+        router.push(dest);
+        router.refresh();
+      }, 2100);
     } catch {
       setMessage("Erro de rede. Tente novamente.");
     } finally {
@@ -83,6 +89,7 @@ export function SignupForm({
 
   return (
     <div className="space-y-6">
+      <SignupSuccessOverlay open={success} />
       {productSlug ? (
         <p className="rounded-2xl bg-[var(--accent-soft)] px-4 py-3 text-sm text-[var(--ink-muted)]">
           Depois de criar a conta você reserva{" "}

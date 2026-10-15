@@ -68,11 +68,16 @@ export async function GET(request: Request) {
         }
       }
 
+      const createdAt = user?.created_at ? new Date(user.created_at).getTime() : 0;
+      const justCreated = createdAt > 0 && Date.now() - createdAt < 2 * 60 * 1000;
       let dest = homeForRole(role);
       if (nextParam && roleAllowedForPath(role, nextParam)) {
         dest = nextParam;
       } else if (nextParam?.startsWith("/admin") && role !== "admin") {
         dest = `/entrar?error=${encodeURIComponent("Esta conta Google não tem permissão de admin.")}&next=/admin`;
+      }
+      if (justCreated && !dest.includes("cadastro=")) {
+        dest += dest.includes("?") ? "&cadastro=ok" : "?cadastro=ok";
       }
 
       const forwardedHost = request.headers.get("x-forwarded-host");

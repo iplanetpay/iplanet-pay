@@ -155,30 +155,25 @@ export function ClientesPanel({
           description="Ajuste a busca ou aguarde novos cadastros."
         />
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_minmax(280px,380px)]">
-          <div className="space-y-3">
+        <div className="grid items-start gap-4 lg:grid-cols-[280px_minmax(0,1fr)]">
+          <div className="space-y-2">
             {filtered.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => void openDetail(c)}
-                className={`w-full rounded-[var(--radius-card)] border bg-white p-4 text-left transition ${
+                className={`w-full rounded-2xl border bg-white px-3 py-2.5 text-left transition ${
                   selectedId === c.id
                     ? "border-[var(--accent)] ring-4 ring-[var(--accent)]/10"
                     : "border-[var(--line)] hover:border-[var(--ink)]/30"
                 }`}
               >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-bold">{c.full_name}</p>
-                  <Pill tone={ROLE_TONE[c.role]}>{c.role}</Pill>
-                </div>
-                <p className="mt-1 text-sm text-[var(--ink-muted)]">
+                <p className="truncate text-sm font-bold">{c.full_name}</p>
+                <p className="truncate text-xs text-[var(--ink-muted)]">
                   {c.phone ?? "Sem telefone"}
-                  {c.store_name ? ` · ${c.store_name}` : ""}
                 </p>
-                <p className="mt-2 text-sm">
-                  {c.reservation_count} reservas ·{" "}
-                  {formatCentsBRL(c.total_paid_cents)} pagos
+                <p className="mt-1 text-xs">
+                  {c.reservation_count} reservas · {formatCentsBRL(c.total_paid_cents)}
                 </p>
               </button>
             ))}
@@ -191,14 +186,32 @@ export function ClientesPanel({
               </p>
             ) : (
               <div className="space-y-4">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--accent)]">
-                    Detalhe
-                  </p>
-                  <h3 className="mt-1 text-xl font-bold">{selected.full_name}</h3>
-                  <p className="text-sm text-[var(--ink-muted)]">
-                    {selected.phone ?? "Sem telefone"}
-                  </p>
+                <div className="flex items-center gap-3">
+                  <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[var(--accent-soft)] text-lg font-bold text-[var(--accent)]">
+                    {selected.full_name.slice(0, 1).toUpperCase()}
+                  </span>
+                  <div>
+                    <h3 className="text-xl font-bold">{selected.full_name}</h3>
+                    <p className="text-sm text-[var(--ink-muted)]">
+                      {selected.phone ?? "Sem telefone"}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <p><span className="block text-xs text-[var(--ink-muted)]">Telefone</span>{selected.phone ?? "—"}</p>
+                  <p><span className="block text-xs text-[var(--ink-muted)]">Loja</span>{selected.store_name ?? "—"}</p>
+                  <p><span className="block text-xs text-[var(--ink-muted)]">Cadastro</span>{new Date(selected.created_at).toLocaleDateString("pt-BR")}</p>
+                  <p><span className="block text-xs text-[var(--ink-muted)]">Papel</span>{selected.role}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="rounded-2xl bg-[var(--bg-subtle)] p-3 text-center">
+                    <p className="text-xl font-bold">{selected.reservation_count}</p>
+                    <p className="text-[10px] font-semibold uppercase text-[var(--ink-muted)]">Reservas</p>
+                  </div>
+                  <div className="rounded-2xl bg-emerald-50 p-3 text-center">
+                    <p className="text-sm font-bold text-emerald-700">{formatCentsBRL(selected.total_paid_cents)}</p>
+                    <p className="text-[10px] font-semibold uppercase text-emerald-700">Confirmado</p>
+                  </div>
                 </div>
 
                 {canEditRole ? (

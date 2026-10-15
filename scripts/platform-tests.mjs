@@ -1,5 +1,9 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { normalizeBrazilPhone } from "../src/lib/phone.ts";
+import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy.ts";
+import { referralActivated } from "../src/lib/referrals/status.ts";
+import { tradeInVisual } from "../src/lib/trade-in/offer-state.ts";
 
 function ticketsFromContributedCents(cents, perTicket = 10_000) {
   return Math.floor(cents / perTicket);
@@ -69,6 +73,60 @@ test("withdrawal 70/30 split", () => {
   const { fee_amount_cents, refund_amount_cents } = calcWithdrawalAmounts(100000, 30);
   assert.equal(fee_amount_cents, 30000);
   assert.equal(refund_amount_cents, 70000);
+});
+
+test("cancel stays allowed when the reservation already has aportes", () => {
+  assert.equal(ownerCanCancelReservation(true, "ativa", 460_000), true);
+  assert.equal(ownerCanCancelReservation(true, "ativa", 0), true);
+  assert.equal(ownerCanCancelReservation(false, "ativa", 0), false);
+  assert.equal(ownerCanCancelReservation(true, "cancelada", 100), false);
+});
+
+test("local WhatsApp numbers gain the 55 prefix", () => {
+  assert.equal(normalizeBrazilPhone("11 97063-8924"), "5511970638924");
+  assert.equal(normalizeBrazilPhone("5511970638924"), "5511970638924");
+  assert.equal(normalizeBrazilPhone(""), null);
+});
+
+test("referral stays pending until R$100 and turns active at the threshold", () => {
+  assert.equal(referralActivated(0, false), false);
+  assert.equal(referralActivated(9999, false), false);
+  assert.equal(referralActivated(10000, false), true);
+  assert.equal(referralActivated(0, true), true);
+});
+
+test("approved trade-in credit expires after 90 days and stays hidden once discarded", () => {
+  const reviewed = new Date("2026-01-01T00:00:00.000Z").toISOString();
+  const base = {
+    id: "o",
+    user_id: "u",
+    reservation_id: "r",
+    device_model: "iPhone",
+    imei: "1",
+    expected_value_cents: 200000,
+    minimum_value_cents: 200000,
+    maintenance_options: [],
+    liquid_exposure: false,
+    photo_paths: [],
+    status: "approved",
+    admin_message: null,
+    approved_value_cents: 200000,
+    reviewed_at: reviewed,
+    created_at: reviewed,
+  };
+  const active = tradeInVisual(base, new Date("2026-02-01T00:00:00.000Z").getTime());
+  assert.equal(active.expired, false);
+  assert.equal(active.tone, "yellow");
+  assert.equal(active.creditCents, 200000);
+  const expired = tradeInVisual(base, new Date("2026-04-02T00:00:00.000Z").getTime());
+  assert.equal(expired.expired, true);
+  assert.equal(expired.tone, "red");
+  const discarded = tradeInVisual(
+    { ...base, admin_message: "DESCARTADA|expirada" },
+    new Date("2026-04-02T00:00:00.000Z").getTime(),
+  );
+  assert.equal(discarded.discarded, true);
+  assert.equal(discarded.creditCents, 0);
 });
 
 console.log(`\n${passed} test(s) passed.`);

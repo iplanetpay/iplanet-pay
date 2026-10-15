@@ -253,15 +253,18 @@ export function Sidebar({
       >
         {collapsed ? (
           <div className="mb-4 flex w-full flex-col items-center gap-3">
-            <div className="flex w-full max-w-[3.25rem] justify-center px-0.5">
+            <Link href="/admin" aria-label="Início do admin" className="flex w-full max-w-[3.25rem] justify-center px-0.5">
               <BrandLogo variant="wordmark" height={22} priority className="w-full" />
-            </div>
+            </Link>
             {collapseBtn}
           </div>
         ) : (
           <div className="mb-6 min-w-0">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
+                <Link href="/admin" aria-label="Início do admin" className="mb-3 inline-flex">
+                  <BrandLogo variant="wordmark" height={28} priority />
+                </Link>
                 <h2 className="text-3xl font-bold tracking-tight text-[var(--ink)]">
                   {title}
                 </h2>

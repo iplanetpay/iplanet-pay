@@ -6,6 +6,7 @@ import {
   serializeMockSession,
 } from "@/lib/auth/mock";
 import { homeForRole } from "@/lib/auth/roles";
+import { normalizeBrazilPhone } from "@/lib/phone";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -17,6 +18,8 @@ export async function POST(request: Request) {
     terms_accepted?: boolean;
     terms_version?: string;
   };
+
+  const phone = normalizeBrazilPhone(body.phone);
 
   if (!body.terms_accepted) {
     return NextResponse.json(
@@ -30,7 +33,7 @@ export async function POST(request: Request) {
       ...MOCK_USERS.cliente,
       email: body.email || MOCK_USERS.cliente.email,
       full_name: body.full_name || MOCK_USERS.cliente.full_name,
-      phone: body.phone || MOCK_USERS.cliente.phone,
+      phone: phone || MOCK_USERS.cliente.phone,
     };
     const response = NextResponse.json({
       ok: true,
@@ -55,7 +58,7 @@ export async function POST(request: Request) {
     options: {
       data: {
         full_name: body.full_name,
-        phone: body.phone,
+        phone,
       },
     },
   });
@@ -85,9 +88,33 @@ export async function POST(request: Request) {
   }
 
   const ref = (body.referral_code ?? "").trim();
-  if (ref && data.session) {
+  if (ref) {
     try {
-      await supabase.rpc("apply_referral_code", { p_code: ref });
+      const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+      const admin = tryCreateServiceClient();
+      if (admin) {
+        const code = ref.toUpperCase();
+        const { data: referrer } = await admin
+          .from("profiles")
+          .select("id")
+          .eq("referral_code", code)
+          .maybeSingle();
+        if (referrer?.id && referrer.id !== data.user.id) {
+          await admin
+            .from("profiles")
+            .update({ referred_by: referrer.id })
+            .eq("id", data.user.id)
+            .is("referred_by", null);
+          await admin.from("referrals").insert({
+            referrer_id: referrer.id,
+            referred_id: data.user.id,
+            status: "pending",
+            bonus_amount_cents: 5000,
+          });
+        }
+      } else if (data.session) {
+        await supabase.rpc("apply_referral_code", { p_code: ref });
+      }
     } catch {
       // non-fatal: user can apply later in /app/indicacoes
     }

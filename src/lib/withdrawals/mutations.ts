@@ -115,6 +115,30 @@ export async function processWithdrawalAdmin(input: {
       payout_status?: string;
     };
 
+    if (input.action === "reject") {
+      try {
+        const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+        const { creditWallet } = await import("@/lib/wallet/balance");
+        const admin = tryCreateServiceClient();
+        if (admin) {
+          const { data: hold } = await admin
+            .from("wallet_ledger")
+            .select("user_id, amount_cents")
+            .eq("memo", `carteira:saque-hold ${input.requestId}`)
+            .maybeSingle();
+          if (hold?.user_id && (hold.amount_cents ?? 0) < 0) {
+            await creditWallet({
+              userId: hold.user_id,
+              amountCents: -hold.amount_cents,
+              memo: `saque-estorno ${input.requestId}`,
+            });
+          }
+        }
+      } catch {
+        /* o saque foi rejeitado mesmo se o estorno da carteira falhar */
+      }
+    }
+
     if (input.action === "approve") {
       try {
         const { notifyWithdrawalApproved } = await import(

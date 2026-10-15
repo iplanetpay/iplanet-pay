@@ -34,7 +34,7 @@ export function AppShell({
     return (
       <div className="min-h-screen overflow-x-hidden bg-[var(--bg)]">
         <RoutePrefetcher routes={CLIENTE_PREFETCH_ROUTES} />
-        <div className="mx-auto max-w-5xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-8 md:pb-10">
+        <div className="mx-auto max-w-5xl px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-6 md:px-8 md:pb-28">
           {topBar}
           {children}
         </div>

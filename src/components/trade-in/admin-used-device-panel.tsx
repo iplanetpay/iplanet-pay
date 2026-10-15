@@ -31,7 +31,8 @@ export function AdminUsedDevicePanel() {
   const [error, setError] = useState<string | null>(null);
   const [active, setActive] = useState<UsedDeviceOfferWithProfile | null>(null);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
-  const [decision, setDecision] = useState<"approve" | "reject" | null>(null);
+  const [decision, setDecision] = useState<"approve" | "reject" | "counter" | null>(null);
+  const [siblings, setSiblings] = useState<UsedDeviceOfferWithProfile[]>([]);
   const [adminMessage, setAdminMessage] = useState("");
   const [approvedBrl, setApprovedBrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -66,6 +67,24 @@ export function AdminUsedDevicePanel() {
 
   async function openDetail(row: UsedDeviceOfferWithProfile) {
     setActive(row);
+    setSiblings(
+      rows.filter(
+        (item) => item.reservation_id === row.reservation_id && item.id !== row.id,
+      ),
+    );
+    try {
+      const res = await fetch("/api/admin/trade-in?status=all");
+      const data = (await res.json()) as { ok?: boolean; rows?: UsedDeviceOfferWithProfile[] };
+      if (data.ok && data.rows) {
+        setSiblings(
+          data.rows.filter(
+            (item) => item.reservation_id === row.reservation_id && item.id !== row.id,
+          ),
+        );
+      }
+    } catch {
+      /* a lista já carregada cobre o ciclo visível */
+    }
     setDecision(null);
     setAdminMessage("");
     setApprovedBrl((row.expected_value_cents / 100).toFixed(2));
@@ -86,15 +105,15 @@ export function AdminUsedDevicePanel() {
 
   async function submitReview() {
     if (!active || !decision) return;
-    if (decision === "reject" && !adminMessage.trim()) {
-      setError("Informe o motivo da recusa.");
+    if ((decision === "reject" || decision === "counter") && !adminMessage.trim()) {
+      setError(decision === "counter" ? "A mensagem da contra-proposta é obrigatória." : "Informe o motivo da recusa.");
       return;
     }
     setLoading(true);
     setError(null);
     try {
       let approvedValueCents: number | undefined;
-      if (decision === "approve") {
+      if (decision === "approve" || decision === "counter") {
         const n = Number(approvedBrl.replace(",", "."));
         if (!Number.isFinite(n) || n <= 0) {
           setError("Valor aprovado inválido.");
@@ -302,7 +321,26 @@ export function AdminUsedDevicePanel() {
                 </div>
               </div>
 
-              {active.status === "pending" ? (
+              {siblings.length > 0 ? (
+                <Card className="space-y-2 text-sm">
+                  <p className="font-semibold text-[var(--ink)]">
+                    Reavaliação · outras avaliações deste aparelho
+                  </p>
+                  {siblings.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="block w-full rounded-xl border border-[var(--line)] px-3 py-2 text-left"
+                      onClick={() => void openDetail(item)}
+                    >
+                      {new Date(item.created_at).toLocaleDateString("pt-BR")} · {item.status} ·{" "}
+                      {formatCentsBRL(item.expected_value_cents)} · {item.photo_paths.length} fotos
+                    </button>
+                  ))}
+                </Card>
+              ) : null}
+
+              {active.status === "pending" && !(active.reviewed_at && active.approved_value_cents) ? (
                 <Card className="space-y-3">
                   <p className="text-sm font-semibold text-[var(--ink)]">Decisão</p>
                   <div className="flex flex-wrap gap-2">
@@ -320,16 +358,27 @@ export function AdminUsedDevicePanel() {
                     >
                       Recusar
                     </Button>
+                    <Button
+                      type="button"
+                      variant={decision === "counter" ? "accent" : "outline"}
+                      onClick={() => setDecision("counter")}
+                    >
+                      Contra-proposta
+                    </Button>
                   </div>
-                  {decision === "approve" ? (
+                  {decision === "approve" || decision === "counter" ? (
                     <Input
-                      label="Valor aprovado (R$)"
+                      label={decision === "counter" ? "Valor proposto (R$)" : "Valor aprovado (R$)"}
                       value={approvedBrl}
                       onChange={(e) => setApprovedBrl(e.target.value)}
                     />
                   ) : null}
                   <Textarea
-                    label={decision === "reject" ? "Motivo (obrigatório)" : "Mensagem (opcional)"}
+                    label={
+                      decision === "reject" || decision === "counter"
+                        ? "Mensagem (obrigatória)"
+                        : "Mensagem (opcional)"
+                    }
                     value={adminMessage}
                     onChange={(e) => setAdminMessage(e.target.value)}
                     rows={4}
@@ -355,7 +404,9 @@ export function AdminUsedDevicePanel() {
                   <p className="font-semibold text-[var(--ink)]">
                     {active.status === "rejected"
                       ? "Avaliação recusada"
-                      : "Avaliação aprovada"}
+                      : active.status === "pending"
+                        ? "Contra-proposta enviada"
+                        : "Avaliação aprovada"}
                   </p>
                   {active.approved_value_cents ? (
                     <p className="mt-1 text-sm text-[var(--ink-muted)]">

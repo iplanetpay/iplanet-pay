@@ -77,6 +77,13 @@ export function ProdutosAdminPanel({
   const [filter, setFilter] = useState("");
   const [catName, setCatName] = useState("");
   const [catLoading, setCatLoading] = useState(false);
+  const [draftVariants, setDraftVariants] = useState<
+    Array<{ model: string; color: string; storage: string; price_cents: number }>
+  >([]);
+  const [draftModel, setDraftModel] = useState("");
+  const [draftColor, setDraftColor] = useState("");
+  const [draftStorage, setDraftStorage] = useState("");
+  const [draftPrice, setDraftPrice] = useState("");
 
   const filtered = useMemo(() => {
     const q = filter.trim().toLowerCase();
@@ -151,12 +158,26 @@ export function ProdutosAdminPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        product?: { id: string };
+      };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Falha ao salvar produto.");
         return;
       }
+      if (!form.id && data.product?.id) {
+        for (const variant of draftVariants) {
+          await fetch(`/api/admin/products/${data.product.id}/variants`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(variant),
+          });
+        }
+      }
       setMessage(form.id ? "Produto atualizado." : "Produto criado.");
+      setDraftVariants([]);
       resetForm();
       router.refresh();
     } catch {
@@ -446,7 +467,54 @@ export function ProdutosAdminPanel({
               ) : null}
             </div>
           </form>
-          {form.id ? <ProductVariantsPanel productId={form.id} /> : null}
+          {form.id ? <ProductVariantsPanel productId={form.id} /> : (
+            <div className="mt-6 space-y-3 rounded-2xl border border-dashed border-[var(--line)] p-4">
+              <h3 className="text-lg font-bold">Variantes (SKU)</h3>
+              <p className="text-sm text-[var(--ink-muted)]">
+                Inclua modelo, cor e armazenamento antes de criar o produto.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-2">
+                <Input label="Modelo" value={draftModel} onChange={(e) => setDraftModel(e.target.value)} />
+                <Input label="Cor" value={draftColor} onChange={(e) => setDraftColor(e.target.value)} />
+                <Input label="Armazenamento" value={draftStorage} onChange={(e) => setDraftStorage(e.target.value)} />
+                <Input label="Preço (R$)" value={draftPrice} onChange={(e) => setDraftPrice(e.target.value)} />
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const price_cents = reaisToCents(draftPrice);
+                  if (!price_cents) {
+                    setError("Informe um preço válido para a variante.");
+                    return;
+                  }
+                  setDraftVariants((current) => [
+                    ...current,
+                    {
+                      model: draftModel,
+                      color: draftColor,
+                      storage: draftStorage,
+                      price_cents,
+                    },
+                  ]);
+                  setDraftModel("");
+                  setDraftColor("");
+                  setDraftStorage("");
+                  setDraftPrice("");
+                }}
+              >
+                Adicionar variante
+              </Button>
+              <ul className="space-y-1 text-sm">
+                {draftVariants.map((variant, index) => (
+                  <li key={`${variant.color}-${variant.storage}-${index}`}>
+                    {[variant.model, variant.color, variant.storage].filter(Boolean).join(" · ")}{" "}
+                    · {formatCentsBRL(variant.price_cents)}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Card>
 
         <Card>

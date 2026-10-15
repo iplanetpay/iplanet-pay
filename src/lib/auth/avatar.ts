@@ -6,7 +6,7 @@ type AuthIdentity = {
 function httpsUrl(value: unknown): string | null {
   if (typeof value !== "string") return null;
   const trimmed = value.trim();
-  if (!trimmed.startsWith("https://")) return null;
+  if (!trimmed.startsWith("https://") && !trimmed.startsWith("http://")) return null;
   return trimmed;
 }
 

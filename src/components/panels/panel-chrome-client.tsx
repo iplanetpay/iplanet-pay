@@ -4,7 +4,8 @@ import { useState } from "react";
 import { AppShell } from "@/components/ui/app-shell";
 import { LogoutButton } from "@/components/auth/logout-button";
 import { Pill } from "@/components/ui/pill";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { AdminValuesMask } from "@/components/admin/admin-values-mask";
+import { HomeLogo } from "@/components/ui/home-logo";
 import { SidebarMenuButton } from "@/components/ui/sidebar";
 import type { SidebarItem } from "@/components/ui/sidebar";
 
@@ -64,11 +65,7 @@ export function PanelChromeClient({
               open={menuOpen}
               onClick={() => setMenuOpen((v) => !v)}
             />
-            <BrandLogo
-              variant="wordmark"
-              height={28}
-              className="shrink-0 lg:hidden"
-            />
+            <HomeLogo href="/admin" height={28} className="shrink-0 lg:hidden" />
             <div className="min-w-0 lg:hidden">
               <p className="truncate text-base font-bold sm:text-lg">{title}</p>
             </div>
@@ -79,7 +76,7 @@ export function PanelChromeClient({
         </div>
       }
     >
-      {children}
+      <AdminValuesMask>{children}</AdminValuesMask>
     </AppShell>
   );
 }

@@ -19,18 +19,15 @@ export function CancelReservationButton({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  const zerada = canCancel ?? amountPaidCents === 0;
+  const allowed = canCancel ?? true;
 
   async function submit() {
-    if (!zerada) {
-      setMessage(
-        "Não é possível cancelar: a reserva já possui aportes. Só reservas zeradas (sem pagamento) podem ser canceladas.",
-      );
-      return;
-    }
+    if (!allowed) return;
 
     const ok = window.confirm(
-      "Cancelar esta reserva zerada? Esta ação não pode ser desfeita.",
+      amountPaidCents > 0
+        ? "Cancelar esta reserva? Os aportes confirmados vão para a carteira e podem ser usados em outro aparelho ou sacados."
+        : "Cancelar esta reserva? Esta ação não pode ser desfeita.",
     );
     if (!ok) return;
 
@@ -60,19 +57,15 @@ export function CancelReservationButton({
       <Button
         type="button"
         variant="outline"
-        disabled={loading || !zerada}
-        title={
-          zerada
-            ? "Cancelar reserva zerada"
-            : `Reserva com ${formatCentsBRL(amountPaidCents)} pagos — cancele só se zerada`
-        }
+        disabled={loading || !allowed}
+        title="Cancelar reserva"
         onClick={() => void submit()}
       >
         {loading ? "Cancelando..." : "Cancelar reserva"}
       </Button>
-      {!zerada ? (
-        <p className="max-w-[220px] text-xs text-[var(--ink-muted)]">
-          Só reservas zeradas (sem aportes) podem ser canceladas.
+      {amountPaidCents > 0 ? (
+        <p className="max-w-[240px] text-xs text-[var(--ink-muted)]">
+          {formatCentsBRL(amountPaidCents)} voltam para a carteira.
         </p>
       ) : null}
       {message ? (

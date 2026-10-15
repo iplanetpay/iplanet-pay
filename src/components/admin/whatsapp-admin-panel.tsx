@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import type { WhatsappTemplate } from "@/types/database";
 
@@ -14,9 +15,19 @@ function previewBody(body: string) {
     .replace(/\{\{nome\}\}/g, "Maria")
     .replace(/\{\{produto\}\}/g, "iPhone 16")
     .replace(/\{\{valor\}\}/g, "R$ 250,00")
-    .replace(/\{\{pix\}\}/g, "QR estará disponível quando Pix estiver configurado")
+    .replace(/\{\{pix\}\}/g, "Pix disponível no app")
     .replace(/\{\{meta\}\}/g, "Meu iPhone");
 }
+
+export function templateLabel(name: string) {
+  return name
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
+
+type DispatchResult = { phone: string; name: string; ok: boolean; error?: string };
 
 export function WhatsappAdminPanel({
   templates: initial,
@@ -32,34 +43,45 @@ export function WhatsappAdminPanel({
     () => templates.find((t) => t.id === selectedId) ?? null,
     [templates, selectedId],
   );
+  const [name, setName] = useState(selected ? templateLabel(selected.name) : "");
   const [body, setBody] = useState(selected?.body ?? "");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [audience, setAudience] = useState<
-    "clients_phone" | "active_goals" | "paste"
-  >("clients_phone");
+  const [audience, setAudience] = useState<"clients_phone" | "active_goals" | "paste">("clients_phone");
   const [paste, setPaste] = useState("");
   const [broadcastTpl, setBroadcastTpl] = useState(initial[0]?.id ?? "");
   const [newTplName, setNewTplName] = useState("");
   const [newTplBody, setNewTplBody] = useState("");
-  const [leads, setLeads] = useState<
-    Array<{
-      user_id: string;
-      full_name: string;
-      phone: string;
-      active: boolean;
-    }>
-  >([]);
-  const [leadsLoaded, setLeadsLoaded] = useState(false);
+  const [leads, setLeads] = useState<Array<{ user_id: string; full_name: string; phone: string; active: boolean }>>([]);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [logOpen, setLogOpen] = useState(false);
+  const [results, setResults] = useState<DispatchResult[]>([]);
 
   function pick(id: string) {
     setSelectedId(id);
-    const t = templates.find((x) => x.id === id);
-    setBody(t?.body ?? "");
+    const template = templates.find((item) => item.id === id);
+    setName(template ? templateLabel(template.name) : "");
+    setBody(template?.body ?? "");
     setMessage(null);
     setError(null);
   }
+
+  async function loadLeads() {
+    try {
+      const res = await fetch("/api/admin/whatsapp/leads");
+      const data = (await res.json()) as { ok?: boolean; leads?: typeof leads };
+      if (data.ok && data.leads) setLeads(data.leads);
+    } catch {
+      /* a próxima atualização tenta de novo */
+    }
+  }
+
+  useEffect(() => {
+    void loadLeads();
+    const id = window.setInterval(() => void loadLeads(), 20000);
+    return () => window.clearInterval(id);
+  }, []);
 
   async function saveTemplate(e: React.FormEvent) {
     e.preventDefault();
@@ -71,7 +93,7 @@ export function WhatsappAdminPanel({
       const res = await fetch("/api/admin/whatsapp/templates", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selected.id, body }),
+        body: JSON.stringify({ id: selected.id, name, body }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -79,9 +101,39 @@ export function WhatsappAdminPanel({
         return;
       }
       setTemplates((prev) =>
-        prev.map((t) => (t.id === selected.id ? { ...t, body } : t)),
+        prev.map((template) =>
+          template.id === selected.id ? { ...template, name, body } : template,
+        ),
       );
       setMessage("Template atualizado.");
+      router.refresh();
+    } catch {
+      setError("Erro de rede.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function removeTemplate() {
+    if (!selected) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/whatsapp/templates", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: selected.id }),
+      });
+      const data = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !data.ok) {
+        setError(data.error ?? "Falha ao excluir.");
+        return;
+      }
+      const next = templates.filter((template) => template.id !== selected.id);
+      setTemplates(next);
+      setSelectedId(next[0]?.id ?? "");
+      setName(next[0] ? templateLabel(next[0].name) : "");
+      setBody(next[0]?.body ?? "");
       router.refresh();
     } catch {
       setError("Erro de rede.");
@@ -99,13 +151,9 @@ export function WhatsappAdminPanel({
       const res = await fetch("/api/admin/whatsapp/templates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: newTplName,
-          kind: "aviso",
-          body: newTplBody,
-        }),
+        body: JSON.stringify({ name: newTplName, kind: "aviso", body: newTplBody }),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string; id?: string };
+      const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Falha ao criar.");
         return;
@@ -121,94 +169,54 @@ export function WhatsappAdminPanel({
     }
   }
 
-  async function loadLeads() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/admin/whatsapp/leads");
-      const data = (await res.json()) as {
-        ok?: boolean;
-        leads?: typeof leads;
-        error?: string;
-      };
-      if (data.ok && data.leads) {
-        setLeads(data.leads);
-        setLeadsLoaded(true);
-      } else {
-        setError(data.error ?? "Falha ao carregar leads.");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function disparar() {
+  async function disparar(phones?: string) {
     setLoading(true);
     setError(null);
     setMessage(null);
+    setLogOpen(false);
+    setProgress(8);
+    const timer = window.setInterval(() => {
+      setProgress((current) => (current == null ? 8 : Math.min(92, current + 7)));
+    }, 400);
     try {
       const res = await fetch("/api/admin/whatsapp/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           template_id: broadcastTpl,
-          audience,
-          paste_phones: paste,
+          audience: phones ? "paste" : audience,
+          paste_phones: phones ?? paste,
         }),
       });
       const data = (await res.json()) as {
         ok?: boolean;
         error?: string;
-        enqueued?: number;
-        api_configured?: boolean;
+        results?: DispatchResult[];
       };
       if (!res.ok || !data.ok) {
         setError(data.error ?? "Falha no disparo.");
+        setProgress(null);
         return;
       }
-      setMessage(
-        `Enfileiradas ${data.enqueued ?? 0} mensagens` +
-          (data.api_configured
-            ? " (Evolution)."
-            : " (sem Evolution; só fila)."),
-      );
+      setResults(data.results ?? []);
+      setProgress(100);
+      setMessage("Disparo concluído com sucesso.");
     } catch {
       setError("Erro de rede.");
+      setProgress(null);
     } finally {
+      window.clearInterval(timer);
       setLoading(false);
     }
   }
 
+  const failed = results.filter((item) => !item.ok);
+
   return (
     <div className="space-y-8">
-      <Card className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold text-[var(--ink-muted)]">
-            Status da API WhatsApp
-          </p>
-          <p className="mt-1 text-lg font-bold">
-            API configurada?{" "}
-            <span className={apiConfigured ? "text-[var(--success)]" : ""}>
-              {apiConfigured ? "sim" : "não"}
-            </span>
-          </p>
-          <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            Defina EVOLUTION_API_URL, EVOLUTION_API_KEY e EVOLUTION_INSTANCE.
-            Sem essas variáveis, as mensagens ficam só na fila.
-          </p>
-        </div>
-        <Pill tone={apiConfigured ? "accent" : "neutral"}>
-          {apiConfigured ? "Evolution pronta" : "Só fila"}
-        </Pill>
-      </Card>
-
+      <p className="sr-only">{apiConfigured ? "API ligada" : "API desligada"}</p>
       {(error || message) && (
-        <p
-          className={
-            error
-              ? "text-sm font-medium text-[var(--danger)]"
-              : "text-sm font-medium text-[var(--accent)]"
-          }
-        >
+        <p className={error ? "text-sm font-medium text-[var(--danger)]" : "text-sm font-medium text-[var(--accent)]"}>
           {error ?? message}
         </p>
       )}
@@ -216,55 +224,51 @@ export function WhatsappAdminPanel({
       <section className="grid gap-6 lg:grid-cols-2">
         <Card>
           <h2 className="text-xl font-bold tracking-tight">Templates</h2>
-          <p className="mt-1 text-sm text-[var(--ink-muted)]">
-            Placeholders: {"{{nome}}"} {"{{produto}}"} {"{{valor}}"} {"{{pix}}"}{" "}
-            {"{{meta}}"}
-          </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            {templates.map((t) => (
+            {templates.map((template) => (
               <button
-                key={t.id}
+                key={template.id}
                 type="button"
-                onClick={() => pick(t.id)}
+                onClick={() => pick(template.id)}
                 className={
-                  t.id === selectedId
+                  template.id === selectedId
                     ? "rounded-full bg-[var(--ink)] px-3 py-1.5 text-xs font-semibold text-white"
                     : "rounded-full border border-[var(--line)] px-3 py-1.5 text-xs font-semibold text-[var(--ink-muted)]"
                 }
               >
-                {t.name}
+                {templateLabel(template.name)}
               </button>
             ))}
           </div>
           {selected ? (
             <form className="mt-4 space-y-3" onSubmit={saveTemplate}>
-              <p className="text-sm">
-                <Pill tone="lavender">{selected.kind}</Pill>{" "}
-                <span className="text-[var(--ink-muted)]">/{selected.name}</span>
-              </p>
+              <Input label="Nome do Template" value={name} onChange={(e) => setName(e.target.value)} />
               <Textarea
                 label="Corpo da mensagem"
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 className="min-h-40 font-mono text-sm"
               />
-              <Button type="submit" variant="accent" disabled={loading}>
-                {loading ? "Salvando…" : "Salvar template"}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button type="submit" variant="accent" disabled={loading}>
+                  {loading ? "Salvando…" : "Salvar template"}
+                </Button>
+                <Button type="button" variant="outline" disabled={loading} onClick={() => void removeTemplate()}>
+                  Excluir
+                </Button>
+              </div>
             </form>
           ) : (
-            <p className="mt-4 text-sm text-[var(--ink-muted)]">
-              Nenhum template.
-            </p>
+            <p className="mt-4 text-sm text-[var(--ink-muted)]">Nenhum template.</p>
           )}
         </Card>
 
         <Card>
           <h2 className="text-xl font-bold tracking-tight">Novo template</h2>
           <form className="mt-4 space-y-3" onSubmit={createTemplate}>
-            <input
-              className="w-full rounded-xl border border-[var(--line)] px-3 py-2 text-sm"
-              placeholder="nome_do_template"
+            <Input
+              label="Nome do Template"
+              placeholder="Boas Vindas"
               value={newTplName}
               onChange={(e) => setNewTplName(e.target.value)}
               required
@@ -281,67 +285,63 @@ export function WhatsappAdminPanel({
           </form>
         </Card>
 
-        <Card>
+        <Card className="lg:col-span-2">
           <h2 className="text-xl font-bold tracking-tight">Preview</h2>
-          <div className="mt-4 whitespace-pre-wrap rounded-[20px] border border-[var(--line)] bg-[var(--bg-subtle)] p-4 text-sm leading-relaxed">
-            {previewBody(body || selected?.body || "…")}
+          <div className="mx-auto mt-4 w-[280px] overflow-hidden rounded-[32px] border border-[#1f2c34] bg-[#0b141a] shadow-[0_20px_50px_rgba(0,0,0,0.25)]">
+            <div className="flex items-center gap-2 bg-[#1f2c34] px-3 py-3 text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#6b7c85] text-xs font-bold">IP</span>
+              <div>
+                <p className="text-sm font-semibold">iPlanet Pay</p>
+                <p className="text-[10px] text-[#8ea0aa]">online</p>
+              </div>
+            </div>
+            <div
+              className="min-h-52 bg-[#0b141a] px-3 py-4"
+              style={{
+                backgroundImage:
+                  "radial-gradient(circle at 20% 20%, rgba(255,255,255,0.03), transparent 40%)",
+              }}
+            >
+              <div className="ml-auto max-w-[85%] rounded-lg rounded-tr-none bg-[#005c4b] px-3 py-2 text-[13px] leading-snug text-[#e9edef] shadow">
+                <p className="whitespace-pre-wrap">{previewBody(body || selected?.body || "…")}</p>
+                <p className="mt-1 text-right text-[10px] text-[#ffffff99]">
+                  {new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
+                </p>
+              </div>
+            </div>
           </div>
         </Card>
       </section>
 
       <Card>
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xl font-bold tracking-tight">Leads de disparo</h2>
-          <Button type="button" variant="outline" size="sm" disabled={loading} onClick={() => void loadLeads()}>
-            {leadsLoaded ? "Atualizar" : "Carregar leads"}
-          </Button>
-        </div>
-        <p className="mt-1 text-xs text-[var(--ink-muted)]">
-          Inativo = sem movimentação há mais de 45 dias.
-        </p>
-        {leadsLoaded ? (
-          <ul className="mt-4 max-h-64 divide-y divide-[var(--line)] overflow-y-auto text-sm">
-            {leads.map((l) => (
-              <li key={l.user_id} className="flex items-center justify-between py-2">
-                <span>
-                  {l.full_name}{" "}
-                  <span className="text-[var(--ink-muted)]">{l.phone}</span>
-                </span>
-                <Pill tone={l.active ? "success" : "neutral"}>
-                  {l.active ? "Ativo" : "Inativo"}
-                </Pill>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+        <h2 className="text-xl font-bold tracking-tight">Leads de disparo</h2>
+        <p className="mt-1 text-xs text-[var(--ink-muted)]">A lista atualiza sozinha.</p>
+        <ul className="mt-4 max-h-64 divide-y divide-[var(--line)] overflow-y-auto text-sm">
+          {leads.map((lead) => (
+            <li key={lead.user_id} className="flex items-center justify-between py-2">
+              <span>
+                {lead.full_name} <span className="text-[var(--ink-muted)]">{lead.phone}</span>
+              </span>
+              <Pill tone={lead.active ? "success" : "neutral"}>{lead.active ? "Ativo" : "Inativo"}</Pill>
+            </li>
+          ))}
+        </ul>
       </Card>
 
       <Card>
-        <h2 className="text-xl font-bold tracking-tight">Broadcast</h2>
-        <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Disparar grava em whatsapp_dispatch_queue e envia pela Evolution
-          quando ela está configurada.
-        </p>
+        <h2 className="text-xl font-bold tracking-tight">Disparo em Massa</h2>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <Select
-            label="Template"
-            value={broadcastTpl}
-            onChange={(e) => setBroadcastTpl(e.target.value)}
-          >
-            {templates.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.name} ({t.kind})
+          <Select label="Template" value={broadcastTpl} onChange={(e) => setBroadcastTpl(e.target.value)}>
+            {templates.map((template) => (
+              <option key={template.id} value={template.id}>
+                {templateLabel(template.name)}
               </option>
             ))}
           </Select>
           <Select
             label="Audiência"
             value={audience}
-            onChange={(e) =>
-              setAudience(
-                e.target.value as "clients_phone" | "active_goals" | "paste",
-              )
-            }
+            onChange={(e) => setAudience(e.target.value as "clients_phone" | "active_goals" | "paste")}
           >
             <option value="clients_phone">Clientes com telefone</option>
             <option value="active_goals">Usuários com metas ativas</option>
@@ -359,33 +359,49 @@ export function WhatsappAdminPanel({
           </div>
         ) : null}
         <div className="mt-4">
-          <Button
-            type="button"
-            variant="accent"
-            disabled={loading || !broadcastTpl}
-            onClick={() => void disparar()}
-          >
+          <Button type="button" variant="accent" disabled={loading || !broadcastTpl} onClick={() => void disparar()}>
             Disparar
           </Button>
         </div>
-      </Card>
-
-      <Card>
-        <h2 className="text-xl font-bold tracking-tight">Configuração</h2>
-        <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--ink-muted)]">
-          <li>EVOLUTION_API_URL — endereço da Evolution, sem barra no final</li>
-          <li>EVOLUTION_API_KEY — header apikey</li>
-          <li>EVOLUTION_INSTANCE — nome da instância conectada</li>
-          <li>whatsapp_support (já em Config) — WhatsApp da loja no FAQ</li>
-          <li>
-            Cron: GET/POST /api/cron/whatsapp-goals com Bearer CRON_SECRET
-          </li>
-        </ul>
-        <p className="mt-4 text-sm text-[var(--ink-muted)]">
-          Após o primeiro aporte confirmado por reserva, o sistema enfileira o
-          template <strong>primeiro_aporte</strong> e agenda lembrete se houver
-          meta com reminder_day (1–30) + reminder_at.
-        </p>
+        {progress != null ? (
+          <div className="mt-4">
+            <div className="mb-1 flex justify-between text-xs text-[var(--ink-muted)]">
+              <span>Disparo</span>
+              <span>{progress}%</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[var(--bg-subtle)]">
+              <div className="h-full bg-[var(--accent)] transition-all" style={{ width: `${progress}%` }} />
+            </div>
+          </div>
+        ) : null}
+        {progress === 100 ? (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <p className="text-sm font-semibold text-[var(--accent)]">Disparo concluído com sucesso.</p>
+            <Button type="button" variant="outline" size="sm" onClick={() => setLogOpen((open) => !open)}>
+              Log
+            </Button>
+          </div>
+        ) : null}
+        {logOpen ? (
+          <div className="mt-3 space-y-2 text-sm">
+            {results.map((item) => (
+              <p key={`${item.phone}-${item.name}`}>
+                {item.name} · {item.phone} · {item.ok ? "recebeu" : `falhou (${item.error ?? "erro"})`}
+              </p>
+            ))}
+            {failed.length > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={loading}
+                onClick={() => void disparar(failed.map((item) => item.phone).join("\n"))}
+              >
+                Reenviar para quem falhou
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
       </Card>
     </div>
   );

@@ -41,7 +41,7 @@ function InstagramGlyph({ className }: { className?: string }) {
   );
 }
 
-export function LiquidGlassFooter() {
+export function LiquidGlassFooter({ homeHref = null }: { homeHref?: string | null }) {
   const year = new Date().getFullYear();
 
   return (
@@ -66,10 +66,11 @@ export function LiquidGlassFooter() {
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-sm">
               <a
-                href="#hero"
+                href={homeHref || "#hero"}
                 className="inline-flex"
-                aria-label="Voltar ao início"
+                aria-label={homeHref ? "Ir para o início" : "Voltar ao início"}
                 onClick={(e) => {
+                  if (homeHref) return;
                   e.preventDefault();
                   document.getElementById("hero")?.scrollIntoView({
                     behavior: "smooth",

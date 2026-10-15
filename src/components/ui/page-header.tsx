@@ -7,6 +7,7 @@ interface PageHeaderProps {
   title: string;
   description?: string;
   actions?: ReactNode;
+  titleAddon?: ReactNode;
   className?: string;
   size?: "md" | "lg" | "xl";
   showBack?: boolean;
@@ -20,6 +21,7 @@ export function PageHeader({
   title,
   description,
   actions,
+  titleAddon,
   className,
   size = "lg",
   showBack = false,
@@ -47,11 +49,12 @@ export function PageHeader({
           ) : null}
           <h1
             className={cn(
-              "font-bold tracking-tight text-[var(--ink)] leading-[1.05]",
+              "flex items-center gap-3 font-bold tracking-tight text-[var(--ink)] leading-[1.05]",
               titleSize,
             )}
           >
             {title}
+            {titleAddon}
           </h1>
           {description ? (
             <p className="mt-3 max-w-2xl text-base text-[var(--ink-muted)] md:text-lg">

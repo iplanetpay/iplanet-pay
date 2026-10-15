@@ -1,5 +1,7 @@
 import { Suspense } from "react";
-import { listCatalogProducts } from "@/lib/catalog/products";
+import { listCatalogProducts, listProductSwatches } from "@/lib/catalog/products";
+import { getCurrentUser } from "@/lib/auth/session";
+import { homeForRole } from "@/lib/auth/roles";
 import { listCategories } from "@/lib/catalog/categories";
 import { LandingCatalog } from "@/components/landing/landing-catalog";
 import { FaqChat } from "@/components/chat/faq-chat";
@@ -8,10 +10,12 @@ import { PageViewTracker } from "@/components/analytics/page-view-tracker";
 import { ExperiencePreloader } from "@/components/ui/experience-preloader";
 
 async function LandingPageContent() {
-  const [{ products }, { categories }, { settings }] = await Promise.all([
+  const [{ products, error: catalogError }, { categories }, { settings }, swatches, user] = await Promise.all([
     listCatalogProducts(),
     listCategories(),
     getAppSettings(["whatsapp_support"]),
+    listProductSwatches(),
+    getCurrentUser(),
   ]);
 
   const landingProducts = products.map((p) => ({
@@ -43,6 +47,9 @@ async function LandingPageContent() {
       <LandingCatalog
         products={landingProducts as never}
         categories={landingCategories}
+        swatches={swatches}
+        catalogError={catalogError}
+        homeHref={user ? homeForRole(user.role) : null}
       />
       <FaqChat whatsappDigits={settings.whatsapp_support} />
     </>

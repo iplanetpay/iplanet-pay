@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
   const body = (await req.json()) as {
     offerId?: string;
-    action?: "approve" | "reject";
+    action?: "approve" | "reject" | "counter";
     adminMessage?: string;
     approvedValueCents?: number;
   };
@@ -33,6 +33,19 @@ export async function POST(req: Request) {
         { status: 503 },
       );
     }
+    if (action === "counter") {
+      const { sendCounterOffer } = await import("@/lib/trade-in/workflow");
+      const result = await sendCounterOffer({
+        offerId,
+        message: body.adminMessage ?? "",
+        valueCents: body.approvedValueCents ?? 0,
+      });
+      if (!result.ok) {
+        return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({ ok: true });
+    }
+
     const { data, error } = await admin.rpc("review_used_device_offer", {
       p_offer_id: offerId,
       p_action: action,

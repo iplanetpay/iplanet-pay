@@ -13,6 +13,7 @@ export interface Referral {
 
 export interface ReferralWithReferred extends Referral {
   referred?: { full_name: string | null } | null;
+  confirmed_cents?: number;
 }
 
 export const REFERRAL_STATUS_LABEL: Record<ReferralStatus, string> = {

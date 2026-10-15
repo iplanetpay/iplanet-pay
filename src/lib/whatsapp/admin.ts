@@ -52,7 +52,7 @@ export async function createWhatsappTemplate(input: {
   if (!user || user.role !== "admin") {
     return { ok: false, error: "Somente admin." };
   }
-  const name = input.name.trim().toLowerCase().replace(/\s+/g, "_");
+  const name = input.name.trim().replace(/\s+/g, " ");
   if (!name) return { ok: false, error: "Nome inválido." };
   if (USE_MOCK_AUTH) return { ok: true, id: "mock-new" };
   try {
@@ -155,9 +155,27 @@ export async function listWhatsappBroadcastLeads(): Promise<{
   }
 }
 
+export async function deleteWhatsappTemplate(
+  id: string,
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") return { ok: false, error: "Somente admin." };
+  if (USE_MOCK_AUTH) return { ok: true };
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { error } = await supabase.from("whatsapp_templates").delete().eq("id", id);
+    if (error) return { ok: false, error: error.message };
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Falha" };
+  }
+}
+
 export async function updateWhatsappTemplate(input: {
   id: string;
   body: string;
+  name?: string;
   kind?: string;
   active?: boolean;
 }): Promise<{ ok: true } | { ok: false; error: string }> {
@@ -170,6 +188,7 @@ export async function updateWhatsappTemplate(input: {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
     const patch: Record<string, unknown> = { body: input.body };
+    if (input.name?.trim()) patch.name = input.name.trim().replace(/\s+/g, " ");
     if (input.kind) patch.kind = input.kind;
     if (typeof input.active === "boolean") patch.active = input.active;
     const { error } = await supabase
@@ -193,7 +212,12 @@ export async function broadcastWhatsapp(input: {
   audience: BroadcastAudience;
   paste_phones?: string;
 }): Promise<
-  | { ok: true; enqueued: number; api_configured: boolean }
+  | {
+      ok: true;
+      enqueued: number;
+      api_configured: boolean;
+      results: Array<{ phone: string; name: string; ok: boolean; error?: string }>;
+    }
   | { ok: false; error: string }
 > {
   const user = await getCurrentUser();
@@ -201,7 +225,7 @@ export async function broadcastWhatsapp(input: {
     return { ok: false, error: "Somente admin." };
   }
   if (USE_MOCK_AUTH) {
-    return { ok: true, enqueued: 0, api_configured: false };
+    return { ok: true, enqueued: 0, api_configured: false, results: [] };
   }
 
   try {
@@ -286,6 +310,7 @@ export async function broadcastWhatsapp(input: {
     }
 
     let enqueued = 0;
+    const results: Array<{ phone: string; name: string; ok: boolean; error?: string }> = [];
     for (const row of phones) {
       const body = renderTemplate(tpl.body, {
         nome: row.nome,
@@ -299,13 +324,24 @@ export async function broadcastWhatsapp(input: {
         body,
         template_id: tpl.id,
       });
-      if (r.ok) enqueued += 1;
+      if (r.ok && r.sent) {
+        enqueued += 1;
+        results.push({ phone: row.phone, name: row.nome, ok: true });
+      } else {
+        results.push({
+          phone: row.phone,
+          name: row.nome,
+          ok: false,
+          error: r.ok ? (r.skipped_api ? "Evolution desligada" : "Não enviado") : r.error,
+        });
+      }
     }
 
     return {
       ok: true,
       enqueued,
       api_configured: whatsappConfigured(),
+      results,
     };
   } catch (err) {
     return {

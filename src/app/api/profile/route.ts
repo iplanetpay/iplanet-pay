@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import type { PixKeyType } from "@/types/auth";
+import { normalizeBrazilPhone } from "@/lib/phone";
 
 const PIX_TYPES: PixKeyType[] = ["cpf", "cnpj", "email", "phone", "random"];
 
@@ -54,7 +55,7 @@ export async function PATCH(request: Request) {
 
   if (body.phone !== undefined) {
     updates.phone =
-      body.phone === null ? null : String(body.phone).trim() || null;
+      body.phone === null ? null : normalizeBrazilPhone(String(body.phone));
   }
 
   if (body.avatar_url !== undefined) {

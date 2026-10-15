@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { Settings } from "lucide-react";
 import { AppShell } from "@/components/ui/app-shell";
 import { LogoutButton } from "@/components/auth/logout-button";
+import { SignupWelcomeFromQuery } from "@/components/auth/signup-success";
 import { getCurrentUser } from "@/lib/auth/session";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { HomeLogo } from "@/components/ui/home-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { FichasIndicator } from "@/components/raffle/fichas-indicator";
@@ -23,7 +25,7 @@ export default async function ClienteLayout({
       topBar={
         <div className="mb-6 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <BrandLogo variant="wordmark" height={44} className="shrink-0" />
+            <HomeLogo href="/app" height={44} className="shrink-0" />
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
               <p className="truncate text-base font-bold tracking-tight sm:text-lg">
                 Olá, {user.full_name}
@@ -52,6 +54,9 @@ export default async function ClienteLayout({
         </div>
       }
     >
+      <Suspense fallback={null}>
+        <SignupWelcomeFromQuery />
+      </Suspense>
       <div className="mb-6">
         <FichasIndicator userId={user.id} />
       </div>

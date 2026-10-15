@@ -1,10 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { MapPin, MessageCircle } from "lucide-react";
+import { MapPin, MessageCircle, Search } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   MotionCard,
@@ -14,13 +13,16 @@ import {
 import { BrandLogo } from "@/components/ui/brand-logo";
 import { Button } from "@/components/ui/button";
 import { ProductModal } from "@/components/catalog/product-modal";
-import { formatCentsBRL } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics/track";
 import type { Product, ProductCategory } from "@/types/database";
 import { ComoFuncionaDuoScroll } from "@/components/landing/como-funciona-duo-scroll";
 import { SeuIphoneSection } from "@/components/landing/seu-iphone-section";
 import { ComoFuncionaReveal } from "@/components/landing/como-funciona-reveal";
 import { VelocityCatalogCarousel } from "@/components/landing/velocity-catalog-carousel";
+import {
+  CatalogProductCard,
+  conditionFromName,
+} from "@/components/catalog/catalog-product-card";
 import { Experiencia3dSection } from "@/components/landing/iphone-3d-viewer";
 import { LiquidGlassFooter } from "@/components/landing/liquid-glass-footer";
 
@@ -61,11 +63,19 @@ const HERO_PRODUCT_SLUG = "iphone-18-pro-256";
 export function LandingCatalog({
   products,
   categories,
+  homeHref,
+  swatches = {},
+  catalogError = null,
 }: {
   products: Product[];
   categories: LandingCategory[];
+  homeHref?: string | null;
+  swatches?: Record<string, string[]>;
+  catalogError?: string | null;
 }) {
   const [cat, setCat] = useState<string>("Todos");
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [selected, setSelected] = useState<Product | null>(null);
   const [showAll, setShowAll] = useState(false);
   const searchParams = useSearchParams();
@@ -107,9 +117,13 @@ export function LandingCatalog({
   }, [categories, products]);
 
   const filtered = useMemo(() => {
-    if (cat === "Todos") return products;
-    return products.filter((p) => p.category === cat);
-  }, [products, cat]);
+    const q = query.trim().toLowerCase();
+    return products.filter((p) => {
+      const inCat = cat === "Todos" || p.category === cat;
+      const inName = !q || p.name.toLowerCase().includes(q) || (p.model ?? "").toLowerCase().includes(q);
+      return inCat && inName;
+    });
+  }, [products, cat, query]);
 
   function openProduct(p: Product) {
     void trackEvent("product_click", {
@@ -124,10 +138,11 @@ export function LandingCatalog({
       <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2.5 md:px-8 md:py-3">
           <a
-            href="#hero"
+            href={homeHref || "#hero"}
             className="inline-flex min-w-0 shrink scale-[0.85] origin-left sm:scale-100"
-            aria-label="Voltar ao início"
+            aria-label={homeHref ? "Ir para o início" : "Voltar ao início"}
             onClick={(e) => {
+              if (homeHref) return;
               e.preventDefault();
               const el = document.getElementById("hero");
               if (el) {
@@ -241,7 +256,26 @@ export function LandingCatalog({
             </div>
           </MotionFade>
 
-          <div className="-mx-4 mb-8 mt-8 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
+          <div className="mb-3 mt-8 flex items-center justify-end gap-2">
+            {searchOpen ? (
+              <input
+                autoFocus
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Buscar pelo nome"
+                className="h-11 w-full max-w-xs rounded-full border border-[var(--line)] px-4 text-sm outline-none"
+              />
+            ) : null}
+            <button
+              type="button"
+              aria-label="Pesquisar produto"
+              onClick={() => setSearchOpen((open) => !open)}
+              className="flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white"
+            >
+              <Search className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="-mx-4 mb-8 flex gap-2 overflow-x-auto px-4 pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:mx-0 md:flex-wrap md:overflow-visible md:px-0 [&::-webkit-scrollbar]:hidden">
             {tabs.map((c) => (
               <motion.button
                 key={c}
@@ -265,10 +299,15 @@ export function LandingCatalog({
           </div>
         </div>
 
-        {!showAll ? (
+        {catalogError ? (
+          <p className="px-4 py-12 text-center text-[var(--ink-muted)]">
+            Não foi possível carregar o catálogo agora.
+          </p>
+        ) : !showAll ? (
           <div className="mx-auto max-w-6xl px-4 md:px-8">
             <VelocityCatalogCarousel
               products={filtered}
+              swatches={swatches}
               onSelect={openProduct}
             />
           </div>
@@ -276,42 +315,20 @@ export function LandingCatalog({
           <div className="mx-auto grid max-w-6xl gap-5 px-4 sm:grid-cols-2 md:px-8 lg:grid-cols-3">
             {filtered.map((p, i) => (
               <MotionCard key={p.id} delay={Math.min(i * 0.04, 0.3)}>
-                <button
-                  type="button"
-                  onClick={() => openProduct(p)}
-                  className="group block w-full overflow-hidden rounded-[28px] border border-[var(--line)] bg-white text-left shadow-[0_8px_32px_rgba(17,17,17,0.04)] transition hover:border-[var(--accent)]/35 hover:shadow-[0_20px_48px_rgba(0,113,227,0.12)]"
-                >
-                  <div className="relative flex h-56 items-center justify-center bg-white p-6">
-                    {p.image_url ? (
-                      <Image
-                        src={p.image_url}
-                        alt={p.name}
-                        width={280}
-                        height={280}
-                        className="h-full w-auto object-contain mix-blend-multiply transition duration-500 group-hover:scale-105"
-                      />
-                    ) : (
-                      <div className="h-40 w-40 rounded-full bg-[var(--line)]" />
-                    )}
-                  </div>
-                  <div className="space-y-1 bg-white px-5 pb-6 pt-2">
-                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">
-                      {p.category ?? "Apple"}
-                    </p>
-                    <h3 className="text-xl font-bold tracking-tight text-[var(--ink)]">
-                      {p.name}
-                    </h3>
-                    <p className="text-sm text-[var(--ink-muted)]">
-                      {[p.storage, p.color].filter(Boolean).join(" · ")}
-                    </p>
-                    <p className="pt-2 text-lg font-semibold text-[var(--ink)]">
-                      {formatCentsBRL(p.list_price_cents)}
-                    </p>
-                    <p className="text-sm font-semibold text-[var(--accent)]">
-                      Ver detalhes
-                    </p>
-                  </div>
-                </button>
+                <CatalogProductCard
+                  name={p.name}
+                  meta={[p.storage, p.color].filter(Boolean).join(" · ") || "1 cor"}
+                  condition={conditionFromName(p.name, p.category)}
+                  priceCents={p.list_price_cents}
+                  images={[p.image_url, ...(p.product_images ?? [])].filter(
+                    (url): url is string => Boolean(url),
+                  )}
+                  colors={[
+                    ...(p.color ? [p.color] : []),
+                    ...((swatches[p.id] ?? []).filter((color) => color !== p.color)),
+                  ]}
+                  onDetails={() => openProduct(p)}
+                />
               </MotionCard>
             ))}
           </div>
@@ -448,7 +465,7 @@ export function LandingCatalog({
         </div>
       </section>
 
-      <LiquidGlassFooter />
+      <LiquidGlassFooter homeHref={homeHref} />
 
       <ProductModal
         product={selected}

@@ -4,6 +4,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Pill } from "@/components/ui/pill";
 import { ContributionList } from "@/components/wallet/contribution-list";
 import { getCurrentUser } from "@/lib/auth/session";
+import { listMyReservations } from "@/lib/reservations/queries";
+import { getWalletBalanceCents } from "@/lib/wallet/balance";
+import { WalletActions } from "@/components/wallet/wallet-actions";
 import { listMyContributions, listMyLedger } from "@/lib/wallet/queries";
 import {
   LEDGER_ENTRY_LABEL,
@@ -19,9 +22,11 @@ export default async function CarteiraPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/entrar");
 
-  const [{ contributions }, { entries }] = await Promise.all([
+  const [{ contributions }, { entries }, balanceCents, { reservations }] = await Promise.all([
     listMyContributions(user.id),
     listMyLedger(user.id),
+    getWalletBalanceCents(user.id),
+    listMyReservations(user.id),
   ]);
 
   const confirmedCents = contributions
@@ -37,8 +42,17 @@ export default async function CarteiraPage() {
         showBack
         eyebrow="Financeiro"
         title="Carteira"
-        description="Extrato de aportes Pix e lançamentos da carteira."
+        description="Extrato de aportes, saldo livre e saque."
       />
+
+      <Card>
+        <p className="text-sm text-[var(--ink-muted)]">Saldo livre</p>
+        <p className="mt-2 text-3xl font-bold tracking-tight">{formatCentsBRL(balanceCents)}</p>
+        <p className="mt-1 text-sm text-[var(--ink-muted)]">
+          Entra aqui quando uma reserva é cancelada.
+        </p>
+      </Card>
+      <WalletActions balanceCents={balanceCents} reservations={reservations} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Card>

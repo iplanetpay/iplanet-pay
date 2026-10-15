@@ -49,6 +49,7 @@ export async function listMyReferrals(userId: string): Promise<{
     const rows = (data ?? []) as Referral[];
     const ids = [...new Set(rows.map((r) => r.referred_id))];
     const nameMap: Record<string, string | null> = {};
+    const paidMap: Record<string, number> = {};
     if (ids.length > 0) {
       const { data: profiles } = await supabase
         .from("profiles")
@@ -57,11 +58,28 @@ export async function listMyReferrals(userId: string): Promise<{
       for (const p of profiles ?? []) {
         nameMap[p.id] = p.full_name;
       }
+      try {
+        const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+        const admin = tryCreateServiceClient();
+        if (admin) {
+          const { data: contribs } = await admin
+            .from("contributions")
+            .select("user_id, amount_cents")
+            .in("user_id", ids)
+            .eq("status", "confirmed");
+          for (const c of contribs ?? []) {
+            paidMap[c.user_id] = (paidMap[c.user_id] ?? 0) + (c.amount_cents ?? 0);
+          }
+        }
+      } catch {
+        /* status falls back to the referral row */
+      }
     }
     return {
       referrals: rows.map((r) => ({
         ...r,
         referred: { full_name: nameMap[r.referred_id] ?? null },
+        confirmed_cents: paidMap[r.referred_id] ?? 0,
       })),
       error: null,
     };

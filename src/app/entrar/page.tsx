@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LoginForm } from "@/components/auth/login-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { BrandLogo } from "@/components/ui/brand-logo";
+import { HomeLogo } from "@/components/ui/home-logo";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { ReferralLoginTeaser } from "@/components/auth/referral-login-teaser";
 
@@ -24,7 +24,7 @@ export default async function EntrarPage({
     <div className="min-h-screen bg-[var(--bg-subtle)] px-4 py-10 md:px-8">
       <div className="mx-auto max-w-md">
         <div className="mb-8 flex justify-center">
-          <BrandLogo variant="wordmark" height={52} priority />
+          <HomeLogo href="/" height={52} />
         </div>
         <PageHeader
           eyebrow="Acesso"

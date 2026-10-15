@@ -117,6 +117,30 @@ export async function listCatalogProducts(): Promise<{
   }
 }
 
+export async function listProductSwatches(): Promise<Record<string, string[]>> {
+  if (USE_MOCK_AUTH) return {};
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("product_variants")
+      .select("product_id, color")
+      .eq("active", true);
+    if (error || !data) return {};
+    const map: Record<string, string[]> = {};
+    for (const row of data) {
+      const color = String(row.color ?? "").trim();
+      if (!color) continue;
+      const list = map[row.product_id] ?? [];
+      if (!list.includes(color)) list.push(color);
+      map[row.product_id] = list;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
 export async function getProductBySlug(slug: string) {
   const { products, error } = await listCatalogProducts();
   if (error) return { product: null, error };

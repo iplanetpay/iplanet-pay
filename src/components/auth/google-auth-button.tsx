@@ -50,7 +50,11 @@ export function GoogleAuthButton({
 
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: {
+          redirectTo,
+          scopes: "openid email profile",
+          queryParams: { prompt: "select_account" },
+        },
       });
 
       if (oauthError) {

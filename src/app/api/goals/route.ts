@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createPaymentGoal } from "@/lib/goals/mutations";
+import { normalizeBrazilPhone } from "@/lib/phone";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -31,7 +32,7 @@ export async function POST(request: Request) {
     installment_cents: Number(body.installment_cents),
     installments_count: Number(body.installments_count),
     whatsapp_phone: body.whatsapp_phone
-      ? String(body.whatsapp_phone)
+      ? normalizeBrazilPhone(String(body.whatsapp_phone))
       : null,
     reservation_id: body.reservation_id
       ? String(body.reservation_id)

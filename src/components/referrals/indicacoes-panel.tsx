@@ -8,11 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCentsBRL } from "@/lib/utils";
-import {
-  REFERRAL_STATUS_LABEL,
-  type ReferralStatus,
-  type ReferralWithReferred,
-} from "@/lib/referrals/types";
+import type { ReferralWithReferred } from "@/lib/referrals/types";
+import { referralActivated } from "@/lib/referrals/status";
 import { CheckCircle2, Copy, Gift, Share2 } from "lucide-react";
 
 export function IndicacoesPanel({
@@ -206,9 +203,18 @@ export function IndicacoesPanel({
                     {formatCentsBRL(r.bonus_amount_cents)}
                   </p>
                 </div>
-                <Pill tone={r.bonus_credited ? "accent" : "lavender"}>
-                  {REFERRAL_STATUS_LABEL[r.status as ReferralStatus] ?? r.status}
-                </Pill>
+                <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                  <span
+                    className={
+                      referralActivated(r.confirmed_cents ?? 0, r.bonus_credited)
+                        ? "h-2.5 w-2.5 rounded-full bg-[#1f8a4c]"
+                        : "h-2.5 w-2.5 rounded-full bg-[#f5b942]"
+                    }
+                  />
+                  {referralActivated(r.confirmed_cents ?? 0, r.bonus_credited)
+                    ? "Ativado · R$ 100"
+                    : "Conta criada"}
+                </span>
               </Card>
             ))}
           </div>

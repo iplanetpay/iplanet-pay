@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 function initialsFromName(name: string): string {
@@ -19,8 +22,9 @@ export function UserAvatar({
   className?: string;
 }) {
   const initials = initialsFromName(name);
+  const [failed, setFailed] = useState(false);
 
-  if (avatarUrl) {
+  if (avatarUrl && !failed) {
     return (
       <span
         className={cn(
@@ -37,6 +41,7 @@ export function UserAvatar({
           height={size}
           referrerPolicy="no-referrer"
           className="h-full w-full object-cover"
+          onError={() => setFailed(true)}
         />
       </span>
     );
