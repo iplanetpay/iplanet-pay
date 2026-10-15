@@ -3,6 +3,8 @@ import { avatarFromAuthMetadata } from "@/lib/auth/avatar";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { homeForRole, roleAllowedForPath } from "@/lib/auth/roles";
+import { signedInWithGoogle } from "@/lib/profile/identity";
+import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import type { UserRole } from "@/types/auth";
 
 function safeNext(raw: string | null): string | null {
@@ -75,6 +77,12 @@ export async function GET(request: Request) {
         dest = nextParam;
       } else if (nextParam?.startsWith("/admin") && role !== "admin") {
         dest = `/entrar?error=${encodeURIComponent("Esta conta Google não tem permissão de admin.")}&next=/admin`;
+      }
+      if (user && role === "cliente" && signedInWithGoogle(user)) {
+        const identity = await loadProfileIdentity(user.id);
+        if (identity.readable && !identity.complete) {
+          dest = "/app/completar-cadastro";
+        }
       }
       if (justCreated && !dest.includes("cadastro=")) {
         dest += dest.includes("?") ? "&cadastro=ok" : "?cadastro=ok";

@@ -21,6 +21,7 @@ export const ADMIN_PREFETCH_ROUTES = [
   "/admin/whatsapp",
   "/admin/financeiro",
   "/admin/sorteio",
+  "/admin/avisos",
   "/admin/config",
   "/admin/indicacoes",
   "/admin/estoque",

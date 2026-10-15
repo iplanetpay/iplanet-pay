@@ -7,6 +7,7 @@ import {
   parseMockSession,
 } from "@/lib/auth/mock";
 import { avatarFromAuthMetadata, resolveProfileAvatar } from "@/lib/auth/avatar";
+import { signedInWithGoogle } from "@/lib/profile/identity";
 import type { AuthUser, PixKeyType } from "@/types/auth";
 
 const PIX_TYPES: PixKeyType[] = ["cpf", "cnpj", "email", "phone", "random"];
@@ -63,6 +64,7 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     referral_bonus_balance_cents:
       (profile as { referral_bonus_balance_cents?: number } | null)
         ?.referral_bonus_balance_cents ?? 0,
+    signed_in_with_google: signedInWithGoogle(user),
   };
 });
 

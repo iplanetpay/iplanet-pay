@@ -9,6 +9,7 @@ export const metadata = { title: "Oferecimento de usado" };
 
 export default async function OferecimentoUsadoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
   searchParams: Promise<{ reavaliar?: string }>;

@@ -7,6 +7,11 @@ import {
 } from "@/lib/auth/mock";
 import { homeForRole } from "@/lib/auth/roles";
 import { normalizeBrazilPhone } from "@/lib/phone";
+import {
+  isValidBirthDate,
+  normalizeCpf,
+  profileIdentityComplete,
+} from "@/lib/profile/identity";
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
@@ -15,11 +20,37 @@ export async function POST(request: Request) {
     password?: string;
     phone?: string;
     referral_code?: string;
+    cpf?: string;
+    city?: string;
+    address?: string;
+    birth_date?: string;
     terms_accepted?: boolean;
     terms_version?: string;
   };
 
   const phone = normalizeBrazilPhone(body.phone);
+  const cpf = normalizeCpf(body.cpf);
+  const city = (body.city ?? "").trim();
+  const address = (body.address ?? "").trim();
+  const birthDate = (body.birth_date ?? "").trim();
+  if (
+    !profileIdentityComplete({
+      cpf,
+      phone,
+      city,
+      address,
+      birthDate,
+    }) ||
+    !isValidBirthDate(birthDate)
+  ) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error: "Informe CPF, telefone, cidade, endereço e data de nascimento.",
+      },
+      { status: 400 },
+    );
+  }
 
   if (!body.terms_accepted) {
     return NextResponse.json(
@@ -80,6 +111,16 @@ export async function POST(request: Request) {
         .update({
           terms_accepted_at: new Date().toISOString(),
           terms_version: body.terms_version || "withdrawal-v1",
+          phone,
+        })
+        .eq("id", data.user.id);
+      await admin
+        .from("profiles")
+        .update({
+          cpf,
+          city,
+          address,
+          birth_date: birthDate,
         })
         .eq("id", data.user.id);
     } catch {

@@ -25,6 +25,10 @@ export function SignupForm({
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [cpf, setCpf] = useState("");
+  const [city, setCity] = useState("");
+  const [address, setAddress] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState(initialReferralCode);
   const [termsAccepted, setTermsAccepted] = useState(false);
@@ -55,6 +59,10 @@ export function SignupForm({
           full_name: fullName,
           email,
           phone: normalizeBrazilPhone(phone) ?? phone,
+          cpf,
+          city,
+          address,
+          birth_date: birthDate,
           password,
           referral_code: referralCode || undefined,
           product: productSlug,
@@ -135,6 +143,39 @@ export function SignupForm({
           placeholder="(11) 99999-9999"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          required
+        />
+        <Input
+          label="CPF"
+          name="cpf"
+          inputMode="numeric"
+          placeholder="000.000.000-00"
+          value={cpf}
+          onChange={(e) => setCpf(e.target.value)}
+          required
+        />
+        <Input
+          label="Cidade"
+          name="city"
+          placeholder="São Paulo"
+          value={city}
+          onChange={(e) => setCity(e.target.value)}
+          required
+        />
+        <Input
+          label="Endereço"
+          name="address"
+          placeholder="Rua, número, bairro"
+          value={address}
+          onChange={(e) => setAddress(e.target.value)}
+          required
+        />
+        <Input
+          label="Data de nascimento"
+          name="birth_date"
+          type="date"
+          value={birthDate}
+          onChange={(e) => setBirthDate(e.target.value)}
           required
         />
         <Input

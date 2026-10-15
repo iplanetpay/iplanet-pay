@@ -13,6 +13,7 @@ export interface AuthUser {
   pix_key?: string | null;
   pix_key_type?: PixKeyType | null;
   referral_bonus_balance_cents?: number;
+  signed_in_with_google?: boolean;
 }
 
 export interface Profile {

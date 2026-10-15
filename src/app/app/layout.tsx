@@ -10,6 +10,9 @@ import { HomeLogo } from "@/components/ui/home-logo";
 import { UserAvatar } from "@/components/ui/user-avatar";
 import { Button } from "@/components/ui/button";
 import { FichasIndicator } from "@/components/raffle/fichas-indicator";
+import { ProfileCompletionGate } from "@/components/auth/profile-completion-gate";
+import { loadProfileIdentity } from "@/lib/profile/identity-server";
+import { NoticeBell } from "@/components/notices/notice-bell";
 
 export default async function ClienteLayout({
   children,
@@ -19,6 +22,12 @@ export default async function ClienteLayout({
   const user = await getCurrentUser();
   if (!user) redirect("/entrar?next=/app");
 
+  let pendingProfile = false;
+  if (user.role === "cliente" && user.signed_in_with_google) {
+    const identity = await loadProfileIdentity(user.id);
+    pendingProfile = identity.readable && !identity.complete;
+  }
+
   return (
     <AppShell
       variant="cliente"
@@ -27,7 +36,7 @@ export default async function ClienteLayout({
           <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <HomeLogo href="/app" height={44} className="shrink-0" />
             <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <p className="truncate text-base font-bold tracking-tight sm:text-lg">
+              <p className="hidden min-w-0 truncate text-base font-bold tracking-tight sm:block sm:text-lg">
                 Olá, {user.full_name}
               </p>
               <UserAvatar
@@ -38,6 +47,7 @@ export default async function ClienteLayout({
             </div>
           </div>
           <div className="flex shrink-0 items-center gap-2">
+            <NoticeBell profilePending={pendingProfile} />
             <Link href="/app/configuracoes" prefetch>
               <Button
                 type="button"
@@ -57,10 +67,12 @@ export default async function ClienteLayout({
       <Suspense fallback={null}>
         <SignupWelcomeFromQuery />
       </Suspense>
-      <div className="mb-6">
-        <FichasIndicator userId={user.id} />
-      </div>
-      {children}
+      <ProfileCompletionGate pending={pendingProfile}>
+        <div className="mb-6">
+          <FichasIndicator userId={user.id} />
+        </div>
+        {children}
+      </ProfileCompletionGate>
       <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
         <Link href="/ajuda" className="underline">
           Guia

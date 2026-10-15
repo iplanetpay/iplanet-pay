@@ -15,6 +15,14 @@ export type ClientListItem = {
   total_paid_cents: number;
 };
 
+export type ClientContributionRow = {
+  id: string;
+  amount_cents: number;
+  status: string;
+  created_at: string;
+  confirmed_at: string | null;
+};
+
 export type ClientReservationRow = {
   id: string;
   status: ReservationStatus;
@@ -22,7 +30,22 @@ export type ClientReservationRow = {
   amount_paid_cents: number;
   created_at: string;
   product_name: string | null;
+  image_url: string | null;
   store_name: string | null;
+  contributions: ClientContributionRow[];
+};
+
+export type ClientDetail = {
+  email: string | null;
+  cpf: string | null;
+  phone: string | null;
+  city: string | null;
+  address: string | null;
+  birth_date: string | null;
+  referral_code: string | null;
+  referred_by_name: string | null;
+  created_at: string | null;
+  wallet_cents: number;
 };
 
 function norm(s: string) {
@@ -156,7 +179,7 @@ export async function listClientReservations(
         list_price_cents,
         amount_paid_cents,
         created_at,
-        product:products ( name ),
+        product:products ( name, image_url ),
         store:stores ( name )
       `,
       )
@@ -166,9 +189,34 @@ export async function listClientReservations(
 
     if (error) return { reservations: [], error: error.message };
 
+    const reservationIds = (data ?? []).map((r) => r.id as string);
+    const contributionsByReservation = new Map<string, ClientContributionRow[]>();
+    if (reservationIds.length > 0) {
+      const { data: contributions, error: contribError } = await supabase
+        .from("contributions")
+        .select("id, reservation_id, amount_cents, status, created_at, confirmed_at")
+        .in("reservation_id", reservationIds)
+        .order("created_at", { ascending: false });
+      if (contribError) return { reservations: [], error: contribError.message };
+      for (const row of contributions ?? []) {
+        const list = contributionsByReservation.get(row.reservation_id) ?? [];
+        list.push({
+          id: row.id,
+          amount_cents: row.amount_cents,
+          status: row.status,
+          created_at: row.created_at,
+          confirmed_at: row.confirmed_at,
+        });
+        contributionsByReservation.set(row.reservation_id, list);
+      }
+    }
+
     const reservations: ClientReservationRow[] = (data ?? []).map((r) => {
       const product = asOne(
-        r.product as { name: string } | { name: string }[] | null,
+        r.product as
+          | { name: string; image_url: string | null }
+          | { name: string; image_url: string | null }[]
+          | null,
       );
       const store = asOne(
         r.store as { name: string } | { name: string }[] | null,
@@ -180,7 +228,9 @@ export async function listClientReservations(
         amount_paid_cents: r.amount_paid_cents,
         created_at: r.created_at,
         product_name: product?.name ?? null,
+        image_url: product?.image_url ?? null,
         store_name: store?.name ?? null,
+        contributions: contributionsByReservation.get(r.id) ?? [],
       };
     });
 
@@ -189,6 +239,94 @@ export async function listClientReservations(
     const message =
       err instanceof Error ? err.message : "Falha ao carregar reservas";
     return { reservations: [], error: message };
+  }
+}
+
+const EMPTY_DETAIL: ClientDetail = {
+  email: null,
+  cpf: null,
+  phone: null,
+  city: null,
+  address: null,
+  birth_date: null,
+  referral_code: null,
+  referred_by_name: null,
+  created_at: null,
+  wallet_cents: 0,
+};
+
+export async function getClientDetail(
+  userId: string,
+): Promise<{ detail: ClientDetail; error: string | null }> {
+  if (!userId) return { detail: EMPTY_DETAIL, error: "Usuário inválido." };
+  if (USE_MOCK_AUTH) return { detail: EMPTY_DETAIL, error: null };
+
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const extended = await supabase
+      .from("profiles")
+      .select("phone, created_at, referral_code, referred_by, cpf, city, address, birth_date")
+      .eq("id", userId)
+      .maybeSingle();
+    const fallback =
+      extended.error && /column/i.test(extended.error.message)
+        ? await supabase
+            .from("profiles")
+            .select("phone, created_at, referral_code, referred_by")
+            .eq("id", userId)
+            .maybeSingle()
+        : null;
+    const profile = fallback?.data ?? extended.data;
+    const error = fallback ? fallback.error : extended.error;
+    if (error || !profile) return { detail: EMPTY_DETAIL, error: error?.message ?? "Cliente não encontrado." };
+    const identity = profile as typeof profile & {
+      cpf?: string | null;
+      city?: string | null;
+      address?: string | null;
+      birth_date?: string | null;
+    };
+
+    let referredByName: string | null = null;
+    if (profile?.referred_by) {
+      const { data: referrer } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", profile.referred_by)
+        .maybeSingle();
+      referredByName = referrer?.full_name?.trim() || null;
+    }
+
+    let email: string | null = null;
+    const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+    const admin = tryCreateServiceClient();
+    if (admin) {
+      const { data } = await admin.auth.admin.getUserById(userId);
+      email = data.user?.email ?? null;
+    }
+
+    const { getWalletBalanceCents } = await import("@/lib/wallet/balance");
+    const walletCents = await getWalletBalanceCents(userId);
+
+    return {
+      detail: {
+        ...EMPTY_DETAIL,
+        email,
+        cpf: identity.cpf ? identity.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null,
+        phone: profile.phone ?? null,
+        city: identity.city ?? null,
+        address: identity.address ?? null,
+        birth_date: identity.birth_date ?? null,
+        referral_code: profile.referral_code ?? null,
+        referred_by_name: referredByName,
+        created_at: profile.created_at ?? null,
+        wallet_cents: walletCents,
+      },
+      error: null,
+    };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Falha ao carregar o cliente";
+    return { detail: EMPTY_DETAIL, error: message };
   }
 }
 

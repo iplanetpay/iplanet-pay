@@ -24,6 +24,7 @@ import {
   Sparkles,
   Smartphone,
   BookOpen,
+  Bell,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -48,7 +49,8 @@ export type SidebarIcon =
   | "message-circle"
   | "sparkles"
   | "smartphone"
-  | "book-open";
+  | "book-open"
+  | "bell";
 
 const icons: Record<SidebarIcon, LucideIcon> = {
   "layout-dashboard": LayoutDashboard,
@@ -67,6 +69,7 @@ const icons: Record<SidebarIcon, LucideIcon> = {
   sparkles: Sparkles,
   smartphone: Smartphone,
   "book-open": BookOpen,
+  bell: Bell,
 };
 
 export interface SidebarItem {

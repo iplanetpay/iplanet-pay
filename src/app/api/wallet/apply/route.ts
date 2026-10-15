@@ -8,6 +8,11 @@ export async function POST(request: Request) {
   if (!user) {
     return NextResponse.json({ ok: false, error: "Entre para continuar." }, { status: 401 });
   }
+  const { aporteBlockedForUser } = await import("@/lib/profile/identity-server");
+  const blocked = await aporteBlockedForUser(user);
+  if (blocked) {
+    return NextResponse.json({ ok: false, error: blocked }, { status: 403 });
+  }
 
   const body = (await request.json()) as {
     reservation_id?: string;

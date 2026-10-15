@@ -5,6 +5,20 @@ import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy
 import { referralActivated } from "../src/lib/referrals/status.ts";
 import { tradeInDaysRemaining, tradeInDecisionValue, tradeInVisual } from "../src/lib/trade-in/offer-state.ts";
 import { productSubtitle } from "../src/lib/reservations/types.ts";
+import {
+  formatCpf,
+  normalizeCpf,
+  profileIdentityComplete,
+  signedInWithGoogle,
+} from "../src/lib/profile/identity.ts";
+import {
+  couponNotice,
+  nextRaffleDate,
+  normalizeCouponCode,
+  raffleDateNotice,
+  unreadNoticeCount,
+  winnerNotice,
+} from "../src/lib/notices/copy.ts";
 
 function ticketsFromContributedCents(cents, perTicket = 10_000) {
   return Math.floor(cents / perTicket);
@@ -174,6 +188,46 @@ test("approved trade-in credit expires after 90 days and stays hidden once disca
   );
   assert.equal(discarded.discarded, true);
   assert.equal(discarded.creditCents, 0);
+});
+
+test("signup identity requires cpf, phone, city, address and birth date", () => {
+  assert.equal(normalizeCpf("390.533.447-05"), "39053344705");
+  assert.equal(formatCpf("39053344705"), "390.533.447-05");
+  assert.equal(normalizeCpf("111.111.111-11"), null);
+  assert.equal(normalizeCpf("123"), null);
+  const complete = {
+    cpf: "390.533.447-05",
+    phone: "11999999999",
+    city: "São Paulo",
+    address: "Rua A, 10",
+    birthDate: "1990-05-20",
+  };
+  assert.equal(profileIdentityComplete(complete), true);
+  assert.equal(profileIdentityComplete({ ...complete, cpf: "" }), false);
+  assert.equal(profileIdentityComplete({ ...complete, city: "  " }), false);
+  assert.equal(profileIdentityComplete({ ...complete, birthDate: "1890-01-01" }), false);
+  assert.equal(signedInWithGoogle({ app_metadata: { provider: "google" } }), true);
+  assert.equal(signedInWithGoogle({ app_metadata: { provider: "email" }, identities: [] }), false);
+  assert.equal(
+    signedInWithGoogle({ identities: [{ provider: "google" }] }),
+    true,
+  );
+});
+
+test("avisos: raffle date, winner and pre-created coupon", () => {
+  const from = new Date(2026, 9, 15, 12, 0, 0);
+  assert.equal(nextRaffleDate(from).getMonth(), 10);
+  assert.equal(nextRaffleDate(from).getDate(), 1);
+  const raffle = raffleDateNotice(from);
+  assert.equal(raffle.kind, "sorteio");
+  assert.equal(raffle.body.includes("01/11/2026"), true);
+  assert.equal(winnerNotice("  ", 2), null);
+  assert.equal(winnerNotice("Ana", 1)?.body, "Ana ganhou o sorteio com 1 ficha.");
+  assert.equal(normalizeCouponCode(" ip 10 "), "IP10");
+  assert.equal(normalizeCouponCode("código"), null);
+  assert.equal(couponNotice("ip10", "Retirada")?.couponCode, "IP10");
+  assert.equal(couponNotice("ab", "Retirada"), null);
+  assert.equal(unreadNoticeCount([{ id: "a" }, { id: "b" }], ["b"]), 1);
 });
 
 console.log(`\n${passed} test(s) passed.`);

@@ -39,7 +39,6 @@ export default async function StaffClientesPage({
         <ClientesPanel
           clients={clients}
           stores={stores}
-          canEditRole={false}
           detailBasePath="/staff/clientes"
         />
       )}

@@ -81,6 +81,10 @@ export async function generatePixForReservation(params: {
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Entre para continuar." };
 
+  const { aporteBlockedForUser } = await import("@/lib/profile/identity-server");
+  const blocked = await aporteBlockedForUser(user);
+  if (blocked) return { ok: false, error: blocked };
+
   const contract = await assertAporteContract({
     contractId,
     reservationId,

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
-import { listClientReservations } from "@/lib/clients/queries";
+import { getClientDetail, listClientReservations } from "@/lib/clients/queries";
 
 export async function GET(
   _request: Request,
@@ -21,9 +21,12 @@ export async function GET(
   }
 
   const { id } = await context.params;
-  const { reservations, error } = await listClientReservations(id);
+  const [{ reservations, error }, { detail }] = await Promise.all([
+    listClientReservations(id),
+    getClientDetail(id),
+  ]);
   if (error) {
     return NextResponse.json({ ok: false, error }, { status: 400 });
   }
-  return NextResponse.json({ ok: true, reservations });
+  return NextResponse.json({ ok: true, reservations, detail });
 }

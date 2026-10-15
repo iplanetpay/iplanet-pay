@@ -25,7 +25,7 @@ export default async function AdminClientesPage({
       <PageHeader
         eyebrow="Plataforma"
         title="Clientes"
-        description="Busca por nome/telefone, reservas e papéis."
+        description="Busca por nome ou telefone e o detalhe de cada cliente."
         size="lg"
       />
 
@@ -39,7 +39,6 @@ export default async function AdminClientesPage({
         <ClientesPanel
           clients={clients}
           stores={stores}
-          canEditRole
           detailBasePath="/admin/clientes"
         />
       )}
