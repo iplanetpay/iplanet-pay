@@ -44,7 +44,7 @@ Abra [http://127.0.0.1:3000](http://127.0.0.1:3000).
 |-------|-----|
 | `MERCADOPAGO_*` | Pix real |
 | `RESEND_API_KEY` | Envio real de e-mail (senão outbox) |
-| `WHATSAPP_*` / `AGENT_API_KEY` | Agente (WhatsApp admin) |
+| `WAHA_API_*` / `AGENT_API_KEY` | Disparos WhatsApp (WAHA) |
 | `CRON_SECRET` | Lembrete + auto-cancel zeradas 30d |
 | `SUPABASE_SERVICE_ROLE_KEY` | Webhooks Pix + outbox + cron RPC |
 

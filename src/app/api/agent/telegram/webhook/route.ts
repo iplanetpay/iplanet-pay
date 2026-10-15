@@ -9,7 +9,7 @@ export async function POST() {
     {
       ok: false,
       error:
-        "Telegram descontinuado. Configure WhatsApp admin (whatsapp_admin + WHATSAPP_*) para o agente AI.",
+        "Telegram descontinuado. Configure WhatsApp admin (whatsapp_admin + WAHA_API_*) para o agente AI.",
     },
     { status: 503 },
   );

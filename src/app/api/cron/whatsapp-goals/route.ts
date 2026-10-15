@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   enqueueWhatsapp,
+  processDueWhatsappQueue,
   renderTemplate,
   whatsappConfigured,
 } from "@/lib/whatsapp/client";
@@ -10,7 +11,7 @@ import { advanceReminderAt, nextReminderAt } from "@/lib/goals/reminder";
 /**
  * Cron: process due goal reminders.
  * Authorization: Bearer $CRON_SECRET
- * Without WA keys → messages stay in queue (skipped/pending).
+ * Without WAHA keys → due messages are marked skipped.
  * Pix stub text when MP missing.
  */
 async function run(request: Request) {
@@ -39,38 +40,7 @@ async function run(request: Request) {
     const admin = createServiceClient();
     const now = new Date().toISOString();
 
-    // 1) Process pending dispatch items that are due
-    const { data: dueQueue } = await admin
-      .from("whatsapp_dispatch_queue")
-      .select("*")
-      .eq("status", "pending")
-      .lte("scheduled_at", now)
-      .order("scheduled_at", { ascending: true })
-      .limit(50);
-
-    let processed = 0;
-    for (const row of dueQueue ?? []) {
-      if (!whatsappConfigured()) {
-        await admin
-          .from("whatsapp_dispatch_queue")
-          .update({
-            status: "skipped",
-            error: "API não configurada (stub)",
-            sent_at: now,
-          })
-          .eq("id", row.id);
-      } else {
-        await admin
-          .from("whatsapp_dispatch_queue")
-          .update({
-            status: "skipped",
-            error: "Envio live: use worker Meta quando token validado",
-            sent_at: now,
-          })
-          .eq("id", row.id);
-      }
-      processed += 1;
-    }
+    const processed = await processDueWhatsappQueue();
 
     // 2) Goals with reminder_at due
     const { data: dueGoals } = await admin
@@ -171,7 +141,7 @@ async function run(request: Request) {
       goals_enqueued: enqueued,
       api_configured: whatsappConfigured(),
       message:
-        "Lembretes processados (fila WhatsApp; Meta só com WHATSAPP_TOKEN).",
+        "Lembretes processados (WAHA quando WAHA_API_* está definido).",
     });
   } catch (err) {
     const message =

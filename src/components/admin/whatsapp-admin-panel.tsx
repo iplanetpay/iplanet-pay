@@ -168,8 +168,8 @@ export function WhatsappAdminPanel({
       setMessage(
         `Enfileiradas ${data.enqueued ?? 0} mensagens` +
           (data.api_configured
-            ? " (API configurada)."
-            : " (stub — sem Meta API; só fila)."),
+            ? " (WAHA)."
+            : " (sem WAHA; só fila)."),
       );
     } catch {
       setError("Erro de rede.");
@@ -192,13 +192,12 @@ export function WhatsappAdminPanel({
             </span>
           </p>
           <p className="mt-1 text-xs text-[var(--ink-muted)]">
-            Defina WHATSAPP_TOKEN, WHATSAPP_PHONE_NUMBER_ID e
-            WHATSAPP_BUSINESS_ACCOUNT_ID no .env. Sem chaves, mensagens vão só
-            para a fila (stub).
+            Defina WAHA_API_URL, WAHA_API_KEY e WAHA_SESSION.
+            Sem essas variáveis, as mensagens ficam só na fila.
           </p>
         </div>
         <Pill tone={apiConfigured ? "accent" : "neutral"}>
-          {apiConfigured ? "Meta pronta" : "Stub / fila"}
+          {apiConfigured ? "WAHA pronta" : "Só fila"}
         </Pill>
       </Card>
 
@@ -320,8 +319,8 @@ export function WhatsappAdminPanel({
       <Card>
         <h2 className="text-xl font-bold tracking-tight">Broadcast</h2>
         <p className="mt-1 text-sm text-[var(--ink-muted)]">
-          Disparar enfileira em whatsapp_dispatch_queue — não chama Meta sem
-          chaves.
+          Disparar grava em whatsapp_dispatch_queue e envia pela WAHA
+          quando ela está configurada.
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
           <Select
@@ -374,9 +373,9 @@ export function WhatsappAdminPanel({
       <Card>
         <h2 className="text-xl font-bold tracking-tight">Configuração</h2>
         <ul className="mt-3 list-inside list-disc space-y-1 text-sm text-[var(--ink-muted)]">
-          <li>WHATSAPP_TOKEN — token Cloud API</li>
-          <li>WHATSAPP_PHONE_NUMBER_ID — ID do número</li>
-          <li>WHATSAPP_BUSINESS_ACCOUNT_ID — WABA</li>
+          <li>WAHA_API_URL — endereço da WAHA, sem barra no final</li>
+          <li>WAHA_API_KEY — header X-Api-Key</li>
+          <li>WAHA_SESSION — sessão. No WAHA Core o nome é default</li>
           <li>whatsapp_support (já em Config) — WhatsApp da loja no FAQ</li>
           <li>
             Cron: GET/POST /api/cron/whatsapp-goals com Bearer CRON_SECRET

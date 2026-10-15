@@ -20,7 +20,7 @@ export default async function AdminConfigPage() {
 
   const whatsappAdminConfigured = Boolean(
     (settings.whatsapp_admin ?? "").trim() ||
-      process.env.WHATSAPP_TOKEN?.trim(),
+      process.env.WAHA_API_KEY?.trim(),
   );
 
   return (
