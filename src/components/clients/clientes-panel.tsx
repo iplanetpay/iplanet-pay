@@ -21,13 +21,22 @@ const EMPTY_DETAIL: ClientDetail = {
   cpf: null,
   phone: null,
   city: null,
+  state: null,
   address: null,
+  address_number: null,
   birth_date: null,
   referral_code: null,
   referred_by_name: null,
   created_at: null,
   wallet_cents: 0,
 };
+
+function formatAddress(detail: ClientDetail) {
+  const street = [detail.address, detail.address_number].filter(Boolean).join(", ");
+  const cityState = [detail.city, detail.state].filter(Boolean).join(" · ");
+  if (street && cityState) return `${street} · ${cityState}`;
+  return street || cityState || null;
+}
 
 function show(value: string | null | undefined) {
   const text = value?.trim();
@@ -124,7 +133,8 @@ export function ClientesPanel({
         ["CPF", show(detail.cpf)],
         ["Telefone", show(detail.phone ?? selected.phone)],
         ["Cidade", show(detail.city)],
-        ["Endereço", show(detail.address)],
+        ["Estado", show(detail.state)],
+        ["Endereço", show(formatAddress(detail))],
         ["Data de nascimento", formatDate(detail.birth_date)],
         ["Código de indicação", show(detail.referral_code)],
         ["Indicado por", show(detail.referred_by_name)],

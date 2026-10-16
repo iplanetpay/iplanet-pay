@@ -7,10 +7,17 @@ import { tradeInDaysRemaining, tradeInDecisionValue, tradeInVisual } from "../sr
 import { productSubtitle } from "../src/lib/reservations/types.ts";
 import {
   formatCpf,
+  identityMissingMessage,
   normalizeCpf,
+  normalizeState,
   profileIdentityComplete,
   signedInWithGoogle,
 } from "../src/lib/profile/identity.ts";
+import {
+  isUploadedAvatar,
+  resolveProfileAvatar,
+  shouldSyncProviderAvatar,
+} from "../src/lib/auth/avatar.ts";
 import {
   couponNotice,
   nextRaffleDate,
@@ -190,28 +197,49 @@ test("approved trade-in credit expires after 90 days and stays hidden once disca
   assert.equal(discarded.creditCents, 0);
 });
 
-test("signup identity requires cpf, phone, city, address and birth date", () => {
+test("signup identity requires cpf, phone, city, state, address, number and birth date", () => {
   assert.equal(normalizeCpf("390.533.447-05"), "39053344705");
   assert.equal(formatCpf("39053344705"), "390.533.447-05");
   assert.equal(normalizeCpf("111.111.111-11"), null);
   assert.equal(normalizeCpf("123"), null);
+  assert.equal(normalizeState("sp"), "SP");
+  assert.equal(normalizeState("XX"), null);
   const complete = {
     cpf: "390.533.447-05",
     phone: "11999999999",
     city: "São Paulo",
-    address: "Rua A, 10",
+    state: "SP",
+    address: "Rua A",
+    addressNumber: "10",
     birthDate: "1990-05-20",
   };
   assert.equal(profileIdentityComplete(complete), true);
   assert.equal(profileIdentityComplete({ ...complete, cpf: "" }), false);
-  assert.equal(profileIdentityComplete({ ...complete, city: "  " }), false);
+  assert.equal(profileIdentityComplete({ ...complete, state: "" }), false);
+  assert.equal(profileIdentityComplete({ ...complete, addressNumber: "  " }), false);
   assert.equal(profileIdentityComplete({ ...complete, birthDate: "1890-01-01" }), false);
+  assert.equal(
+    identityMissingMessage({ ...complete, addressNumber: "" }),
+    "Informe o número.",
+  );
   assert.equal(signedInWithGoogle({ app_metadata: { provider: "google" } }), true);
   assert.equal(signedInWithGoogle({ app_metadata: { provider: "email" }, identities: [] }), false);
   assert.equal(
     signedInWithGoogle({ identities: [{ provider: "google" }] }),
     true,
   );
+});
+
+test("google avatar syncs until the user uploads a custom photo", () => {
+  const google = "https://lh3.googleusercontent.com/a/photo";
+  const uploaded = "https://xeeogfmmasvgbpmodqym.supabase.co/storage/v1/object/public/avatars/u/avatar.jpg";
+  assert.equal(isUploadedAvatar(uploaded), true);
+  assert.equal(isUploadedAvatar(google), false);
+  assert.equal(resolveProfileAvatar(null, google), google);
+  assert.equal(resolveProfileAvatar(uploaded, google), uploaded);
+  assert.equal(shouldSyncProviderAvatar(null, google), true);
+  assert.equal(shouldSyncProviderAvatar(google, "https://lh3.googleusercontent.com/a/new"), true);
+  assert.equal(shouldSyncProviderAvatar(uploaded, google), false);
 });
 
 test("avisos: raffle date, winner and pre-created coupon", () => {

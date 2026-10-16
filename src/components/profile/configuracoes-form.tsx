@@ -154,6 +154,10 @@ export function ConfiguracoesForm({
 
   async function onCropConfirm(blob: Blob) {
     clearFeedback();
+    const previousAvatar = avatar;
+    const previewUrl = URL.createObjectURL(blob);
+    setAvatar(previewUrl);
+    closeCrop();
     setAvatarLoading(true);
     try {
       const form = new FormData();
@@ -168,14 +172,18 @@ export function ConfiguracoesForm({
         avatar_url?: string;
       };
       if (!res.ok || !data.ok || !data.avatar_url) {
+        URL.revokeObjectURL(previewUrl);
+        setAvatar(previousAvatar);
         setError(data.error ?? "Falha no upload da foto.");
         return;
       }
       setAvatar(data.avatar_url);
+      URL.revokeObjectURL(previewUrl);
       setMessage("Foto atualizada.");
-      closeCrop();
       router.refresh();
     } catch {
+      URL.revokeObjectURL(previewUrl);
+      setAvatar(previousAvatar);
       setError("Erro de rede no upload.");
     } finally {
       setAvatarLoading(false);
@@ -328,6 +336,9 @@ export function ConfiguracoesForm({
               <Input
                 label="Telefone"
                 name="phone"
+                type="tel"
+                autoComplete="tel"
+                inputMode="tel"
                 value={phoneValue}
                 onChange={(e) => setPhoneValue(e.target.value)}
                 placeholder="(11) 99999-9999"

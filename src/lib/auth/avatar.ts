@@ -29,11 +29,32 @@ export function avatarFromAuthMetadata(user: {
   return null;
 }
 
-/** A photo chosen in settings wins. Otherwise use the provider photo. */
+/** Foto enviada nas configurações (storage ou data URL). */
+export function isUploadedAvatar(url: string | null | undefined): boolean {
+  if (!url) return false;
+  const value = url.trim();
+  if (value.startsWith("data:image")) return true;
+  return value.includes("/avatars/") || value.includes("/storage/v1/object/");
+}
+
+/** Foto do Google (ou outro provedor) quando ainda não há upload próprio. */
 export function resolveProfileAvatar(
   stored: string | null | undefined,
   fromProvider: string | null,
 ): string | null {
   const trimmed = stored?.trim() || null;
-  return trimmed ?? fromProvider;
+  if (trimmed && isUploadedAvatar(trimmed)) return trimmed;
+  return fromProvider ?? trimmed;
+}
+
+/** Atualiza o perfil com a foto do Google se ainda não houver upload próprio. */
+export function shouldSyncProviderAvatar(
+  stored: string | null | undefined,
+  fromProvider: string | null,
+): boolean {
+  if (!fromProvider) return false;
+  const trimmed = stored?.trim() || "";
+  if (!trimmed) return true;
+  if (isUploadedAvatar(trimmed)) return false;
+  return trimmed !== fromProvider;
 }

@@ -8,9 +8,9 @@ import {
 import { homeForRole } from "@/lib/auth/roles";
 import { normalizeBrazilPhone } from "@/lib/phone";
 import {
-  isValidBirthDate,
+  identityMissingMessage,
   normalizeCpf,
-  profileIdentityComplete,
+  normalizeState,
 } from "@/lib/profile/identity";
 
 export async function POST(request: Request) {
@@ -22,7 +22,9 @@ export async function POST(request: Request) {
     referral_code?: string;
     cpf?: string;
     city?: string;
+    state?: string;
     address?: string;
+    address_number?: string;
     birth_date?: string;
     terms_accepted?: boolean;
     terms_version?: string;
@@ -31,25 +33,21 @@ export async function POST(request: Request) {
   const phone = normalizeBrazilPhone(body.phone);
   const cpf = normalizeCpf(body.cpf);
   const city = (body.city ?? "").trim();
+  const state = normalizeState(body.state);
   const address = (body.address ?? "").trim();
+  const addressNumber = (body.address_number ?? "").trim();
   const birthDate = (body.birth_date ?? "").trim();
-  if (
-    !profileIdentityComplete({
-      cpf,
-      phone,
-      city,
-      address,
-      birthDate,
-    }) ||
-    !isValidBirthDate(birthDate)
-  ) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error: "Informe CPF, telefone, cidade, endereço e data de nascimento.",
-      },
-      { status: 400 },
-    );
+  const missing = identityMissingMessage({
+    cpf,
+    phone,
+    city,
+    state,
+    address,
+    addressNumber,
+    birthDate,
+  });
+  if (missing) {
+    return NextResponse.json({ ok: false, error: missing }, { status: 400 });
   }
 
   if (!body.terms_accepted) {
@@ -81,11 +79,20 @@ export async function POST(request: Request) {
     return response;
   }
 
+  const email = (body.email ?? "").trim();
+  const password = body.password ?? "";
+  if (!email || password.length < 6) {
+    return NextResponse.json(
+      { ok: false, error: "Informe e-mail e senha com pelo menos 6 caracteres." },
+      { status: 400 },
+    );
+  }
+
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
-    email: body.email ?? "",
-    password: body.password ?? "",
+    email,
+    password,
     options: {
       data: {
         full_name: body.full_name,
@@ -101,17 +108,17 @@ export async function POST(request: Request) {
     );
   }
 
-
-  if (data.user) {
-    try {
-      const { createServiceClient } = await import("@/lib/supabase/admin");
-      const admin = createServiceClient();
+  try {
+    const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+    const admin = tryCreateServiceClient();
+    if (admin) {
       await admin
         .from("profiles")
         .update({
           terms_accepted_at: new Date().toISOString(),
           terms_version: body.terms_version || "withdrawal-v1",
           phone,
+          full_name: body.full_name ?? null,
         })
         .eq("id", data.user.id);
       await admin
@@ -119,13 +126,35 @@ export async function POST(request: Request) {
         .update({
           cpf,
           city,
+          state,
           address,
+          address_number: addressNumber,
           birth_date: birthDate,
         })
         .eq("id", data.user.id);
-    } catch {
-      /* non-fatal if service role missing */
+    } else {
+      await supabase
+        .from("profiles")
+        .update({
+          terms_accepted_at: new Date().toISOString(),
+          terms_version: body.terms_version || "withdrawal-v1",
+          phone,
+        })
+        .eq("id", data.user.id);
+      await supabase
+        .from("profiles")
+        .update({
+          cpf,
+          city,
+          state,
+          address,
+          address_number: addressNumber,
+          birth_date: birthDate,
+        })
+        .eq("id", data.user.id);
     }
+  } catch {
+    /* non-fatal if identity columns are still missing */
   }
 
   const ref = (body.referral_code ?? "").trim();
@@ -161,11 +190,11 @@ export async function POST(request: Request) {
     }
   }
 
-  if (body.email) {
+  if (email) {
     try {
       const { notifyWelcome } = await import("@/lib/email/notify");
       void notifyWelcome({
-        email: body.email,
+        email,
         fullName: body.full_name,
       });
     } catch {
@@ -177,5 +206,6 @@ export async function POST(request: Request) {
     ok: true,
     redirectTo: homeForRole("cliente"),
     mode: "supabase",
+    needs_email_confirmation: !data.session,
   });
 }

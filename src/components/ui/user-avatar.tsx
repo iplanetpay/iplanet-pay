@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 function initialsFromName(name: string): string {
@@ -23,6 +23,10 @@ export function UserAvatar({
 }) {
   const initials = initialsFromName(name);
   const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [avatarUrl]);
 
   if (avatarUrl && !failed) {
     return (

@@ -6,7 +6,11 @@ import {
   USE_MOCK_AUTH,
   parseMockSession,
 } from "@/lib/auth/mock";
-import { avatarFromAuthMetadata, resolveProfileAvatar } from "@/lib/auth/avatar";
+import {
+  avatarFromAuthMetadata,
+  resolveProfileAvatar,
+  shouldSyncProviderAvatar,
+} from "@/lib/auth/avatar";
 import { signedInWithGoogle } from "@/lib/profile/identity";
 import type { AuthUser, PixKeyType } from "@/types/auth";
 
@@ -44,7 +48,7 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
   const fromProvider = avatarFromAuthMetadata(user);
   const avatar_url = resolveProfileAvatar(profile?.avatar_url, fromProvider);
 
-  if (!profile?.avatar_url?.trim() && fromProvider) {
+  if (shouldSyncProviderAvatar(profile?.avatar_url, fromProvider) && fromProvider) {
     await supabase
       .from("profiles")
       .update({ avatar_url: fromProvider })

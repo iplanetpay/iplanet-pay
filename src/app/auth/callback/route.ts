@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { avatarFromAuthMetadata } from "@/lib/auth/avatar";
+import {
+  avatarFromAuthMetadata,
+  shouldSyncProviderAvatar,
+} from "@/lib/auth/avatar";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { homeForRole, roleAllowedForPath } from "@/lib/auth/roles";
@@ -59,9 +62,7 @@ export async function GET(request: Request) {
           role = "cliente";
         } else {
           role = (profile.role ?? "cliente") as UserRole;
-          const stored =
-            typeof profile.avatar_url === "string" ? profile.avatar_url.trim() : "";
-          if (!stored && avatarUrl) {
+          if (shouldSyncProviderAvatar(profile.avatar_url, avatarUrl) && avatarUrl) {
             await supabase
               .from("profiles")
               .update({ avatar_url: avatarUrl })

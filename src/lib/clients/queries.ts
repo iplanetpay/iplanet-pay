@@ -40,7 +40,9 @@ export type ClientDetail = {
   cpf: string | null;
   phone: string | null;
   city: string | null;
+  state: string | null;
   address: string | null;
+  address_number: string | null;
   birth_date: string | null;
   referral_code: string | null;
   referred_by_name: string | null;
@@ -247,7 +249,9 @@ const EMPTY_DETAIL: ClientDetail = {
   cpf: null,
   phone: null,
   city: null,
+  state: null,
   address: null,
+  address_number: null,
   birth_date: null,
   referral_code: null,
   referred_by_name: null,
@@ -266,11 +270,13 @@ export async function getClientDetail(
     const supabase = await createClient();
     const extended = await supabase
       .from("profiles")
-      .select("phone, created_at, referral_code, referred_by, cpf, city, address, birth_date")
+      .select(
+        "phone, created_at, referral_code, referred_by, cpf, city, state, address, address_number, birth_date",
+      )
       .eq("id", userId)
       .maybeSingle();
     const fallback =
-      extended.error && /column/i.test(extended.error.message)
+      extended.error && /column|schema cache/i.test(extended.error.message)
         ? await supabase
             .from("profiles")
             .select("phone, created_at, referral_code, referred_by")
@@ -283,7 +289,9 @@ export async function getClientDetail(
     const identity = profile as typeof profile & {
       cpf?: string | null;
       city?: string | null;
+      state?: string | null;
       address?: string | null;
+      address_number?: string | null;
       birth_date?: string | null;
     };
 
@@ -315,7 +323,9 @@ export async function getClientDetail(
         cpf: identity.cpf ? identity.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null,
         phone: profile.phone ?? null,
         city: identity.city ?? null,
+        state: identity.state ?? null,
         address: identity.address ?? null,
+        address_number: identity.address_number ?? null,
         birth_date: identity.birth_date ?? null,
         referral_code: profile.referral_code ?? null,
         referred_by_name: referredByName,

@@ -10,6 +10,10 @@ import { MotionModal } from "@/components/ui/motion";
 import { SignupSuccessOverlay } from "@/components/auth/signup-success";
 import { trackEvent } from "@/lib/analytics/track";
 import { normalizeBrazilPhone } from "@/lib/phone";
+import {
+  BRAZIL_STATES,
+  identityMissingMessage,
+} from "@/lib/profile/identity";
 import { TERMS_OF_USE_PT, TERMS_VERSION } from "@/lib/withdrawals/types";
 
 export function SignupForm({
@@ -22,12 +26,15 @@ export function SignupForm({
   productSlug?: string;
 }) {
   const router = useRouter();
+  const referralLocked = Boolean(initialReferralCode.trim());
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [cpf, setCpf] = useState("");
   const [city, setCity] = useState("");
+  const [state, setState] = useState("");
   const [address, setAddress] = useState("");
+  const [addressNumber, setAddressNumber] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [password, setPassword] = useState("");
   const [referralCode, setReferralCode] = useState(initialReferralCode);
@@ -49,6 +56,19 @@ export function SignupForm({
       setMessage("Marque todos os aceites dos Termos de Uso para criar a conta.");
       return;
     }
+    const missing = identityMissingMessage({
+      cpf,
+      phone: normalizeBrazilPhone(phone) ?? phone,
+      city,
+      state,
+      address,
+      addressNumber,
+      birthDate,
+    });
+    if (missing) {
+      setMessage(missing);
+      return;
+    }
     setLoading(true);
     setMessage(null);
     try {
@@ -61,21 +81,36 @@ export function SignupForm({
           phone: normalizeBrazilPhone(phone) ?? phone,
           cpf,
           city,
+          state,
           address,
+          address_number: addressNumber,
           birth_date: birthDate,
           password,
-          referral_code: referralCode || undefined,
+          referral_code: referralLocked
+            ? initialReferralCode
+            : referralCode || undefined,
           product: productSlug,
           terms_accepted: true,
           terms_version: TERMS_VERSION,
         }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        redirectTo?: string;
+        needs_email_confirmation?: boolean;
+      };
       if (!res.ok || !data.ok) {
         setMessage(data.error ?? "Não foi possível criar a conta.");
         return;
       }
       void trackEvent("signup", { meta: { product: productSlug } });
+      if (data.needs_email_confirmation) {
+        setMessage(
+          "Conta criada. Confirme o e-mail que enviamos para entrar na plataforma.",
+        );
+        return;
+      }
       const dest = productSlug
         ? `/app/catalogo?product=${encodeURIComponent(productSlug)}`
         : (data.redirectTo ?? "/app");
@@ -132,6 +167,8 @@ export function SignupForm({
           label="E-mail"
           type="email"
           name="email"
+          autoComplete="email"
+          inputMode="email"
           placeholder="voce@email.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -139,7 +176,10 @@ export function SignupForm({
         />
         <Input
           label="Telefone"
+          type="tel"
           name="phone"
+          autoComplete="tel"
+          inputMode="tel"
           placeholder="(11) 99999-9999"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
@@ -154,22 +194,52 @@ export function SignupForm({
           onChange={(e) => setCpf(e.target.value)}
           required
         />
-        <Input
-          label="Cidade"
-          name="city"
-          placeholder="São Paulo"
-          value={city}
-          onChange={(e) => setCity(e.target.value)}
-          required
-        />
-        <Input
-          label="Endereço"
-          name="address"
-          placeholder="Rua, número, bairro"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          required
-        />
+        <div className="grid gap-4 sm:grid-cols-[1fr_7rem]">
+          <Input
+            label="Cidade"
+            name="city"
+            placeholder="São Paulo"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            required
+          />
+          <label className="flex w-full flex-col gap-2 text-sm">
+            <span className="font-medium text-[var(--ink)]">Estado</span>
+            <select
+              name="state"
+              className="h-12 w-full rounded-2xl border border-[var(--line)] bg-white px-4 text-[var(--ink)] outline-none focus:border-[var(--ink)] focus:ring-4 focus:ring-black/5"
+              value={state}
+              onChange={(e) => setState(e.target.value)}
+              required
+            >
+              <option value="">UF</option>
+              {BRAZIL_STATES.map((uf) => (
+                <option key={uf} value={uf}>
+                  {uf}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-[1fr_7rem]">
+          <Input
+            label="Endereço"
+            name="address"
+            placeholder="Rua, avenida, bairro"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            required
+          />
+          <Input
+            label="Número"
+            name="address_number"
+            inputMode="numeric"
+            placeholder="123"
+            value={addressNumber}
+            onChange={(e) => setAddressNumber(e.target.value)}
+            required
+          />
+        </div>
         <Input
           label="Data de nascimento"
           name="birth_date"
@@ -179,12 +249,25 @@ export function SignupForm({
           required
         />
         <Input
-          label="Código de indicação (opcional)"
+          label={
+            referralLocked
+              ? "Código de indicação"
+              : "Código de indicação (opcional)"
+          }
           name="referral_code"
           placeholder="ABC123"
           value={referralCode}
-          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          onChange={(e) => {
+            if (referralLocked) return;
+            setReferralCode(e.target.value.toUpperCase());
+          }}
+          readOnly={referralLocked}
           className="uppercase tracking-widest"
+          hint={
+            referralLocked
+              ? "Este código veio do link de indicação e não pode ser alterado."
+              : undefined
+          }
         />
         <Input
           label="Senha"
@@ -253,7 +336,7 @@ export function SignupForm({
           {loading ? "Criando..." : "Criar conta"}
         </Button>
         {message ? (
-          <p className="text-sm text-[var(--ink-muted)]">{message}</p>
+          <p className="text-sm text-[var(--danger)]">{message}</p>
         ) : null}
         <p className="text-sm text-[var(--ink-muted)]">
           Já tem conta?{" "}

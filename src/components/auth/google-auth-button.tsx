@@ -53,7 +53,8 @@ export function GoogleAuthButton({
         options: {
           redirectTo,
           scopes: "openid email profile",
-          queryParams: { prompt: "select_account" },
+          // consent ensures Google returns the profile picture on this login.
+          queryParams: { prompt: "consent select_account" },
         },
       });
 

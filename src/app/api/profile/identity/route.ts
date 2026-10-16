@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { normalizeBrazilPhone } from "@/lib/phone";
-import { normalizeCpf, profileIdentityComplete } from "@/lib/profile/identity";
+import {
+  identityMissingMessage,
+  normalizeCpf,
+  normalizeState,
+} from "@/lib/profile/identity";
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -13,21 +17,30 @@ export async function POST(request: Request) {
     phone?: string;
     cpf?: string;
     city?: string;
+    state?: string;
     address?: string;
+    address_number?: string;
     birth_date?: string;
   };
 
   const phone = normalizeBrazilPhone(body.phone);
   const cpf = normalizeCpf(body.cpf);
   const city = (body.city ?? "").trim();
+  const state = normalizeState(body.state);
   const address = (body.address ?? "").trim();
+  const addressNumber = (body.address_number ?? "").trim();
   const birthDate = (body.birth_date ?? "").trim();
-
-  if (!profileIdentityComplete({ cpf, phone, city, address, birthDate })) {
-    return NextResponse.json(
-      { ok: false, error: "Informe CPF, telefone, cidade, endereço e data de nascimento." },
-      { status: 400 },
-    );
+  const missing = identityMissingMessage({
+    cpf,
+    phone,
+    city,
+    state,
+    address,
+    addressNumber,
+    birthDate,
+  });
+  if (missing) {
+    return NextResponse.json({ ok: false, error: missing }, { status: 400 });
   }
 
   const { createClient } = await import("@/lib/supabase/server");
@@ -38,7 +51,9 @@ export async function POST(request: Request) {
       phone,
       cpf,
       city,
+      state,
       address,
+      address_number: addressNumber,
       birth_date: birthDate,
     })
     .eq("id", user.id);
