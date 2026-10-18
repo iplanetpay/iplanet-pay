@@ -69,6 +69,15 @@ import {
 } from "../src/lib/goals/journey.ts";
 import { contributionReminder } from "../src/lib/goals/reminders.ts";
 import { CLIENTE_DOCK } from "../src/lib/navigation/cliente-dock.ts";
+import { climbGoalFromPlan, prizeKindFromProductName } from "../src/lib/goals/climb/adapter.ts";
+import { isClimbableGoal, selectClimbGoal } from "../src/lib/goals/climb/goal-cards.ts";
+import {
+  brl,
+  climbDaysLate,
+  climbStreak,
+  deriveStatus,
+  relativeDue,
+} from "../src/lib/goals/climb/goal-logic.ts";
 
 function ticketsFromContributedCents(cents, perTicket = 10_000) {
   return Math.floor(cents / perTicket);
@@ -977,6 +986,201 @@ test("a late notice already sent is not sent again", () => {
 test("the client dock includes Metas", () => {
   assert.ok(
     CLIENTE_DOCK.some((item) => item.href === "/app/metas" && item.label === "Metas"),
+  );
+});
+
+test("climb status is late when a deposit is overdue and near late the day before", () => {
+  const pending = (dueDate) => ({ id: dueDate, dueDate, amount: 10, status: "pending" });
+  assert.equal(
+    deriveStatus([pending("2026-06-10")], 10, "2026-06-12"),
+    "late",
+  );
+  assert.equal(
+    deriveStatus(
+      [{ id: "m", dueDate: "2026-06-01", amount: 10, status: "missed" }, pending("2026-07-01")],
+      20,
+      "2026-06-12",
+    ),
+    "late",
+  );
+  assert.equal(deriveStatus([pending("2026-06-10")], 40, "2026-06-10"), "near_late");
+  assert.equal(deriveStatus([pending("2026-06-11")], 40, "2026-06-10"), "near_late");
+  assert.equal(deriveStatus([pending("2026-06-12")], 40, "2026-06-10"), "on_track");
+  assert.equal(
+    deriveStatus(
+      [{ id: "late-paid", dueDate: "2026-06-01", amount: 10, status: "paid_late" }, pending("2026-06-20")],
+      30,
+      "2026-06-03",
+    ),
+    "on_track",
+  );
+  assert.equal(deriveStatus([pending("2026-06-01")], 100, "2026-06-20"), "done");
+  assert.equal(relativeDue("2026-06-10", "2026-06-10"), "hoje");
+  assert.equal(relativeDue("2026-06-11", "2026-06-10"), "amanhã");
+  assert.equal(relativeDue("2026-06-09", "2026-06-10"), "atrasado há 1 dia");
+  assert.match(brl(10.5).replace(/\s/g, " "), /R\$ 10,50/);
+  assert.match(brl(100).replace(/\s/g, " "), /R\$ 100(?!,)/);
+});
+
+test("the climb adapter maps the real schedule without treating a paid-late aporte as missed", () => {
+  const plan = buildContributionPlan({
+    targetCents: 30000,
+    contributedCents: 0,
+    startDate: "2026-06-01",
+    endDate: "2026-06-15",
+    frequency: "weekly",
+  });
+  assert.deepEqual(plan.dates, ["2026-06-01", "2026-06-08", "2026-06-15"]);
+
+  const onTime = climbGoalFromPlan({
+    id: "meta-1",
+    name: "Meu iPhone",
+    productName: "iPhone 16 Pro",
+    targetCents: 30000,
+    savedCents: 10000,
+    today: "2026-06-02",
+    plan,
+    contributions: [{ paidOn: "2026-06-01", amountCents: 10000 }],
+  });
+  assert.equal(onTime.status, "on_track");
+  assert.equal(onTime.product.kind, "phone");
+  assert.equal(onTime.percent, 33);
+  assert.equal(onTime.deposits[0].status, "paid_on_time");
+  assert.equal(onTime.deposits[1].status, "pending");
+  assert.equal(onTime.streak, 1);
+  assert.equal(onTime.daysLate, 0);
+  assert.equal(onTime.deposits[0].amount, 100);
+
+  const almost = climbGoalFromPlan({
+    id: "meta-1",
+    name: "Meu iPhone",
+    productName: "iPhone 16 Pro",
+    targetCents: 30000,
+    savedCents: 10000,
+    today: "2026-06-07",
+    plan,
+    contributions: [{ paidOn: "2026-06-01", amountCents: 10000 }],
+  });
+  assert.equal(almost.status, "near_late");
+  assert.equal(almost.deposits[1].dueDate, "2026-06-08");
+
+  const paidLate = climbGoalFromPlan({
+    id: "meta-1",
+    name: "Meu iPhone",
+    productName: "iPhone 16 Pro",
+    targetCents: 30000,
+    savedCents: 10000,
+    today: "2026-06-03",
+    plan,
+    contributions: [{ paidOn: "2026-06-03", amountCents: 10000 }],
+  });
+  assert.equal(paidLate.deposits[0].status, "paid_late");
+  assert.equal(paidLate.deposits[0].paidAt, "2026-06-03");
+  assert.equal(paidLate.status, "on_track");
+  assert.equal(paidLate.streak, 0);
+
+  const overdue = climbGoalFromPlan({
+    id: "meta-1",
+    name: "Meu iPhone",
+    productName: "iPhone 16 Pro",
+    targetCents: 30000,
+    savedCents: 0,
+    today: "2026-06-09",
+    plan,
+    contributions: [],
+  });
+  assert.equal(overdue.status, "late");
+  assert.equal(overdue.deposits[0].status, "missed");
+  assert.equal(overdue.deposits[1].status, "missed");
+  assert.equal(overdue.deposits[2].status, "pending");
+  assert.equal(overdue.daysLate, 8);
+  assert.equal(
+    climbDaysLate("2026-06-09", [
+      { status: "missed", dueDate: "2026-06-01" },
+      { status: "pending", dueDate: "2026-06-15" },
+    ]),
+    8,
+  );
+  assert.equal(
+    climbStreak([
+      { status: "paid_on_time" },
+      { status: "paid_on_time" },
+      { status: "paid_late" },
+      { status: "paid_on_time" },
+    ]),
+    1,
+  );
+
+  const conquered = climbGoalFromPlan({
+    id: "meta-1",
+    name: "Meu iPhone",
+    productName: "iPhone 16 Pro",
+    targetCents: 30000,
+    savedCents: 30000,
+    today: "2026-06-20",
+    plan,
+    contributions: [
+      { paidOn: "2026-06-01", amountCents: 10000 },
+      { paidOn: "2026-06-08", amountCents: 10000 },
+      { paidOn: "2026-06-15", amountCents: 10000 },
+    ],
+  });
+  assert.equal(conquered.status, "done");
+  assert.equal(conquered.percent, 100);
+  assert.ok(conquered.deposits.every((deposit) => deposit.status === "paid_on_time"));
+  assert.equal(conquered.streak, 3);
+
+  assert.equal(prizeKindFromProductName("MacBook Air"), "laptop");
+  assert.equal(prizeKindFromProductName("AirPods Pro"), "headphones");
+  assert.equal(prizeKindFromProductName("Apple Watch"), "gift");
+});
+
+test("the metas grid opens the goal in the link and skips an unknown id", () => {
+  const entry = (id, name, status) => ({
+    depositHref: `/app/reserva/${id}`,
+    goal: {
+      id,
+      name,
+      status,
+      product: { name: "iPhone", kind: "phone" },
+      targetAmount: 100,
+      savedAmount: 40,
+      percent: 40,
+      deposits: [],
+    },
+  });
+  const entries = [entry("g-on", "iPhone da Ana", "on_track"), entry("g-late", "Mac do escritório", "late")];
+  assert.equal(selectClimbGoal(entries, "g-late")?.goal.name, "Mac do escritório");
+  assert.equal(selectClimbGoal(entries, "g-late")?.goal.status, "late");
+  assert.equal(selectClimbGoal(entries, "nao-existe"), null);
+  assert.equal(selectClimbGoal(entries, "  "), null);
+  assert.equal(selectClimbGoal(entries, null), null);
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: "r1",
+      frequency: "weekly",
+      plan_start_date: "2026-10-12",
+    }),
+    true,
+  );
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: null,
+      frequency: "weekly",
+      plan_start_date: "2026-10-12",
+    }),
+    false,
+  );
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: "r1",
+      frequency: "yearly",
+      plan_start_date: "2026-10-12",
+    }),
+    false,
   );
 });
 
