@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { analyticsPersistMode } from "@/lib/analytics/persist";
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 
 const ALLOWED = new Set([
   "page_view",
@@ -18,6 +20,10 @@ export async function POST(request: Request) {
 
     if (!body.event_type || !ALLOWED.has(body.event_type)) {
       return NextResponse.json({ ok: false, error: "event_type inválido" }, { status: 400 });
+    }
+
+    if (analyticsPersistMode(USE_MOCK_AUTH) === "skip") {
+      return NextResponse.json({ ok: true });
     }
 
     const { createClient } = await import("@/lib/supabase/server");

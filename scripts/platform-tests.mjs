@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { normalizeBrazilPhone } from "../src/lib/phone.ts";
 import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy.ts";
 import { referralActivated } from "../src/lib/referrals/status.ts";
@@ -19,7 +19,9 @@ import {
   resolveProfileAvatar,
   shouldSyncProviderAvatar,
 } from "../src/lib/auth/avatar.ts";
+import { analyticsPersistMode } from "../src/lib/analytics/persist.ts";
 import { resolveSignupAccess } from "../src/lib/auth/signup-access.ts";
+import { wordmarkBox } from "../src/lib/brand/wordmark.ts";
 import { showCatalogStepArrows } from "../src/lib/catalog/carousel-arrows.ts";
 import { CHOOSE_TILES } from "../src/lib/landing/choose-tiles.ts";
 import { videoBlocksBoot } from "../src/lib/navigation/boot-media.ts";
@@ -310,6 +312,59 @@ test("Safari and every iOS browser are detected as WebKit, Chrome is not", () =>
   assert.equal(isWebKitSafari(iphoneChrome), true);
   assert.equal(isWebKitSafari(androidChrome), false);
   assert.equal(isWebKitSafari(macSafari.replace("Version/26.0 ", ""), 5), true);
+});
+
+test("device mockup quality is listed in next image qualities", () => {
+  const config = readFileSync(new URL("../next.config.ts", import.meta.url), "utf8");
+  const mockup = readFileSync(
+    new URL("../src/components/landing/framer-device-mockup.tsx", import.meta.url),
+    "utf8",
+  );
+  const used = [...mockup.matchAll(/quality=\{(\d+)\}/g)].map((match) => Number(match[1]));
+  assert.ok(used.includes(85));
+  const list = config.match(/qualities:\s*\[([^\]]+)\]/);
+  assert.ok(list);
+  const configured = list[1].split(",").map((part) => Number(part.trim()));
+  assert.ok(configured.includes(75));
+  for (const quality of used) {
+    assert.ok(configured.includes(quality));
+  }
+});
+
+test("wordmark sets both image axes so Next does not warn about one resized side", () => {
+  const box = wordmarkBox(44);
+  assert.equal(box.height, 44);
+  assert.equal(box.width, Math.round(44 * (1175 / 296)));
+  assert.equal(typeof box.width, "number");
+  const logo = readFileSync(
+    new URL("../src/components/ui/brand-logo.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.equal(logo.includes('width: "auto"'), false);
+  assert.match(logo, /style=\{box\}|style=\{\{ \.\.\.box/);
+});
+
+test("lazy landing images ignore the Chrome loading attribute mismatch", () => {
+  const section = readFileSync(
+    new URL("../src/components/landing/seu-iphone-section.tsx", import.meta.url),
+    "utf8",
+  );
+  const logo = readFileSync(
+    new URL("../src/components/ui/brand-logo.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(section, /suppressHydrationWarning/);
+  assert.match(logo, /suppressHydrationWarning/);
+});
+
+test("analytics does not throw when auth is mocked", () => {
+  assert.equal(analyticsPersistMode(true), "skip");
+  assert.equal(analyticsPersistMode(false), "write");
+  const route = readFileSync(
+    new URL("../src/app/api/analytics/track/route.ts", import.meta.url),
+    "utf8",
+  );
+  assert.match(route, /analyticsPersistMode\(USE_MOCK_AUTH\) === "skip"/);
 });
 
 test("step 1 of Como funciona shows a photo on iPad Air and MacBook Air", () => {

@@ -40,6 +40,9 @@ const nextConfig: NextConfig = {
       process.env.EMAIL_FROM?.trim() || "noreply@iplanet.com.br",
   },
   reactStrictMode: true,
+  images: {
+    qualities: [75, 85],
+  },
   // Vendored Framer marketplace JS (THREE / USD parsers) ships as plain ESM.
   turbopack: {
     resolveAlias: {

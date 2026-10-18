@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { wordmarkBox } from "@/lib/brand/wordmark";
 import { cn } from "@/lib/utils";
 
 interface BrandLogoProps {
@@ -12,7 +13,7 @@ interface BrandLogoProps {
    * mark = same pay wordmark, scaled for compact chrome (sidebar collapsed, top bar).
    */
   variant?: "mark" | "wordmark";
-  /** Explicit height for wordmark (width auto). Default 48. */
+  /** Explicit wordmark height. Width follows the cropped logo aspect. Default 48. */
   height?: number;
 }
 
@@ -25,40 +26,36 @@ export function BrandLogo({
   height,
 }: BrandLogoProps) {
   if (variant === "wordmark") {
-    const h = height ?? 48;
-    // Cropped wordmark ~1175×296 → aspect ≈ 3.97
-    const w = Math.round(h * (1175 / 296));
+    const box = wordmarkBox(height ?? 48);
     return (
       <Image
         src="/logo-iplanet-pay.png"
         alt="iPlanet Pay"
-        width={w}
-        height={h}
+        width={box.width}
+        height={box.height}
         priority={priority}
-        className={cn(
-          "h-auto w-auto rounded-xl object-contain",
-          className,
-        )}
-        style={{ height: h, width: "auto" }}
+        suppressHydrationWarning
+        className={cn("rounded-xl object-contain", className)}
+        style={box}
       />
     );
   }
 
-  const h = size;
-  const w = Math.round(h * (1175 / 296));
+  const box = wordmarkBox(size);
   return (
     <Image
       src="/logo-iplanet-pay.png"
       alt="iPlanet Pay"
-      width={w}
-      height={h}
+      width={box.width}
+      height={box.height}
       priority={priority}
+      suppressHydrationWarning
       className={cn(
-        "h-auto w-auto max-w-full object-contain",
+        "max-w-full object-contain",
         onDark && "brightness-0 invert",
         className,
       )}
-      style={{ height: h, width: "auto", maxWidth: "100%" }}
+      style={{ ...box, maxWidth: "100%" }}
     />
   );
 }
