@@ -70,6 +70,7 @@ import {
 import { contributionReminder } from "../src/lib/goals/reminders.ts";
 import { CLIENTE_DOCK } from "../src/lib/navigation/cliente-dock.ts";
 import { climbGoalFromPlan, prizeKindFromProductName } from "../src/lib/goals/climb/adapter.ts";
+import { isClimbableGoal, selectClimbGoal } from "../src/lib/goals/climb/goal-cards.ts";
 import {
   brl,
   climbDaysLate,
@@ -1132,6 +1133,55 @@ test("the climb adapter maps the real schedule without treating a paid-late apor
   assert.equal(prizeKindFromProductName("MacBook Air"), "laptop");
   assert.equal(prizeKindFromProductName("AirPods Pro"), "headphones");
   assert.equal(prizeKindFromProductName("Apple Watch"), "gift");
+});
+
+test("the metas grid opens the goal in the link and skips an unknown id", () => {
+  const entry = (id, name, status) => ({
+    depositHref: `/app/reserva/${id}`,
+    goal: {
+      id,
+      name,
+      status,
+      product: { name: "iPhone", kind: "phone" },
+      targetAmount: 100,
+      savedAmount: 40,
+      percent: 40,
+      deposits: [],
+    },
+  });
+  const entries = [entry("g-on", "iPhone da Ana", "on_track"), entry("g-late", "Mac do escritório", "late")];
+  assert.equal(selectClimbGoal(entries, "g-late")?.goal.name, "Mac do escritório");
+  assert.equal(selectClimbGoal(entries, "g-late")?.goal.status, "late");
+  assert.equal(selectClimbGoal(entries, "nao-existe"), null);
+  assert.equal(selectClimbGoal(entries, "  "), null);
+  assert.equal(selectClimbGoal(entries, null), null);
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: "r1",
+      frequency: "weekly",
+      plan_start_date: "2026-10-12",
+    }),
+    true,
+  );
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: null,
+      frequency: "weekly",
+      plan_start_date: "2026-10-12",
+    }),
+    false,
+  );
+  assert.equal(
+    isClimbableGoal({
+      status: "active",
+      reservation_id: "r1",
+      frequency: "yearly",
+      plan_start_date: "2026-10-12",
+    }),
+    false,
+  );
 });
 
 console.log(`\n${passed} test(s) passed.`);
