@@ -43,6 +43,32 @@ import {
   unreadNoticeCount,
   winnerNotice,
 } from "../src/lib/notices/copy.ts";
+import {
+  applyEarlyPayments,
+  assignContributionStatuses,
+  buildContributionPlan,
+  nextOpenAporteCents,
+} from "../src/lib/reservations/contribution-plan.ts";
+import {
+  calendarMarks,
+  defaultMonthIndex,
+  planMonthKeys,
+  resolveContributionSlots,
+  stepMonthIndex,
+} from "../src/lib/goals/calendar-marks.ts";
+import {
+  climbMotion,
+  dayPhase,
+  goalHealth,
+  journeyWeather,
+  mapOpenWeather,
+  previewScene,
+  ropeMark,
+  ropePoints,
+  suppliesFor,
+} from "../src/lib/goals/journey.ts";
+import { contributionReminder } from "../src/lib/goals/reminders.ts";
+import { CLIENTE_DOCK } from "../src/lib/navigation/cliente-dock.ts";
 
 function ticketsFromContributedCents(cents, perTicket = 10_000) {
   return Math.floor(cents / perTicket);
@@ -413,6 +439,545 @@ test("mobile Como funciona shows one step at a time and never rests mid cross-fa
   assert.equal(phoneShellTilt(lastHoldEnd), 0);
   assert.equal(phoneShellTilt(1), 0);
   assert.notEqual(phoneShellTilt(1), 14);
+});
+
+test("daily contributions count each day from the start through the deadline", () => {
+  const plan = buildContributionPlan({
+    targetCents: 400,
+    contributedCents: 0,
+    startDate: "2026-01-01",
+    endDate: "2026-01-04",
+    frequency: "daily",
+  });
+  assert.deepEqual(plan.dates, [
+    "2026-01-01",
+    "2026-01-02",
+    "2026-01-03",
+    "2026-01-04",
+  ]);
+  assert.equal(plan.installmentCount, 4);
+  assert.equal(plan.amountPerInstallmentCents, 100);
+  assert.equal(plan.lastInstallmentCents, 100);
+});
+
+test("weekly contributions land every seven days through the deadline", () => {
+  const plan = buildContributionPlan({
+    targetCents: 400,
+    contributedCents: 0,
+    startDate: "2026-01-01",
+    endDate: "2026-01-29",
+    frequency: "weekly",
+  });
+  assert.deepEqual(plan.dates, [
+    "2026-01-01",
+    "2026-01-08",
+    "2026-01-15",
+    "2026-01-22",
+    "2026-01-29",
+  ]);
+  assert.equal(plan.installmentCount, 5);
+  assert.equal(plan.amountPerInstallmentCents, 80);
+});
+
+test("monthly contributions step one month through the deadline", () => {
+  const plan = buildContributionPlan({
+    targetCents: 300,
+    contributedCents: 0,
+    startDate: "2026-01-10",
+    endDate: "2026-04-10",
+    frequency: "monthly",
+  });
+  assert.deepEqual(plan.dates, [
+    "2026-01-10",
+    "2026-02-10",
+    "2026-03-10",
+    "2026-04-10",
+  ]);
+  assert.equal(plan.installmentCount, 4);
+});
+
+test("plan uses the remaining balance after prior aportes", () => {
+  const plan = buildContributionPlan({
+    targetCents: 100_000,
+    contributedCents: 40_000,
+    startDate: "2026-03-01",
+    endDate: "2026-03-04",
+    frequency: "daily",
+  });
+  assert.equal(plan.remainingCents, 60_000);
+  assert.equal(plan.installmentCount, 4);
+  assert.equal(plan.amountPerInstallmentCents, 15_000);
+  const sum =
+    plan.amountPerInstallmentCents * (plan.installmentCount - 1) +
+    plan.lastInstallmentCents;
+  assert.equal(sum, 60_000);
+});
+
+test("last installment absorbs the cent remainder", () => {
+  const plan = buildContributionPlan({
+    targetCents: 100,
+    contributedCents: 0,
+    startDate: "2026-05-01",
+    endDate: "2026-05-03",
+    frequency: "daily",
+  });
+  assert.deepEqual(plan.dates, ["2026-05-01", "2026-05-02", "2026-05-03"]);
+  assert.equal(plan.installmentCount, 3);
+  assert.equal(plan.amountPerInstallmentCents, 33);
+  assert.equal(plan.lastInstallmentCents, 34);
+  assert.equal(33 + 33 + 34, plan.remainingCents);
+});
+
+test("an early extra payment reduces the next aporte and does not go negative", () => {
+  const installments = [
+    { dueDate: "2026-11-01", amountCents: 10000 },
+    { dueDate: "2026-12-01", amountCents: 10000 },
+    { dueDate: "2027-01-01", amountCents: 10000 },
+  ];
+
+  const early = applyEarlyPayments({
+    installments,
+    contributions: [{ paidOn: "2026-10-15", amountCents: 15000 }],
+  });
+  assert.equal(early[0].paid, true);
+  assert.equal(early[0].dueCents, 0);
+  assert.equal(early[1].paid, false);
+  assert.equal(early[1].dueCents, 5000);
+  assert.equal(early[1].antecipado, true);
+  assert.equal(early[2].dueCents, 10000);
+  assert.equal(early[2].paid, false);
+  assert.equal(nextOpenAporteCents(early), 5000);
+
+  const larger = applyEarlyPayments({
+    installments,
+    contributions: [{ paidOn: "2026-10-15", amountCents: 25000 }],
+  });
+  assert.equal(larger[0].paid, true);
+  assert.equal(larger[0].dueCents, 0);
+  assert.equal(larger[1].paid, true);
+  assert.equal(larger[1].dueCents, 0);
+  assert.equal(larger[2].paid, false);
+  assert.equal(larger[2].dueCents, 5000);
+  assert.equal(nextOpenAporteCents(larger), 5000);
+
+  const exact = applyEarlyPayments({
+    installments,
+    contributions: [{ paidOn: "2026-11-01", amountCents: 10000 }],
+  });
+  assert.equal(exact[0].paid, true);
+  assert.equal(exact[1].dueCents, 10000);
+  assert.equal(exact[1].antecipado, false);
+  assert.equal(exact[2].dueCents, 10000);
+  assert.equal(nextOpenAporteCents(exact), 10000);
+
+  const overflow = applyEarlyPayments({
+    installments,
+    contributions: [{ paidOn: "2026-10-01", amountCents: 50000 }],
+  });
+  assert.deepEqual(
+    overflow.map((row) => row.dueCents),
+    [0, 0, 0],
+  );
+  assert.equal(overflow.every((row) => row.paid && row.dueCents >= 0), true);
+  assert.equal(nextOpenAporteCents(overflow), null);
+});
+
+test("monthly plan includes the start date and rejects an end that is not after it", () => {
+  const plan = buildContributionPlan({
+    targetCents: 300,
+    contributedCents: 0,
+    startDate: "2026-11-01",
+    endDate: "2027-01-01",
+    frequency: "monthly",
+  });
+  assert.deepEqual(plan.dates, ["2026-11-01", "2026-12-01", "2027-01-01"]);
+  assert.equal(plan.dates[0], "2026-11-01");
+  assert.equal(plan.dates.at(-1), "2027-01-01");
+  assert.throws(
+    () =>
+      buildContributionPlan({
+        targetCents: 300,
+        contributedCents: 0,
+        startDate: "2026-11-01",
+        endDate: "2026-11-01",
+        frequency: "monthly",
+      }),
+    /depois do início/,
+  );
+  assert.throws(
+    () =>
+      buildContributionPlan({
+        targetCents: 300,
+        contributedCents: 0,
+        startDate: "2026-11-01",
+        endDate: "2026-10-15",
+        frequency: "monthly",
+      }),
+    /depois do início/,
+  );
+});
+
+test("end date must be after the start", () => {
+  assert.throws(
+    () =>
+      buildContributionPlan({
+        targetCents: 100,
+        contributedCents: 0,
+        startDate: "2026-05-01",
+        endDate: "2026-05-01",
+        frequency: "daily",
+      }),
+    /depois do início/,
+  );
+  assert.throws(
+    () =>
+      buildContributionPlan({
+        targetCents: 100,
+        contributedCents: 0,
+        startDate: "2026-05-02",
+        endDate: "2026-05-01",
+        frequency: "weekly",
+      }),
+    /depois do início/,
+  );
+});
+
+test("reservation calendar stays on one plan month until every month is shown", () => {
+  const months = planMonthKeys([
+    "2026-12-18",
+    "2026-11-18",
+    "2027-01-18",
+    "2026-11-18",
+  ]);
+  assert.deepEqual(months, ["2026-11", "2026-12", "2027-01"]);
+  assert.equal(
+    defaultMonthIndex({
+      months,
+      today: "2026-10-18",
+      upcomingDate: "2026-11-18",
+    }),
+    0,
+  );
+  assert.equal(
+    defaultMonthIndex({
+      months,
+      today: "2026-11-02",
+      upcomingDate: "2026-12-18",
+    }),
+    1,
+  );
+  assert.equal(
+    defaultMonthIndex({ months, today: "2026-12-20", upcomingDate: null }),
+    1,
+  );
+  assert.equal(
+    defaultMonthIndex({ months, today: "2026-08-01", upcomingDate: null }),
+    0,
+  );
+  assert.equal(stepMonthIndex(0, -1, months.length), 0);
+  assert.equal(stepMonthIndex(0, 1, months.length), 1);
+  assert.equal(stepMonthIndex(2, 1, months.length), 2);
+});
+
+test("calendar marks on-time, late, missed and upcoming dates", () => {
+  const statuses = assignContributionStatuses({
+    dates: ["2026-01-10", "2026-01-17", "2026-01-24", "2026-01-31"],
+    today: "2026-01-20",
+    contributions: [
+      { paidOn: "2026-01-10", amountCents: 1000 },
+      { paidOn: "2026-01-18", amountCents: 1000 },
+    ],
+  });
+  assert.deepEqual(statuses, ["on_time", "late", "upcoming", "upcoming"]);
+
+  assert.deepEqual(
+    assignContributionStatuses({
+      dates: ["2026-01-10"],
+      today: "2026-01-20",
+      contributions: [],
+    }),
+    ["missed"],
+  );
+
+  assert.deepEqual(
+    assignContributionStatuses({
+      dates: ["2026-01-10", "2026-01-17"],
+      today: "2026-01-20",
+      contributions: [{ paidOn: "2026-01-17", amountCents: 500 }],
+    }),
+    ["missed", "on_time"],
+  );
+
+  assert.deepEqual(
+    assignContributionStatuses({
+      dates: ["2026-01-20"],
+      today: "2026-01-20",
+      contributions: [],
+    }),
+    ["upcoming"],
+  );
+});
+
+test("a payment one day late marks the due date with an X and the payment date in yellow", () => {
+  const slots = resolveContributionSlots({
+    dates: ["2026-06-10"],
+    today: "2026-06-12",
+    contributions: [{ paidOn: "2026-06-11", amountCents: 100 }],
+  });
+  assert.equal(slots[0].status, "late_payment");
+  assert.equal(slots[0].paidOn, "2026-06-11");
+  assert.deepEqual(slots[0].missedDays, []);
+  const marks = calendarMarks(slots);
+  const due = marks.find((day) => day.date === "2026-06-10");
+  const paid = marks.find((day) => day.date === "2026-06-11");
+  assert.ok(due.marks.includes("due"));
+  assert.ok(due.marks.includes("late_due"));
+  assert.ok(paid.marks.includes("late_paid"));
+  assert.equal(marks.some((day) => day.marks.includes("missed")), false);
+});
+
+test("a missed stretch of 3 days stays on the calendar", () => {
+  const slots = resolveContributionSlots({
+    dates: ["2026-06-10"],
+    today: "2026-06-12",
+    contributions: [],
+  });
+  assert.equal(slots[0].status, "missed");
+  assert.deepEqual(slots[0].missedDays, ["2026-06-10", "2026-06-11", "2026-06-12"]);
+  const missed = calendarMarks(slots)
+    .filter((day) => day.marks.includes("missed"))
+    .map((day) => day.date);
+  assert.deepEqual(missed, ["2026-06-10", "2026-06-11", "2026-06-12"]);
+});
+
+test("an on-time payment marks only the due date", () => {
+  const slots = resolveContributionSlots({
+    dates: ["2026-06-10"],
+    today: "2026-06-12",
+    contributions: [{ paidOn: "2026-06-10", amountCents: 100 }],
+  });
+  assert.equal(slots[0].status, "on_time");
+  assert.deepEqual(slots[0].missedDays, []);
+  const marks = calendarMarks(slots);
+  assert.deepEqual(marks.map((day) => day.date), ["2026-06-10"]);
+  assert.ok(marks[0].marks.includes("on_time"));
+  assert.equal(
+    marks.some((day) =>
+      day.marks.some((mark) => mark === "missed" || mark === "late_due" || mark === "late_paid"),
+    ),
+    false,
+  );
+});
+
+test("days between a late payment stay marked after the money arrives", () => {
+  const slots = resolveContributionSlots({
+    dates: ["2026-06-10"],
+    today: "2026-06-20",
+    contributions: [{ paidOn: "2026-06-13", amountCents: 100 }],
+  });
+  assert.equal(slots[0].status, "late_payment");
+  assert.deepEqual(slots[0].missedDays, ["2026-06-11", "2026-06-12"]);
+  const missed = calendarMarks(slots)
+    .filter((day) => day.marks.includes("missed"))
+    .map((day) => day.date);
+  assert.deepEqual(missed, ["2026-06-11", "2026-06-12"]);
+});
+
+test("goal health follows the next due date and a passed unpaid date", () => {
+  assert.equal(
+    goalHealth({
+      today: "2026-06-10",
+      dueDates: ["2026-06-11"],
+      contributions: [],
+      progressPercent: 10,
+    }),
+    "near_late",
+  );
+  assert.equal(
+    goalHealth({
+      today: "2026-06-12",
+      dueDates: ["2026-06-10"],
+      contributions: [],
+      progressPercent: 10,
+    }),
+    "late",
+  );
+  assert.equal(
+    goalHealth({
+      today: "2026-06-12",
+      dueDates: ["2026-06-10", "2026-07-10"],
+      contributions: [{ paidOn: "2026-06-10", amountCents: 100 }],
+      progressPercent: 20,
+    }),
+    "on_track",
+  );
+  assert.equal(
+    goalHealth({
+      today: "2026-06-12",
+      dueDates: ["2026-06-10"],
+      contributions: [],
+      progressPercent: 100,
+    }),
+    "complete",
+  );
+});
+
+test("each aporte is a rope point from the base to the summit", () => {
+  assert.equal(ropeMark("upcoming"), "upcoming");
+  assert.equal(ropeMark("on_time"), "on_time");
+  assert.equal(ropeMark("late_payment"), "late");
+  assert.equal(ropeMark("missed"), "late");
+  assert.deepEqual(ropePoints(0), []);
+  const two = ropePoints(2);
+  assert.equal(two.length, 2);
+  assert.ok(two[0].y > two[1].y, "the first aporte stays below the last");
+  const many = ropePoints(4);
+  assert.equal(many.length, 4);
+  assert.ok(many[0].y > many[1].y && many[1].y > many[2].y && many[2].y > many[3].y);
+  assert.deepEqual(many[0], ropePoints(2)[0]);
+  assert.deepEqual(many[many.length - 1], two[two.length - 1]);
+  assert.deepEqual(ropePoints(1), [two[1]]);
+});
+
+test("on-time climb carries supplies while a late night stays stormy", () => {
+  assert.deepEqual(suppliesFor("on_track", 0), ["mochila"]);
+  assert.deepEqual(suppliesFor("on_track", 35), ["mochila", "corda"]);
+  assert.deepEqual(suppliesFor("on_track", 85), [
+    "mochila",
+    "corda",
+    "casaco",
+    "comida",
+    "lanterna",
+  ]);
+  assert.deepEqual(suppliesFor("complete", 100), [
+    "mochila",
+    "corda",
+    "casaco",
+    "comida",
+    "lanterna",
+  ]);
+  assert.deepEqual(suppliesFor("near_late", 85), []);
+  assert.deepEqual(suppliesFor("late", 85), []);
+
+  assert.equal(dayPhase(10), "day");
+  assert.equal(dayPhase(22), "night");
+  const day = journeyWeather({ health: "on_track", hour: 15 });
+  assert.equal(day.phase, "day");
+  assert.equal(day.kind, "clear");
+  assert.equal(day.density, 1);
+  const night = journeyWeather({ health: "on_track", hour: 23 });
+  assert.equal(night.phase, "night");
+  assert.equal(night.kind, "calm");
+  assert.equal(night.density, 1);
+
+  const near = journeyWeather({ health: "near_late", hour: 15 });
+  assert.equal(near.phase, "day");
+  assert.equal(near.kind, "rain");
+  assert.ok(near.density > day.density);
+
+  const lateNight = journeyWeather({ health: "late", hour: 23, external: "clear" });
+  assert.equal(lateNight.phase, "night");
+  assert.equal(lateNight.kind, "storm");
+  assert.ok(lateNight.density > night.density);
+  assert.ok(lateNight.density > near.density);
+  assert.equal(climbMotion("on_track"), "confident");
+  assert.equal(climbMotion("near_late"), "slow");
+  assert.equal(climbMotion("late"), "slip");
+  assert.equal(climbMotion("complete"), "celebrate");
+  assert.equal(mapOpenWeather({ code: 211, windSpeed: 1 }), "storm");
+  assert.equal(mapOpenWeather({ code: 800, windSpeed: 2 }), "clear");
+  assert.deepEqual(previewScene("progress_30", { health: "late", progressPercent: 10 }), {
+    health: "on_track",
+    progressPercent: 30,
+  });
+  assert.deepEqual(previewScene("progress_100", { health: "on_track", progressPercent: 10 }), {
+    health: "complete",
+    progressPercent: 100,
+  });
+  assert.deepEqual(previewScene("live", { health: "near_late", progressPercent: 12 }), {
+    health: "near_late",
+    progressPercent: 12,
+  });
+});
+
+test("day-before WhatsApp sends once and names the reservation and the goal", () => {
+  const first = contributionReminder({
+    today: "2026-06-09",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: null,
+    sent: { dayBefore: false, late: false },
+  });
+  assert.equal(first.send, true);
+  assert.equal(first.kind, "day_before");
+  assert.match(first.body, /iPhone 17/);
+  assert.match(first.body, /Fim de ano/);
+  assert.match(first.body, /aporte/i);
+  const again = contributionReminder({
+    today: "2026-06-09",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: null,
+    sent: { dayBefore: true, late: false },
+  });
+  assert.equal(again.send, false);
+});
+
+test("a due date with no payment sends the late WhatsApp notice", () => {
+  const decision = contributionReminder({
+    today: "2026-06-10",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: null,
+    sent: { dayBefore: true, late: false },
+  });
+  assert.equal(decision.send, true);
+  assert.equal(decision.kind, "late");
+  assert.match(decision.body, /atrasada/);
+  assert.match(decision.body, /iPhone 17/);
+  assert.match(decision.body, /Fim de ano/);
+});
+
+test("an on-time payment sends neither the late notice", () => {
+  const onDue = contributionReminder({
+    today: "2026-06-10",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: "2026-06-10",
+    sent: { dayBefore: false, late: false },
+  });
+  assert.equal(onDue.send, false);
+  const dayBefore = contributionReminder({
+    today: "2026-06-09",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: "2026-06-09",
+    sent: { dayBefore: false, late: false },
+  });
+  assert.equal(dayBefore.send, false);
+});
+
+test("a late notice already sent is not sent again", () => {
+  const decision = contributionReminder({
+    today: "2026-06-11",
+    dueDate: "2026-06-10",
+    reservationName: "iPhone 17",
+    goalName: "Fim de ano",
+    paidOn: null,
+    sent: { dayBefore: true, late: true },
+  });
+  assert.equal(decision.send, false);
+});
+
+test("the client dock includes Metas", () => {
+  assert.ok(
+    CLIENTE_DOCK.some((item) => item.href === "/app/metas" && item.label === "Metas"),
+  );
 });
 
 console.log(`\n${passed} test(s) passed.`);

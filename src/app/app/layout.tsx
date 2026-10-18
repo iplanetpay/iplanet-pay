@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { FichasIndicator } from "@/components/raffle/fichas-indicator";
 import { ProfileCompletionGate } from "@/components/auth/profile-completion-gate";
 import { loadProfileIdentity } from "@/lib/profile/identity-server";
+import { ClienteHeaderMenu } from "@/components/auth/cliente-header-menu";
 import { NoticeBell } from "@/components/notices/notice-bell";
 
 export default async function ClienteLayout({
@@ -32,34 +33,35 @@ export default async function ClienteLayout({
     <AppShell
       variant="cliente"
       topBar={
-        <div className="mb-6 flex min-w-0 items-center justify-between gap-2 sm:gap-3">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+        <div className="mb-6 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             <HomeLogo href="/app" height={44} className="shrink-0" />
-            <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-              <p className="hidden min-w-0 truncate text-base font-bold tracking-tight sm:block sm:text-lg">
-                Olá, {user.full_name}
-              </p>
-              <UserAvatar
-                name={user.full_name}
-                avatarUrl={user.avatar_url}
-                size={44}
-              />
-            </div>
+            <p className="hidden min-w-0 truncate text-base font-bold tracking-tight sm:block sm:text-lg">
+              Olá, {user.full_name}
+            </p>
+            <UserAvatar
+              name={user.full_name}
+              avatarUrl={user.avatar_url}
+              size={44}
+            />
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <NoticeBell profilePending={pendingProfile} />
-            <Link href="/app/configuracoes" prefetch>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                leftIcon={<Settings className="h-4 w-4" />}
-                aria-label="Configurações"
-              >
-                <span className="hidden sm:inline">Configurações</span>
-              </Button>
-            </Link>
-            <LogoutButton />
+            <div className="hidden items-center gap-2 md:flex">
+              <Link href="/app/configuracoes" prefetch>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Settings className="h-4 w-4" />}
+                  aria-label="Configurações"
+                >
+                  <span className="hidden sm:inline">Configurações</span>
+                </Button>
+              </Link>
+              <LogoutButton />
+            </div>
+            <ClienteHeaderMenu />
           </div>
         </div>
       }

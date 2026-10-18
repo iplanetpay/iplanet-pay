@@ -6,26 +6,50 @@ import type {
   ReservationWithDetails,
 } from "@/lib/reservations/types";
 
-const store = new Map<string, ReservationWithDetails>();
+function store(): Map<string, ReservationWithDetails> {
+  const scope = globalThis as typeof globalThis & {
+    __iplanetMockReservations?: Map<string, ReservationWithDetails>;
+  };
+  if (!scope.__iplanetMockReservations) {
+    scope.__iplanetMockReservations = new Map();
+  }
+  return scope.__iplanetMockReservations;
+}
 
 function nowIso() {
   return new Date().toISOString();
 }
 
 export function mockListMine(userId: string): ReservationWithDetails[] {
-  return [...store.values()]
+  return [...store().values()]
     .filter((r) => r.user_id === userId)
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 export function mockListRecent(limit = 12): ReservationWithDetails[] {
-  return [...store.values()]
+  return [...store().values()]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
 }
 
 export function mockGetById(id: string): ReservationWithDetails | null {
-  return store.get(id) ?? null;
+  return store().get(id) ?? null;
+}
+
+export function mockAddPaidCents(reservationId: string, cents: number) {
+  const current = store().get(reservationId);
+  if (!current || cents <= 0) return;
+  const amountPaid = current.amount_paid_cents + Math.round(cents);
+  const status: ReservationStatus =
+    amountPaid >= current.list_price_cents && current.status === "ativa"
+      ? "quitada"
+      : current.status;
+  store().set(reservationId, {
+    ...current,
+    amount_paid_cents: amountPaid,
+    status,
+    updated_at: nowIso(),
+  });
 }
 
 export function mockCreate(
@@ -75,7 +99,7 @@ export function mockCreate(
       city: stock.store.slug === "sao-caetano" ? "São Caetano do Sul" : "São Paulo",
     },
   };
-  store.set(id, reservation);
+  store().set(id, reservation);
   return { id };
 }
 
@@ -84,7 +108,7 @@ export function mockCancel(
   role: string,
   reservationId: string,
 ): { id: string } | { error: string } {
-  const current = store.get(reservationId);
+  const current = store().get(reservationId);
   if (!current) return { error: "Reserva não encontrada." };
   const can = current.user_id === userId || role === "staff" || role === "admin";
   if (!can) return { error: "Você não pode cancelar esta reserva." };
@@ -96,7 +120,7 @@ export function mockCancel(
     status: "cancelada" as ReservationStatus,
     updated_at: nowIso(),
   };
-  store.set(reservationId, next);
+  store().set(reservationId, next);
   return { id: reservationId };
 }
 
@@ -104,7 +128,7 @@ export function mockListQuitadas(
   storeId?: string | null,
   limit = 24,
 ): ReservationWithDetails[] {
-  return [...store.values()]
+  return [...store().values()]
     .filter((r) => r.status === "quitada")
     .filter((r) => !storeId || r.store_id === storeId)
     .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
@@ -120,7 +144,7 @@ export function mockConfirmRetirada(
   if (role !== "staff" && role !== "admin" && role !== "parceiro") {
     return { error: "Somente staff, admin ou parceiro podem confirmar retirada." };
   }
-  const current = store.get(reservationId);
+  const current = store().get(reservationId);
   if (!current) return { error: "Reserva não encontrada." };
   if (
     role === "parceiro" &&
@@ -137,7 +161,7 @@ export function mockConfirmRetirada(
     status: "retirada" as ReservationStatus,
     updated_at: nowIso(),
   };
-  store.set(reservationId, next);
+  store().set(reservationId, next);
   return { id: reservationId };
 }
 
@@ -148,7 +172,7 @@ export function mockSwitch(
   reservationId: string,
   newProductId: string,
 ): { id: string } | { error: string } {
-  const current = store.get(reservationId);
+  const current = store().get(reservationId);
   if (!current) return { error: "Reserva não encontrada." };
   const can =
     current.user_id === userId || role === "staff" || role === "admin";
@@ -176,7 +200,7 @@ export function mockSwitch(
   const created = nowIso();
   const newId = globalThis.crypto.randomUUID();
 
-  store.set(reservationId, {
+  store().set(reservationId, {
     ...current,
     status: "trocada",
     amount_paid_cents: 0,
@@ -207,7 +231,7 @@ export function mockSwitch(
     },
     store: current.store,
   };
-  store.set(newId, reservation);
+  store().set(newId, reservation);
   return { id: newId };
 }
 
@@ -240,7 +264,7 @@ export function mockListOps(options?: {
   const storeId = options?.storeId ?? null;
   const limit = options?.limit ?? 200;
 
-  return [...store.values()]
+  return [...store().values()]
     .filter((r) => !status || r.status === status)
     .filter((r) => !storeId || r.store_id === storeId)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))

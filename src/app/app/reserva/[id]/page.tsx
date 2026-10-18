@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
-import { ProgressBar } from "@/components/ui/progress-bar";
+import { ProgressRing } from "@/components/ui/progress-ring";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ReservationStatusPill } from "@/components/reservations/status-pill";
 import { CancelReservationButton } from "@/components/reservations/cancel-button";
 import { SwitchDeviceButton } from "@/components/reservations/switch-device-button";
+import { ReservationSimulatorButton } from "@/components/reservations/reservation-simulator-button";
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
@@ -37,6 +38,12 @@ import {
 } from "@/lib/pickup/queries";
 import { Package } from "lucide-react";
 import { ProductImage } from "@/components/products/product-image";
+import { ReservationGoalSection } from "@/components/reservations/reservation-goal-section";
+import { getActiveGoalForReservation } from "@/lib/goals/queries";
+import {
+  calendarToday,
+  isContributionFrequency,
+} from "@/lib/reservations/contribution-plan";
 
 export const metadata = { title: "Reserva" };
 
@@ -47,6 +54,7 @@ export default async function ReservaDetailPage({
 }) {
   const { id } = await params;
   const user = await getCurrentUser();
+  const { contributions } = await listContributionsForReservation(id);
   const { reservation, error } = await getReservationById(id);
 
   if (error) {
@@ -65,7 +73,6 @@ export default async function ReservaDetailPage({
 
   if (!reservation) notFound();
 
-  const { contributions } = await listContributionsForReservation(id);
   const confirmedAportesCents = await getConfirmedAportesCents(id);
   const pickupRequest = await getLatestPickupRequest(id);
   const title = reservation.product?.name ?? "Reserva";
@@ -138,6 +145,7 @@ export default async function ReservaDetailPage({
   const { products: catalogProducts } = canSwitchDevice
     ? await listCatalogProducts()
     : { products: [] };
+  const goal = isOwner ? await getActiveGoalForReservation(reservation.id) : null;
 
   return (
     <div className="space-y-8">
@@ -247,10 +255,8 @@ export default async function ReservaDetailPage({
         ) : null}
 
 
-        <ProgressBar
-          value={cashProgress}
-          extra={tradeProgress}
-          extraTone={tradeVisual.tone}
+        <ProgressRing
+          value={Math.min(100, effectiveProgress)}
           label="Aportes"
         />
         <div className="grid gap-3 text-sm text-[var(--ink-muted)] sm:grid-cols-2">
@@ -316,6 +322,30 @@ export default async function ReservaDetailPage({
           </div>
         ) : null}
 
+        {isOwner && reservation.status === "ativa" ? (
+          <ReservationSimulatorButton
+            today={calendarToday()}
+            goalName={goal?.name ?? null}
+            initialName={goal?.name ?? ""}
+            initialStartDate={goal?.plan_start_date ?? ""}
+            initialDate={goal?.target_date ?? ""}
+            initialFrequency={
+              goal && isContributionFrequency(goal.frequency) ? goal.frequency : "monthly"
+            }
+            product={{
+              id: reservation.product_id,
+              name: title,
+              listPriceCents: reservation.list_price_cents,
+            }}
+            reservation={{
+              id: reservation.id,
+              productId: reservation.product_id,
+              listPriceCents: reservation.list_price_cents,
+              contributedCents: reservation.amount_paid_cents,
+            }}
+          />
+        ) : null}
+
         {canSwitchDevice ? (
           <SwitchDeviceButton
             reservationId={reservation.id}
@@ -355,6 +385,19 @@ export default async function ReservaDetailPage({
           />
         ) : null}
       </Card>
+
+      {isOwner ? (
+        <ReservationGoalSection
+          reservationId={reservation.id}
+          productId={reservation.product_id}
+          productName={title}
+          listPriceCents={reservation.list_price_cents}
+          contributedCents={reservation.amount_paid_cents}
+          canEdit={reservation.status === "ativa"}
+          goal={goal}
+          contributions={contributions}
+        />
+      ) : null}
 
       <ContributionHistoryPanel
         contributions={contributions}

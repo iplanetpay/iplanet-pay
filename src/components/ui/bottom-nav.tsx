@@ -3,16 +3,9 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Home, Smartphone, Wallet, UserRound, Gift } from "lucide-react";
+import { Home, Smartphone, Wallet, UserRound, Gift, Mountain } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const items = [
-  { href: "/app", label: "Início", icon: Home },
-  { href: "/app/catalogo", label: "Catálogo", icon: Smartphone },
-  { href: "/app/carteira", label: "Carteira", icon: Wallet },
-  { href: "/app/indicacoes", label: "Indicações", icon: Gift },
-  { href: "/app/configuracoes", label: "Conta", icon: UserRound },
-];
+import { CLIENTE_DOCK, type ClienteDockHref } from "@/lib/navigation/cliente-dock";
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -23,9 +16,10 @@ export function BottomNav() {
   }, [pathname]);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 backdrop-blur md:inset-x-auto md:bottom-6 md:left-1/2 md:w-[min(40rem,calc(100%-2rem))] md:-translate-x-1/2 md:rounded-full md:border md:shadow-[0_12px_40px_rgba(17,17,17,0.12)]">
-      <ul className="mx-auto flex max-w-lg items-stretch justify-between px-2 pb-[env(safe-area-inset-bottom)] md:max-w-none md:px-3 md:pb-0">
-        {items.map(({ href, label, icon: Icon }) => {
+    <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 backdrop-blur md:inset-x-auto md:bottom-6 md:left-1/2 md:w-[min(46rem,calc(100%-2rem))] md:-translate-x-1/2 md:rounded-full md:border md:shadow-[0_12px_40px_rgba(17,17,17,0.12)]">
+      <ul className="mx-auto flex max-w-lg items-stretch justify-between px-1 pb-[env(safe-area-inset-bottom)] md:max-w-none md:px-3 md:pb-0">
+        {CLIENTE_DOCK.map(({ href, label }) => {
+          const Icon = dockIcon(href);
           const active =
             pendingPath === href ||
             (href === "/app" ? pathname === "/app" : pathname.startsWith(href));
@@ -49,4 +43,25 @@ export function BottomNav() {
       </ul>
     </nav>
   );
+}
+
+function dockIcon(href: ClienteDockHref) {
+  switch (href) {
+    case "/app":
+      return Home;
+    case "/app/catalogo":
+      return Smartphone;
+    case "/app/carteira":
+      return Wallet;
+    case "/app/metas":
+      return Mountain;
+    case "/app/indicacoes":
+      return Gift;
+    case "/app/configuracoes":
+      return UserRound;
+    default: {
+      const _exhaustive: never = href;
+      return _exhaustive;
+    }
+  }
 }

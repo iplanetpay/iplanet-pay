@@ -7,7 +7,6 @@ import { ArrowRight, QrCode } from "lucide-react";
 import { ProductHeroCard } from "@/components/ui/product-hero-card";
 import { ProductImage } from "@/components/products/product-image";
 import { ProgressRing } from "@/components/ui/progress-ring";
-import { ProgressBar } from "@/components/ui/progress-bar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -82,28 +81,22 @@ export function ActiveHeroCarousel({ items }: { items: ActiveHeroItem[] }) {
                 footer={
                   <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
                     <ProgressRing value={hero.progress} label="quitado" />
-                    <div className="flex-1 space-y-4">
-                      <ProgressBar
-                        value={hero.progress}
-                        label="Progresso da reserva"
-                      />
-                      <div className="flex flex-wrap gap-2">
-                        <Link href={`/app/reserva/${hero.id}`} prefetch>
-                          <Button size="sm">
-                            Ver reserva
-                            <ArrowRight className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                        <Link href={`/app/reserva/${hero.id}`} prefetch>
-                          <Button
-                            size="sm"
-                            variant="accent"
-                            leftIcon={<QrCode className="h-4 w-4" />}
-                          >
-                            Gerar aporte Pix
-                          </Button>
-                        </Link>
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link href={`/app/reserva/${hero.id}`} prefetch>
+                        <Button size="sm">
+                          Ver reserva
+                          <ArrowRight className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                      <Link href={`/app/reserva/${hero.id}`} prefetch>
+                        <Button
+                          size="sm"
+                          variant="accent"
+                          leftIcon={<QrCode className="h-4 w-4" />}
+                        >
+                          Gerar aporte Pix
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 }

@@ -51,6 +51,10 @@ export interface PaymentGoal {
   amount_cents: number;
   installment_cents: number;
   installments_count: number;
+  /** daily, weekly ou monthly; metas antigas ficam sem cadência */
+  frequency: "daily" | "weekly" | "monthly" | null;
+  /** Dia de início do plano; aportes são posteriores a esta data */
+  plan_start_date: string | null;
   status: PaymentGoalStatus;
   whatsapp_phone: string | null;
   created_at: string;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Smartphone } from "lucide-react";
+import { Calculator, Smartphone } from "lucide-react";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,6 +120,18 @@ export default async function ClienteHomePage() {
           </p>
           <Link prefetch href="/app/carteira" className="mt-5 inline-block">
             <Button variant="ghost">Ir para carteira →</Button>
+          </Link>
+        </Card>
+        <Card>
+          <Pill tone="lavender">Simulador</Pill>
+          <h3 className="mt-3 text-2xl font-bold tracking-tight">Simulador de aportes</h3>
+          <p className="mt-2 text-[var(--ink-muted)]">
+            Calcule o valor de cada aporte e crie a meta do produto.
+          </p>
+          <Link prefetch href="/app/simulador" className="mt-5 inline-block">
+            <Button variant="outline" leftIcon={<Calculator className="h-4 w-4" />}>
+              Abrir simulador
+            </Button>
           </Link>
         </Card>
       </div>

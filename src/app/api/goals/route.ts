@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
+import { saveContributionMeta } from "@/lib/goals/contribution-goal";
 import { createPaymentGoal } from "@/lib/goals/mutations";
 import { normalizeBrazilPhone } from "@/lib/phone";
+import { isContributionFrequency } from "@/lib/reservations/contribution-plan";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -11,6 +13,35 @@ export async function POST(request: Request) {
       { ok: false, error: "JSON inválido." },
       { status: 400 },
     );
+  }
+
+  if (body.frequency != null && body.frequency !== "") {
+    const frequency = String(body.frequency);
+    if (!isContributionFrequency(frequency)) {
+      return NextResponse.json(
+        { ok: false, error: "Frequência inválida." },
+        { status: 400 },
+      );
+    }
+    const planned = await saveContributionMeta({
+      name: String(body.name ?? ""),
+      product_id: String(body.product_id ?? ""),
+      target_date: String(body.target_date ?? ""),
+      start_date: String(body.start_date ?? ""),
+      frequency,
+      reservation_id: body.reservation_id ? String(body.reservation_id) : null,
+    });
+    if (!planned.ok) {
+      return NextResponse.json(
+        { ok: false, error: planned.error, needsAuth: planned.needsAuth },
+        { status: planned.needsAuth ? 401 : 400 },
+      );
+    }
+    return NextResponse.json({
+      ok: true,
+      goal_id: planned.goal_id,
+      reservation_id: planned.reservation_id,
+    });
   }
 
   const reminderRaw = body.reminder_day ?? body.reminderDay;

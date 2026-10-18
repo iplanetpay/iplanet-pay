@@ -4,6 +4,8 @@ export const CLIENTE_PREFETCH_ROUTES = [
   "/app/catalogo",
   "/app/reservas",
   "/app/carteira",
+  "/app/metas",
+  "/app/simulador",
   "/app/indicacoes",
   "/app/configuracoes",
   "/app/ranking",

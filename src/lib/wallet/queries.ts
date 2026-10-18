@@ -1,4 +1,5 @@
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
+import { mockContributionsForReservation } from "@/lib/wallet/mock-contributions";
 import {
   CONTRIBUTION_SELECT,
   type Contribution,
@@ -8,6 +9,9 @@ import {
 export async function listContributionsForReservation(
   reservationId: string,
 ): Promise<{ contributions: Contribution[]; error: string | null }> {
+  if (USE_MOCK_AUTH) {
+    return { contributions: mockContributionsForReservation(reservationId), error: null };
+  }
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();

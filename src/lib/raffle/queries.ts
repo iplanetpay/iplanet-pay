@@ -1,3 +1,4 @@
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { ticketsFromContributedCents } from "@/lib/raffle/utils";
 
@@ -11,6 +12,7 @@ export type RaffleRankingRow = {
 export { daysUntilNextRaffle, pickWeightedWinner, ticketsFromContributedCents } from "@/lib/raffle/utils";
 
 export async function getUserTickets(userId: string): Promise<number> {
+  if (USE_MOCK_AUTH || !userId) return 0;
   const supabase = await createClient();
   const { data } = await supabase.rpc("user_raffle_tickets", {
     p_user_id: userId,

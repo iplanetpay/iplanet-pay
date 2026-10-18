@@ -77,7 +77,7 @@ export function NoticeBell({ profilePending = false }: { profilePending?: boolea
     <div className="relative" ref={rootRef}>
       <button
         type="button"
-        className="relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink)]"
+        className="relative inline-flex h-11 w-11 items-center justify-center rounded-full border border-[var(--line)] bg-white text-[var(--ink)]"
         aria-label="Notificações"
         aria-expanded={open}
         aria-controls={panelId}

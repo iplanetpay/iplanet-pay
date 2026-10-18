@@ -1,6 +1,9 @@
 import { getCurrentUser } from "@/lib/auth/session";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
+import { mockUpsertGoal } from "@/lib/goals/mock";
 import { nextReminderAt, parseReminderDay } from "@/lib/goals/reminder";
+import { createClient } from "@/lib/supabase/server";
+import type { ContributionFrequency } from "@/lib/reservations/contribution-plan";
 
 export type CreateGoalInput = {
   product_id: string;
@@ -15,6 +18,10 @@ export type CreateGoalInput = {
   installments_count: number;
   whatsapp_phone?: string | null;
   reservation_id?: string | null;
+  frequency?: ContributionFrequency | null;
+  plan_start_date?: string | null;
+  /** Quando preenchido, atualiza a meta ativa em vez de inserir outra */
+  goal_id?: string | null;
 };
 
 export type CreateGoalResult =
@@ -60,31 +67,67 @@ export async function createPaymentGoal(
   const reminderAt =
     reminderDay != null ? nextReminderAt(reminderDay).toISOString() : null;
 
+  const frequency = input.frequency ?? null;
+  const planStartDate = input.plan_start_date ?? null;
+  const whatsappPhone = input.whatsapp_phone || user.phone || null;
+  const amountCents = Math.round(input.amount_cents);
+  const installmentCents = Math.round(input.installment_cents);
+  const installmentsCount = Math.round(input.installments_count);
+  const reservationId = input.reservation_id ?? null;
+
   if (USE_MOCK_AUTH) {
-    return { ok: true, goal_id: `mock-goal-${Date.now()}` };
+    const saved = mockUpsertGoal({
+      userId: user.id,
+      goalId: input.goal_id,
+      productId: input.product_id,
+      reservationId,
+      name: input.name.trim(),
+      targetDate: input.target_date,
+      reminderDay,
+      reminderAt,
+      amountCents,
+      installmentCents,
+      installmentsCount,
+      whatsappPhone,
+      frequency,
+      planStartDate,
+    });
+    if (!saved.ok) return saved;
+    return { ok: true, goal_id: saved.id };
   }
 
+  const row: Record<string, unknown> = {
+    product_id: input.product_id,
+    reservation_id: reservationId,
+    name: input.name.trim(),
+    target_date: input.target_date,
+    reminder_day: reminderDay,
+    reminder_at: reminderAt,
+    amount_cents: amountCents,
+    installment_cents: installmentCents,
+    installments_count: installmentsCount,
+    whatsapp_phone: whatsappPhone,
+    status: "active",
+  };
+  if (frequency) row.frequency = frequency;
+  if (planStartDate) row.plan_start_date = planStartDate;
+
   try {
-    const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("payment_goals")
-      .insert({
-        user_id: user.id,
-        product_id: input.product_id,
-        reservation_id: input.reservation_id ?? null,
-        name: input.name.trim(),
-        target_date: input.target_date,
-        reminder_day: reminderDay,
-        reminder_at: reminderAt,
-        amount_cents: Math.round(input.amount_cents),
-        installment_cents: Math.round(input.installment_cents),
-        installments_count: Math.round(input.installments_count),
-        whatsapp_phone: input.whatsapp_phone || user.phone || null,
-        status: "active",
-      })
-      .select("id")
-      .single();
+    const query = input.goal_id
+      ? supabase
+          .from("payment_goals")
+          .update(row)
+          .eq("id", input.goal_id)
+          .eq("user_id", user.id)
+          .select("id")
+          .single()
+      : supabase
+          .from("payment_goals")
+          .insert({ ...row, user_id: user.id })
+          .select("id")
+          .single();
+    const { data, error } = await query;
 
     if (error || !data) {
       return { ok: false, error: error?.message ?? "Falha ao salvar meta." };
