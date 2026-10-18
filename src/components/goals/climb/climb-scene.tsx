@@ -1,6 +1,6 @@
 import { animate, useMotionValue, useMotionValueEvent } from 'framer-motion';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import type { Deposit, GoalStatus, PrizeKind, ViewMode } from '@/lib/goals/climb/types';
+import type { Deposit, GoalStatus, ViewMode } from "@/lib/goals/climb/types";
 import { clamp } from '@/lib/goals/climb/goal-logic';
 import { buildTrail, type SceneSize } from '@/lib/goals/climb/geometry';
 import { Climber } from './climber';
@@ -19,7 +19,6 @@ interface Props {
   percent: number;
   status: GoalStatus;
   deposits: Deposit[];
-  prize: PrizeKind;
   mountainFill: string;
   view: ViewMode;
   onToggleView: () => void;
@@ -30,7 +29,7 @@ interface Props {
 const FIG_H = 44;
 const reduce = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
-export function ClimbScene({ size, ppu, percent, status, deposits, prize, mountainFill, view, onToggleView, selected, onSelect }: Props) {
+export function ClimbScene({ size, ppu, percent, status, deposits, mountainFill, view, onToggleView, selected, onSelect }: Props) {
   const { W, H } = size;
   const trail = useMemo(() => buildTrail(size), [size]);
   const progress = useMotionValue(0);
@@ -151,11 +150,6 @@ export function ClimbScene({ size, ppu, percent, status, deposits, prize, mounta
           <stop offset="0" stopColor="#fff" stopOpacity="0" />
           <stop offset="1" stopColor="#8aa0c0" stopOpacity="0.16" />
         </linearGradient>
-        <radialGradient id="prizeGlow">
-          <stop offset="0" stopColor="#ffe9a8" stopOpacity="0.9" />
-          <stop offset="0.6" stopColor="#ffd60a" stopOpacity="0.18" />
-          <stop offset="1" stopColor="#ffd60a" stopOpacity="0" />
-        </radialGradient>
         <radialGradient id="doneGlow">
           <stop offset="0" stopColor="#ffffff" stopOpacity="0.95" />
           <stop offset="0.5" stopColor="#ffe9a8" stopOpacity="0.35" />
@@ -163,7 +157,7 @@ export function ClimbScene({ size, ppu, percent, status, deposits, prize, mounta
         </radialGradient>
       </defs>
       <g ref={camRef}>
-        <Mountain size={size} fill={mountainFill} unit={unit} prize={prize} done={done} />
+        <Mountain size={size} fill={mountainFill} />
 
         {/* trecho percorrido */}
         <path ref={walkedRef} fill="none" stroke="#0071e3" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />

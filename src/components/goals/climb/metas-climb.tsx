@@ -148,7 +148,6 @@ export function MetasClimb({
             percent={percent}
             status={goal.status}
             deposits={goal.deposits}
-            prize={goal.product.kind}
             mountainFill={sky.mountainFill}
             view={view}
             onToggleView={() => changeView(view === 'overview' ? 'closeup' : 'overview')}

@@ -574,16 +574,6 @@
   color: var(--muted);
 }
 
-.metas-climb .prize-float {
-  animation: metas-float 5s ease-in-out infinite;
-}
-
-.metas-climb .prize-glow {
-  animation: metas-glow 5s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: center;
-}
-
 .metas-climb .done-glow {
   animation: metas-glow 5s ease-in-out infinite;
   transform-box: fill-box;
@@ -600,16 +590,6 @@
   transform-box: view-box;
   transform-origin: 0 0;
   transform: scale(var(--ms, 1));
-}
-
-@keyframes metas-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-2px);
-  }
 }
 
 @keyframes metas-glow {
@@ -666,8 +646,6 @@
 @media (prefers-reduced-motion: reduce) {
   .metas-climb .cloud,
   .metas-climb .fog i,
-  .metas-climb .prize-float,
-  .metas-climb .prize-glow,
   .metas-climb .done-glow,
   .metas-climb .ms-pulse,
   .metas-climb .sky-stars i {
