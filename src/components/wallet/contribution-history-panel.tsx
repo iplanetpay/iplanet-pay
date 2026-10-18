@@ -77,7 +77,7 @@ export function ContributionHistoryPanel({
         labelledBy="historico-fullscreen-title"
         className="max-w-3xl"
       >
-        <div className="flex max-h-[92vh] flex-col px-5 py-4">
+        <div className="flex max-h-[92dvh] flex-col px-5 py-4">
           <div className="mb-3 flex items-center justify-between gap-2">
             <h2 id="historico-fullscreen-title" className="text-lg font-bold">
               Histórico de aportes

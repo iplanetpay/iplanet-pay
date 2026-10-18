@@ -10,6 +10,7 @@ import {
 } from "react";
 import { MotionFade } from "@/components/ui/motion";
 import { IphoneDuoScrollClient } from "@/components/landing/iphone-duo-scroll-client";
+import { ComoFuncionaStory } from "@/components/landing/como-funciona-story";
 
 /**
  * Scroll runway while the phone is pinned in the viewport (vh).
@@ -66,7 +67,8 @@ const DESKTOP_DUO_MQ = "(min-width: 768px)";
 const PHONE_SIZE_DESKTOP = 1.18;
 
 function useDuoLayout() {
-  const [desktop, setDesktop] = useState(true);
+  /** null until measured, so phones never mount the WebGL Duo. */
+  const [desktop, setDesktop] = useState<boolean | null>(null);
 
   useLayoutEffect(() => {
     const mq = window.matchMedia(DESKTOP_DUO_MQ);
@@ -77,6 +79,7 @@ function useDuoLayout() {
   }, []);
 
   return {
+    desktop,
     phoneSize: desktop ? PHONE_SIZE_DESKTOP : 1,
     pinVh: desktop ? PIN_VH_DESKTOP : PIN_VH_MOBILE,
     mobile: !desktop,
@@ -156,7 +159,9 @@ function DuoPinnedStep({
     };
   }, [update]);
 
-  const pinH = mobile ? "46vh" : `calc(100vh - ${PIN_TOP}px)`;
+  // dvh tracks window.innerHeight (used by pinWindowPx); vh on iOS Safari is
+  // the toolbar-hidden height and makes the pinned stage overshoot.
+  const pinH = mobile ? "46dvh" : `calc(100dvh - ${PIN_TOP}px)`;
 
   const stageStyle: CSSProperties =
     phase === "pinned"
@@ -249,10 +254,29 @@ function DuoPinnedStep({
  * Fixed pin: enter closed → centered → slow open → hold open → release.
  */
 export function ComoFuncionaDuoScroll() {
-  const { phoneSize, pinVh, mobile } = useDuoLayout();
+  const { desktop, phoneSize, pinVh, mobile } = useDuoLayout();
 
   return (
     <section id="como-funciona-duo" className="relative bg-white text-[#111]">
+      <ComoFuncionaStory className="md:hidden" />
+      {desktop ? (
+        <DesktopDuoSteps phoneSize={phoneSize} pinVh={pinVh} mobile={mobile} />
+      ) : null}
+    </section>
+  );
+}
+
+function DesktopDuoSteps({
+  phoneSize,
+  pinVh,
+  mobile,
+}: {
+  phoneSize: number;
+  pinVh: number;
+  mobile: boolean;
+}) {
+  return (
+    <>
       <div className="relative z-30 mx-auto max-w-6xl px-4 pb-2 pt-10 md:px-8 md:pb-12 md:pt-24">
         <MotionFade>
           <p className="mb-3 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--accent)]">
@@ -278,6 +302,6 @@ export function ComoFuncionaDuoScroll() {
           mobile={mobile}
         />
       ))}
-    </section>
+    </>
   );
 }

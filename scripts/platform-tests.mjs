@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { existsSync } from "node:fs";
 import { normalizeBrazilPhone } from "../src/lib/phone.ts";
 import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy.ts";
 import { referralActivated } from "../src/lib/referrals/status.ts";
@@ -18,6 +19,20 @@ import {
   resolveProfileAvatar,
   shouldSyncProviderAvatar,
 } from "../src/lib/auth/avatar.ts";
+import { resolveSignupAccess } from "../src/lib/auth/signup-access.ts";
+import { showCatalogStepArrows } from "../src/lib/catalog/carousel-arrows.ts";
+import { CHOOSE_TILES } from "../src/lib/landing/choose-tiles.ts";
+import { videoBlocksBoot } from "../src/lib/navigation/boot-media.ts";
+import { isWebKitSafari } from "../src/lib/browser/webkit.ts";
+import {
+  STORY_FADE,
+  activeStoryStep,
+  holdRange,
+  nearestRestingProgress,
+  phoneShellTilt,
+  presenceKeyframes,
+  storySegments,
+} from "../src/lib/landing/story-timeline.ts";
 import {
   couponNotice,
   nextRaffleDate,
@@ -230,6 +245,21 @@ test("signup identity requires cpf, phone, city, state, address, number and birt
   );
 });
 
+test("signup does not ask for email confirmation when the server already confirmed", () => {
+  assert.equal(
+    resolveSignupAccess({ hasSession: false, autoConfirmed: false }).needsEmailConfirmation,
+    true,
+  );
+  assert.equal(
+    resolveSignupAccess({ hasSession: true, autoConfirmed: false }).needsEmailConfirmation,
+    false,
+  );
+  assert.equal(
+    resolveSignupAccess({ hasSession: false, autoConfirmed: true }).needsEmailConfirmation,
+    false,
+  );
+});
+
 test("google avatar syncs until the user uploads a custom photo", () => {
   const google = "https://lh3.googleusercontent.com/a/photo";
   const uploaded = "https://xeeogfmmasvgbpmodqym.supabase.co/storage/v1/object/public/avatars/u/avatar.jpg";
@@ -256,6 +286,78 @@ test("avisos: raffle date, winner and pre-created coupon", () => {
   assert.equal(couponNotice("ip10", "Retirada")?.couponCode, "IP10");
   assert.equal(couponNotice("ab", "Retirada"), null);
   assert.equal(unreadNoticeCount([{ id: "a" }, { id: "b" }], ["b"]), 1);
+});
+
+test("hero video with a poster never holds the landing boot overlay on iOS Safari", () => {
+  const iosBeforePlay = { hasError: false, readyState: 1 };
+  assert.equal(videoBlocksBoot({ ...iosBeforePlay, optional: true }), false);
+  assert.equal(videoBlocksBoot({ ...iosBeforePlay, optional: false }), true);
+  assert.equal(videoBlocksBoot({ optional: false, hasError: false, readyState: 3 }), false);
+  assert.equal(videoBlocksBoot({ optional: false, hasError: true, readyState: 0 }), false);
+});
+
+test("Safari and every iOS browser are detected as WebKit, Chrome is not", () => {
+  const macSafari =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
+  const macChrome =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 15_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36";
+  const iphoneChrome =
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0 Mobile/15E148 Safari/604.1";
+  const androidChrome =
+    "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Mobile Safari/537.36";
+  assert.equal(isWebKitSafari(macSafari), true);
+  assert.equal(isWebKitSafari(macChrome), false);
+  assert.equal(isWebKitSafari(iphoneChrome), true);
+  assert.equal(isWebKitSafari(androidChrome), false);
+  assert.equal(isWebKitSafari(macSafari.replace("Version/26.0 ", ""), 5), true);
+});
+
+test("step 1 of Como funciona shows a photo on iPad Air and MacBook Air", () => {
+  const names = CHOOSE_TILES.map((tile) => tile.name);
+  assert.deepEqual(names, ["iPad Air", "MacBook Air"]);
+  for (const tile of CHOOSE_TILES) {
+    assert.match(tile.src, /^\/products\/.+\.(jpg|png|webp)$/);
+    assert.equal(existsSync(`public${tile.src}`), true);
+  }
+});
+
+test("catalog carousel keeps the next arrow on web and mobile when another model exists", () => {
+  assert.equal(showCatalogStepArrows(1), false);
+  assert.equal(showCatalogStepArrows(2), true);
+  assert.equal(showCatalogStepArrows(28), true);
+});
+
+test("mobile Como funciona shows one step at a time and never rests mid cross-fade", () => {
+  const count = 3;
+  const segments = storySegments(count);
+  const half = STORY_FADE / 2;
+  for (let i = 0; i < count - 1; i++) {
+    const out = presenceKeyframes(i, count).input;
+    const into = presenceKeyframes(i + 1, count).input;
+    assert.equal(out[2], into[0]);
+    assert.equal(out[3], into[1]);
+  }
+  assert.deepEqual(presenceKeyframes(2, count).output, [0, 1, 1]);
+  for (let i = 0; i < count; i++) {
+    const [a, b] = holdRange(i, count);
+    assert.ok(b > a);
+    assert.equal(activeStoryStep((a + b) / 2, count), i);
+    assert.equal(nearestRestingProgress((a + b) / 2, count), null);
+  }
+  const boundary = segments[0].end;
+  const back = nearestRestingProgress(boundary - half / 2, count);
+  const forward = nearestRestingProgress(boundary + half / 2, count);
+  assert.ok(back < boundary - half);
+  assert.ok(forward > boundary + half);
+  assert.equal(nearestRestingProgress(back, count), null);
+  assert.equal(nearestRestingProgress(forward, count), null);
+  assert.equal(nearestRestingProgress(0, count), null);
+  assert.equal(nearestRestingProgress(1, count), null);
+  const [lastHoldStart, lastHoldEnd] = holdRange(count - 1, count);
+  assert.equal(phoneShellTilt(lastHoldStart), 0);
+  assert.equal(phoneShellTilt(lastHoldEnd), 0);
+  assert.equal(phoneShellTilt(1), 0);
+  assert.notEqual(phoneShellTilt(1), 14);
 });
 
 console.log(`\n${passed} test(s) passed.`);

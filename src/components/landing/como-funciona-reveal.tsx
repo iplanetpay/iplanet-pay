@@ -10,7 +10,7 @@ import {
 const fadeUp = {
   initial: { opacity: 0, y: 28 },
   whileInView: { opacity: 1, y: 0 },
-  viewport: { once: true, amount: 0.25 },
+  viewport: { once: true, amount: 0.1, margin: "0px 0px 15% 0px" },
   transition: { duration: 0.55, ease: [0.22, 1, 0.36, 1] as const },
 };
 
@@ -27,7 +27,7 @@ const STEPS: {
     title: "Acesse a conta",
     body: "Entre com e-mail, Google ou magic link e continue de onde parou.",
     screenSrc: "/images/app-screens/login-mobile.png",
-    angle: "left",
+    angle: "straight",
     color: "silver",
   },
   {
@@ -43,7 +43,7 @@ const STEPS: {
     title: "Cadastre metas",
     body: "Defina data, lembrete e ritmo de Pix — sem juros de cartão.",
     screenSrc: "/images/app-screens/meta-mobile.png",
-    angle: "right",
+    angle: "straight",
     color: "silver",
   },
 ];
@@ -56,6 +56,8 @@ function ScreenImage({ src, alt }: { src: string; alt: string }) {
       alt={alt}
       width={402}
       height={874}
+      loading="eager"
+      decoding="async"
       draggable={false}
       style={{
         width: 402,

@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/mock";
 import { homeForRole } from "@/lib/auth/roles";
 import { normalizeBrazilPhone } from "@/lib/phone";
+import { resolveSignupAccess } from "@/lib/auth/signup-access";
 import {
   identityMissingMessage,
   normalizeCpf,
@@ -89,28 +90,69 @@ export async function POST(request: Request) {
   }
 
   const { createClient } = await import("@/lib/supabase/server");
+  const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
+  const admin = tryCreateServiceClient();
+
+  let userId: string | null = null;
+  let hasSession = false;
+  let autoConfirmed = false;
+
+  // Prefer admin create with email already confirmed so signup is not blocked
+  // by Supabase "Confirm email" / confirmation-email rate limits.
+  if (admin) {
+    const created = await admin.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+      user_metadata: {
         full_name: body.full_name,
         phone,
       },
-    },
-  });
-
-  if (error || !data.user) {
-    return NextResponse.json(
-      { ok: false, error: error?.message ?? "Falha ao criar conta" },
-      { status: 400 },
-    );
+    });
+    if (created.error || !created.data.user) {
+      return NextResponse.json(
+        { ok: false, error: created.error?.message ?? "Falha ao criar conta" },
+        { status: 400 },
+      );
+    }
+    userId = created.data.user.id;
+    autoConfirmed = true;
+    const signedIn = await supabase.auth.signInWithPassword({ email, password });
+    if (signedIn.error || !signedIn.data.session) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            signedIn.error?.message ??
+            "Conta criada, mas não foi possível entrar automaticamente.",
+        },
+        { status: 400 },
+      );
+    }
+    hasSession = true;
+  } else {
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          full_name: body.full_name,
+          phone,
+        },
+      },
+    });
+    if (error || !data.user) {
+      return NextResponse.json(
+        { ok: false, error: error?.message ?? "Falha ao criar conta" },
+        { status: 400 },
+      );
+    }
+    userId = data.user.id;
+    hasSession = Boolean(data.session);
   }
 
   try {
-    const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
-    const admin = tryCreateServiceClient();
     if (admin) {
       await admin
         .from("profiles")
@@ -120,7 +162,7 @@ export async function POST(request: Request) {
           phone,
           full_name: body.full_name ?? null,
         })
-        .eq("id", data.user.id);
+        .eq("id", userId);
       await admin
         .from("profiles")
         .update({
@@ -131,7 +173,7 @@ export async function POST(request: Request) {
           address_number: addressNumber,
           birth_date: birthDate,
         })
-        .eq("id", data.user.id);
+        .eq("id", userId);
     } else {
       await supabase
         .from("profiles")
@@ -140,7 +182,7 @@ export async function POST(request: Request) {
           terms_version: body.terms_version || "withdrawal-v1",
           phone,
         })
-        .eq("id", data.user.id);
+        .eq("id", userId);
       await supabase
         .from("profiles")
         .update({
@@ -151,17 +193,15 @@ export async function POST(request: Request) {
           address_number: addressNumber,
           birth_date: birthDate,
         })
-        .eq("id", data.user.id);
+        .eq("id", userId);
     }
   } catch {
     /* non-fatal if identity columns are still missing */
   }
 
   const ref = (body.referral_code ?? "").trim();
-  if (ref) {
+  if (ref && userId) {
     try {
-      const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
-      const admin = tryCreateServiceClient();
       if (admin) {
         const code = ref.toUpperCase();
         const { data: referrer } = await admin
@@ -169,20 +209,20 @@ export async function POST(request: Request) {
           .select("id")
           .eq("referral_code", code)
           .maybeSingle();
-        if (referrer?.id && referrer.id !== data.user.id) {
+        if (referrer?.id && referrer.id !== userId) {
           await admin
             .from("profiles")
             .update({ referred_by: referrer.id })
-            .eq("id", data.user.id)
+            .eq("id", userId)
             .is("referred_by", null);
           await admin.from("referrals").insert({
             referrer_id: referrer.id,
-            referred_id: data.user.id,
+            referred_id: userId,
             status: "pending",
             bonus_amount_cents: 5000,
           });
         }
-      } else if (data.session) {
+      } else if (hasSession) {
         await supabase.rpc("apply_referral_code", { p_code: ref });
       }
     } catch {
@@ -202,10 +242,11 @@ export async function POST(request: Request) {
     }
   }
 
+  const access = resolveSignupAccess({ hasSession, autoConfirmed });
   return NextResponse.json({
     ok: true,
     redirectTo: homeForRole("cliente"),
     mode: "supabase",
-    needs_email_confirmation: !data.session,
+    needs_email_confirmation: access.needsEmailConfirmation,
   });
 }

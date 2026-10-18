@@ -103,7 +103,7 @@ export function AporteContractModal({
       <div
         ref={scrollerRef}
         onScroll={onScroll}
-        className="mx-5 max-h-[46vh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-[var(--bg-subtle)] px-4 py-3 text-sm leading-relaxed text-[var(--ink)]"
+        className="mx-5 max-h-[46dvh] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-[var(--line)] bg-[var(--bg-subtle)] px-4 py-3 text-sm leading-relaxed text-[var(--ink)]"
       >
         {APORTE_CONTRACT_TEXT}
       </div>

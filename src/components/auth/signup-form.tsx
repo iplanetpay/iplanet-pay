@@ -364,7 +364,7 @@ export function SignupForm({
             Fechar
           </button>
         </div>
-        <div className="max-h-[70vh] overflow-y-auto px-5 py-4">
+        <div className="max-h-[70dvh] overflow-y-auto px-5 py-4">
           <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-[var(--ink-muted)]">
             {TERMS_OF_USE_PT}
           </pre>

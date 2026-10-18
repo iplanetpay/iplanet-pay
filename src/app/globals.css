@@ -44,10 +44,15 @@
   box-sizing: border-box;
 }
 
+/* Horizontal clip only. overflow-x: clip with a visible y-axis computes to
+   clip on both axes and freezes the page, so y stays an explicit scrollport
+   on the document. Body stays out of that so sticky sections pin to it. */
 html {
   scroll-behavior: smooth;
   scroll-padding-top: 5rem;
   overflow-x: hidden;
+  overflow-x: clip;
+  overflow-y: auto;
 }
 
 html.lenis,
@@ -65,6 +70,7 @@ html.lenis body {
 
 body {
   overflow-x: hidden;
+  overflow-x: clip;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont,

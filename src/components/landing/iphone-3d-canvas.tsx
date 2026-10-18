@@ -292,9 +292,23 @@ function ViewerFrame({
 }) {
   const view = mobileLayout ? MOBILE_VIEW : DESKTOP_VIEW;
   const blockLenisScroll = controlsEnabled;
+  const shellRef = useRef<HTMLDivElement>(null);
+  const [nearViewport, setNearViewport] = useState(false);
+
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setNearViewport(Boolean(entry?.isIntersecting)),
+      { rootMargin: "200px 0px" },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     <div
+      ref={shellRef}
       className={`relative isolate overflow-hidden ${shellClassName}`}
       {...(blockLenisScroll
         ? { "data-lenis-prevent-touch": true as const }
@@ -311,7 +325,7 @@ function ViewerFrame({
       <CornerBrackets />
       <Canvas
         key={mobileLayout ? "mobile-3d" : "desktop-3d"}
-        frameloop="always"
+        frameloop={nearViewport || controlsEnabled ? "always" : "demand"}
         camera={{
           position: view.camera.position,
           fov: view.camera.fov,

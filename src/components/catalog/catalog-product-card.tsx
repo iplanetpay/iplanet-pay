@@ -59,7 +59,7 @@ export function CatalogProductCard({
 
   return (
     <article className="flex h-full flex-col rounded-[28px] border border-[#ececef] bg-white p-4 shadow-[0_10px_30px_rgba(17,17,17,0.06)]">
-      <div className="relative flex aspect-[1.05/1] items-center justify-center rounded-[22px] bg-[#f6f6f8]">
+      <div className="relative flex aspect-[1.05/1] items-center justify-center rounded-[22px] bg-white">
         {shots.length > 1 ? (
           <>
             <button

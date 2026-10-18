@@ -2,21 +2,23 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ExperiencePreloader } from "@/components/ui/experience-preloader";
+import { readBootVideo, videoBlocksBoot } from "@/lib/navigation/boot-media";
 import { waitUntilPageReady } from "@/lib/navigation/wait-until-page-ready";
 
 /** Keep the overlay up until landing media, Fold models and the 3D stage are ready. */
 function landingStillLoading(root: HTMLElement) {
   const video = root.querySelector<HTMLVideoElement>("#hero video");
   if (!video) return true;
-  if (!video.error && video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) {
-    return true;
-  }
+  if (videoBlocksBoot(readBootVideo(video))) return true;
   for (const img of root.querySelectorAll("img")) {
     if (!img.getAttribute("src") && !img.currentSrc) continue;
     if (!img.complete) return true;
   }
+  // Phones get the DOM story instead of the WebGL Duo, so there is nothing to wait for.
+  const story = root.querySelector("[data-howto-story]");
+  const storyShown = Boolean(story && story.getClientRects().length > 0);
   const steps = root.querySelectorAll("[data-duo-step]");
-  if (steps.length < 3) return true;
+  if (!storyShown && steps.length < 3) return true;
   if (root.querySelector('[aria-label="Carregando iPhone Duo"]')) return true;
   if (root.querySelector('[aria-label="Loading iPhone Duo"]')) return true;
   if (root.querySelector(".iphone-duo-loading-mark")) return true;

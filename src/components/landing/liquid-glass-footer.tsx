@@ -71,6 +71,7 @@ export function LiquidGlassFooter({ homeHref = null }: { homeHref?: string | nul
             boxShadow:
               "inset 0 1px 0 rgba(255,255,255,0.85), inset 0 -1px 0 rgba(17,17,17,0.04), 0 1px 2px rgba(17,17,17,0.03)",
             backdropFilter: "blur(18px)",
+            WebkitBackdropFilter: "blur(18px)",
           }}
         >
           <div className="flex flex-col gap-8 lg:flex-row lg:items-start lg:justify-between">

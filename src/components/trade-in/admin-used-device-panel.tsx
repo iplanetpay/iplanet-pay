@@ -248,7 +248,7 @@ export function AdminUsedDevicePanel() {
         className="max-w-3xl"
       >
         {active ? (
-          <div className="flex max-h-[92vh] flex-col">
+          <div className="flex max-h-[92dvh] flex-col">
             <header className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--accent)]">

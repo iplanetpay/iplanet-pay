@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   useEffect,
   useRef,
@@ -195,10 +196,15 @@ export function FramerDeviceMockup({
         >
           {content}
         </div>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
+        {/* Source PNGs are ~4096px tall; next/image serves a right-sized WebP/AVIF. */}
+        <Image
           src={overlay}
           alt=""
+          width={DESIGN_WIDTH}
+          height={height}
+          sizes="(max-width: 768px) 70vw, 320px"
+          quality={85}
+          loading="eager"
           draggable={false}
           style={{
             position: "absolute",

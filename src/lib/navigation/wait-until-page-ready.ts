@@ -1,3 +1,5 @@
+import { readBootVideo, videoBlocksBoot } from "@/lib/navigation/boot-media";
+
 const MAX_READY_MS = 12_000;
 const MIN_VISIBLE_MS = 650;
 
@@ -87,10 +89,9 @@ function mediaStillLoading(root: HTMLElement) {
     if (!img.complete) return true;
   }
   for (const video of root.querySelectorAll("video")) {
-    if (video.error) continue;
     // Playable buffer is enough. Waiting for NETWORK_LOADING to go idle
     // holds the gate until the whole file arrives.
-    if (video.readyState < HTMLMediaElement.HAVE_FUTURE_DATA) return true;
+    if (videoBlocksBoot(readBootVideo(video))) return true;
   }
   return false;
 }

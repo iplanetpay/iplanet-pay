@@ -13,11 +13,13 @@ import {
   animate,
   type PanInfo,
 } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { Product } from "@/types/database";
 import {
   CatalogProductCard,
   conditionFromName,
 } from "@/components/catalog/catalog-product-card";
+import { showCatalogStepArrows } from "@/lib/catalog/carousel-arrows";
 
 const GAP = 28;
 const AUTOPLAY_MS = 5000;
@@ -131,6 +133,12 @@ export function VelocityCatalogCarousel({
     setIndex(next);
   }
 
+  /** Functional update so rapid taps chain instead of repeating the same target. */
+  function step(delta: number) {
+    if (slideCount < 2) return;
+    setIndex((prev) => (((prev + delta) % slideCount) + slideCount) % slideCount);
+  }
+
   // Autoplay every 5s; pause while dragging; reset on index change
   useEffect(() => {
     if (slideCount < 2 || paused) return;
@@ -173,65 +181,88 @@ export function VelocityCatalogCarousel({
   }
 
   return (
-    <div className="relative">
-      <div
-        ref={viewportRef}
-        className="relative overflow-hidden py-4"
-        style={{
-          maskImage:
-            "linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%)",
-        }}
-      >
-        <motion.div
-          className="flex cursor-grab items-stretch active:cursor-grabbing"
-          style={{ x, gap: GAP }}
-          drag="x"
-          dragConstraints={{
-            left: offsetFor(groups.length - 1) - 40,
-            right: offsetFor(0) + 40,
+    <div>
+      <div className="relative">
+        <div
+          ref={viewportRef}
+          className="relative overflow-hidden py-4"
+          style={{
+            maskImage:
+              "linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%)",
+            WebkitMaskImage:
+              "linear-gradient(90deg, transparent 0%, #000 6%, #000 94%, transparent 100%)",
           }}
-          dragElastic={0.12}
-          onPointerDown={() => setPaused(true)}
-          onPointerUp={() => setPaused(false)}
-          onPointerCancel={() => setPaused(false)}
-          onDragStart={() => setPaused(true)}
-          onDragEnd={onDragEnd}
         >
-          {groups.map((group, i) => {
-            const dist = Math.abs(i - index);
-            const scale = dist === 0 ? 1 : dist === 1 ? 0.9 : 0.82;
-            const opacity = dist === 0 ? 1 : dist === 1 ? 0.72 : 0.45;
-            const z = 20 - dist;
+          <motion.div
+            className="flex cursor-grab items-stretch active:cursor-grabbing"
+            style={{ x, gap: GAP }}
+            drag="x"
+            dragConstraints={{
+              left: offsetFor(groups.length - 1) - 40,
+              right: offsetFor(0) + 40,
+            }}
+            dragElastic={0.12}
+            onPointerDown={() => setPaused(true)}
+            onPointerUp={() => setPaused(false)}
+            onPointerCancel={() => setPaused(false)}
+            onDragStart={() => setPaused(true)}
+            onDragEnd={onDragEnd}
+          >
+            {groups.map((group, i) => {
+              const dist = Math.abs(i - index);
+              const scale = dist === 0 ? 1 : dist === 1 ? 0.9 : 0.82;
+              const opacity = dist === 0 ? 1 : dist === 1 ? 0.72 : 0.45;
+              const z = 20 - dist;
 
-            return (
-              <motion.div
-                key={group.key}
-                animate={{ scale, opacity }}
-                transition={{ type: "spring", stiffness: 320, damping: 30 }}
-                style={{ width: cardW, zIndex: z }}
-                className="relative shrink-0"
-              >
-                <CatalogProductCard
-                  name={group.name}
-                  meta={group.meta}
-                  condition={conditionFromName(group.name, group.category)}
-                  priceCents={group.priceCents}
-                  images={group.images}
-                  colors={group.colors}
-                  onDetails={() => {
-                    if (i !== index) {
-                      goTo(i);
-                      return;
-                    }
-                    onSelect(group.product);
-                  }}
-                />
-              </motion.div>
-            );
-          })}
-        </motion.div>
+              return (
+                <motion.div
+                  key={group.key}
+                  animate={{ scale, opacity }}
+                  transition={{ type: "spring", stiffness: 320, damping: 30 }}
+                  style={{ width: cardW, zIndex: z }}
+                  className="relative shrink-0"
+                >
+                  <CatalogProductCard
+                    name={group.name}
+                    meta={group.meta}
+                    condition={conditionFromName(group.name, group.category)}
+                    priceCents={group.priceCents}
+                    images={group.images}
+                    colors={group.colors}
+                    onDetails={() => {
+                      if (i !== index) {
+                        goTo(i);
+                        return;
+                      }
+                      onSelect(group.product);
+                    }}
+                  />
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </div>
+
+        {showCatalogStepArrows(groups.length) ? (
+          <>
+            <button
+              type="button"
+              aria-label="Aparelho anterior"
+              onClick={() => step(-1)}
+              className="absolute left-2 top-1/2 z-40 flex h-11 w-11 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full border border-black/5 bg-white/85 text-[var(--ink)] shadow-[0_8px_24px_rgba(17,17,17,0.12)] backdrop-blur-md transition active:scale-90 md:left-4 md:h-12 md:w-12"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              aria-label="Próximo aparelho"
+              onClick={() => step(1)}
+              className="absolute right-2 top-1/2 z-40 flex h-12 w-12 -translate-y-1/2 touch-manipulation items-center justify-center rounded-full bg-[var(--ink)] text-white shadow-[0_10px_28px_rgba(17,17,17,0.28)] transition hover:scale-105 active:scale-90 md:right-4 md:h-14 md:w-14"
+            >
+              <ChevronRight className="h-6 w-6" />
+            </button>
+          </>
+        ) : null}
       </div>
 
       <div className="mt-5 flex items-center justify-center gap-2">

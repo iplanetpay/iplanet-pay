@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { usePathname } from "next/navigation";
 import Lenis from "lenis";
+import { isWebKitSafari } from "@/lib/browser/webkit";
 
 /** Lenis só na landing — evita conflito com scroll nativo em /app e /admin. */
 export function lenisEnabledForPath(pathname: string | null): boolean {
@@ -32,6 +33,9 @@ export function SmoothScroll() {
 
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
     if (reduce.matches) return;
+    // Safari scrolls smoothly on its own; Lenis re-easing every wheel tick on
+    // top of WebKit's 60 fps rAF cap reads as lag.
+    if (isWebKitSafari(navigator.userAgent, navigator.maxTouchPoints)) return;
 
     const lenis = new Lenis({
       duration: 1.35,

@@ -90,7 +90,7 @@ export function SwitchDeviceButton({
             className="absolute inset-0 bg-black/40"
             onClick={() => !loading && setOpen(false)}
           />
-          <div className="relative z-10 flex max-h-[85vh] w-full max-w-lg flex-col rounded-t-[var(--radius-card)] border border-[var(--line)] bg-white shadow-xl sm:rounded-[var(--radius-card)]">
+          <div className="relative z-10 flex max-h-[85dvh] w-full max-w-lg flex-col rounded-t-[var(--radius-card)] border border-[var(--line)] bg-white shadow-xl sm:rounded-[var(--radius-card)]">
             <div className="flex items-start justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
               <div>
                 <h2 className="text-lg font-bold tracking-tight">

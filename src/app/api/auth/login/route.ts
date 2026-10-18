@@ -36,10 +36,35 @@ export async function POST(request: Request) {
 
   const { createClient } = await import("@/lib/supabase/server");
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: body.email ?? "",
-    password: body.password ?? "",
+  const email = (body.email ?? "").trim();
+  const password = body.password ?? "";
+  let { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
   });
+
+  // Contas antigas criadas com "Confirm email" no Supabase: confirma e tenta de novo.
+  if (error && /email not confirmed/i.test(error.message)) {
+    try {
+      const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+      const admin = tryCreateServiceClient();
+      if (admin) {
+        const linked = await admin.auth.admin.generateLink({
+          type: "recovery",
+          email,
+        });
+        const userId = linked.data.user?.id;
+        if (userId) {
+          await admin.auth.admin.updateUserById(userId, { email_confirm: true });
+          const retry = await supabase.auth.signInWithPassword({ email, password });
+          data = retry.data;
+          error = retry.error;
+        }
+      }
+    } catch {
+      /* keep original error */
+    }
+  }
 
   if (error || !data.user) {
     return NextResponse.json(

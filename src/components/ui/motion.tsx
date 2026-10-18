@@ -206,7 +206,7 @@ export function MotionModal({
               aria-labelledby={labelledBy}
               data-lenis-prevent-touch
               className={cn(
-                "pointer-events-auto relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[var(--line)] bg-white shadow-[0_24px_80px_rgba(17,17,17,0.18)] sm:rounded-[28px]",
+                "pointer-events-auto relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-t-[28px] border border-[var(--line)] bg-white shadow-[0_24px_80px_rgba(17,17,17,0.18)] sm:rounded-[28px]",
                 className,
               )}
               initial={{ opacity: 0, y: 40, scale: 0.96 }}

@@ -16,6 +16,7 @@ import { ProductModal } from "@/components/catalog/product-modal";
 import { trackEvent } from "@/lib/analytics/track";
 import type { Product, ProductCategory } from "@/types/database";
 import { ComoFuncionaDuoScroll } from "@/components/landing/como-funciona-duo-scroll";
+import { HeroVideo } from "@/components/landing/hero-video";
 import { SeuIphoneSection } from "@/components/landing/seu-iphone-section";
 import { ComoFuncionaReveal } from "@/components/landing/como-funciona-reveal";
 import { VelocityCatalogCarousel } from "@/components/landing/velocity-catalog-carousel";
@@ -153,7 +154,7 @@ export function LandingCatalog({
 
   return (
     <div className="min-h-screen bg-white text-[var(--ink)]">
-      <header className="sticky top-0 z-30 border-b border-black/5 bg-white/90 backdrop-blur-md">
+      <header className="relative z-30 border-b border-black/5 bg-white/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2.5 md:px-8 md:py-3">
           <a
             href={homeHref || "#hero"}
@@ -193,23 +194,13 @@ export function LandingCatalog({
       </header>
 
       {/* Hero — dark full-bleed video */}
-      <section id="hero" className="relative isolate min-h-[78vh] overflow-hidden bg-black text-white md:min-h-[88vh]">
-        <video
-          className="absolute inset-0 h-full w-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          poster="/videos/iphone-18-pro-hero-poster.jpg"
-          preload="auto"
-        >
-          <source src="/videos/iphone-18-pro-hero.mp4" type="video/mp4" />
-        </video>
+      <section id="hero" className="relative isolate min-h-[78svh] overflow-hidden bg-black text-white md:min-h-[88svh]">
+        <HeroVideo className="absolute inset-0 h-full w-full object-cover" />
         <div
           className="absolute inset-0 bg-gradient-to-b from-black/55 via-black/35 to-black/75"
           aria-hidden
         />
-        <div className="relative z-10 mx-auto flex min-h-[78vh] max-w-6xl flex-col justify-end px-4 pb-16 pt-24 md:min-h-[88vh] md:px-8 md:pb-24">
+        <div className="relative z-10 mx-auto flex min-h-[78svh] max-w-6xl flex-col justify-end px-4 pb-16 pt-24 md:min-h-[88svh] md:px-8 md:pb-24">
           <MotionFade>
             <p className="mb-3 text-sm font-semibold uppercase tracking-[0.22em] text-white/70">
               iPlanet Pay
@@ -249,7 +240,7 @@ export function LandingCatalog({
 
       <ComoFuncionaReveal />
 
-      <section id="catalogo" className="overflow-hidden bg-white py-14 md:py-20">
+      <section id="catalogo" className="bg-white py-14 md:py-20">
         <div className="mx-auto max-w-6xl px-4 md:px-8">
           <MotionFade>
             <div className="flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
