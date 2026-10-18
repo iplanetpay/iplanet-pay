@@ -1,11 +1,9 @@
+import { Suspense } from "react";
+import { MetasScreen } from "@/components/goals/climb/metas-screen";
 import { PageHeader } from "@/components/ui/page-header";
-import {
-  MountainJourney,
-  type TrailAporte,
-} from "@/components/goals/mountain/mountain-journey";
+import { climbGoalFromPlan } from "@/lib/goals/climb/adapter";
+import type { GoalState } from "@/lib/goals/climb/types";
 import { getCurrentUser } from "@/lib/auth/session";
-import { resolveContributionSlots } from "@/lib/goals/calendar-marks";
-import { goalHealth, type GoalHealth } from "@/lib/goals/journey";
 import { listPaymentGoalsForUser } from "@/lib/goals/queries";
 import { getReservationById } from "@/lib/reservations/queries";
 import {
@@ -31,13 +29,8 @@ export default async function MetasPage() {
         item.plan_start_date,
     ) ?? null;
 
-  let trail: {
-    goalName: string;
-    productName: string;
-    health: GoalHealth;
-    progressPercent: number;
-    points: TrailAporte[];
-  } | null = null;
+  let climb: GoalState | null = null;
+  let depositHref: string | null = null;
 
   if (
     goal?.reservation_id &&
@@ -57,34 +50,23 @@ export default async function MetasPage() {
           endDate: goal.target_date,
           frequency: goal.frequency,
         });
-        const paid = confirmedMarks(contributions);
-        const today = calendarToday();
-        const slots = resolveContributionSlots({
-          dates: plan.dates,
-          today,
-          contributions: paid,
-        });
-        const progress =
+        const targetCents =
           reservation.list_price_cents > 0
-            ? Math.round((reservation.amount_paid_cents / reservation.list_price_cents) * 100)
-            : 0;
-        trail = {
-          goalName: goal.name,
+            ? reservation.list_price_cents
+            : goal.amount_cents;
+        climb = climbGoalFromPlan({
+          id: goal.id,
+          name: goal.name,
           productName: reservation.product?.name ?? "Reserva",
-          health: goalHealth({
-            today,
-            dueDates: plan.dates,
-            contributions: paid,
-            progressPercent: progress,
-          }),
-          progressPercent: progress,
-          points: slots.map((slot) => ({
-            dueDate: slot.dueDate,
-            status: slot.status,
-          })),
-        };
+          targetCents,
+          savedCents: reservation.amount_paid_cents,
+          today: calendarToday(),
+          plan,
+          contributions: confirmedMarks(contributions),
+        });
+        depositHref = `/app/reserva/${goal.reservation_id}`;
       } catch {
-        trail = null;
+        climb = null;
       }
     }
   }
@@ -94,9 +76,11 @@ export default async function MetasPage() {
       <PageHeader
         eyebrow="Jornada"
         title="Metas"
-        description="A subida até o topo, com um ponto de corda para cada aporte."
+        description="Cada aporte é um passo até o topo."
       />
-      <MountainJourney trail={trail} />
+      <Suspense fallback={null}>
+        <MetasScreen goal={climb} depositHref={depositHref} />
+      </Suspense>
     </div>
   );
 }
