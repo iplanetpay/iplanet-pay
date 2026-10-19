@@ -25,6 +25,7 @@ import { wordmarkBox } from "../src/lib/brand/wordmark.ts";
 import { showCatalogStepArrows } from "../src/lib/catalog/carousel-arrows.ts";
 import { CHOOSE_TILES } from "../src/lib/landing/choose-tiles.ts";
 import { videoBlocksBoot } from "../src/lib/navigation/boot-media.ts";
+import { LEGAL_FOOTER_LINKS } from "../src/lib/navigation/legal-footer.ts";
 import { isWebKitSafari } from "../src/lib/browser/webkit.ts";
 import {
   STORY_FADE,
@@ -1020,6 +1021,29 @@ test("climb status is late when a deposit is overdue and near late the day befor
   assert.equal(relativeDue("2026-06-09", "2026-06-10"), "atrasado há 1 dia");
   assert.match(brl(10.5).replace(/\s/g, " "), /R\$ 10,50/);
   assert.match(brl(100).replace(/\s/g, " "), /R\$ 100(?!,)/);
+});
+
+test("Guia and Termos de uso live in the footer", () => {
+  assert.deepEqual(
+    LEGAL_FOOTER_LINKS.map((link) => link.label),
+    ["Guia", "Termos de uso"],
+  );
+  assert.deepEqual(
+    LEGAL_FOOTER_LINKS.map((link) => link.href),
+    ["/ajuda", "/termos"],
+  );
+  const shell = readFileSync(
+    new URL("../src/components/ui/app-shell.tsx", import.meta.url),
+    "utf8",
+  );
+  const layout = readFileSync(new URL("../src/app/app/layout.tsx", import.meta.url), "utf8");
+  const landing = readFileSync(
+    new URL("../src/components/landing/liquid-glass-footer.tsx", import.meta.url),
+    "utf8",
+  );
+  assert.match(shell, /<LegalFooter \/>/);
+  assert.equal(layout.includes('href="/ajuda"'), false);
+  assert.match(landing, /LEGAL_FOOTER_LINKS/);
 });
 
 test("the climb adapter maps the real schedule without treating a paid-late aporte as missed", () => {

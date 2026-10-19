@@ -75,15 +75,6 @@ export default async function ClienteLayout({
         </div>
         {children}
       </ProfileCompletionGate>
-      <p className="mt-10 text-center text-xs text-[var(--ink-muted)]">
-        <Link href="/ajuda" className="underline">
-          Guia
-        </Link>
-        {" · "}
-        <Link href="/termos" className="underline">
-          Termos de uso
-        </Link>
-      </p>
     </AppShell>
   );
 }

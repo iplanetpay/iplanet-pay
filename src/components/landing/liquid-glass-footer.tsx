@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { MessageCircle } from "lucide-react";
 import { BrandLogo } from "@/components/ui/brand-logo";
+import { LEGAL_FOOTER_LINKS } from "@/lib/navigation/legal-footer";
 
 const WA = "https://wa.me/5511973484819";
 const IG = "https://www.instagram.com/iplanet_totens/";
@@ -190,11 +191,13 @@ export function LiquidGlassFooter({ homeHref = null }: { homeHref?: string | nul
                 Recursos
               </p>
               <ul className="mt-4 space-y-2.5 text-sm font-medium text-[var(--ink)]">
-                <li>
-                  <Link href="/ajuda" className="hover:text-[var(--accent)]">
-                    Guia
-                  </Link>
-                </li>
+                {LEGAL_FOOTER_LINKS.map((link) => (
+                  <li key={link.href}>
+                    <Link href={link.href} className="hover:text-[var(--accent)]">
+                      {link.label}
+                    </Link>
+                  </li>
+                ))}
                 <li>
                   <button
                     type="button"

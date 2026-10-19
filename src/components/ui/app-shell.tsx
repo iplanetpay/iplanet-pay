@@ -4,6 +4,7 @@ import {
   ADMIN_PREFETCH_ROUTES,
   CLIENTE_PREFETCH_ROUTES,
 } from "@/lib/navigation/prefetch-routes";
+import { LegalFooter } from "./legal-footer";
 import { Sidebar, type SidebarItem } from "./sidebar";
 import { BottomNav } from "./bottom-nav";
 
@@ -38,6 +39,7 @@ export function AppShell({
           {topBar}
           {children}
         </div>
+        <LegalFooter />
         <BottomNav />
       </div>
     );
