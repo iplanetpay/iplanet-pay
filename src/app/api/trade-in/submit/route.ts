@@ -3,28 +3,50 @@ import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getReservationById } from "@/lib/reservations/queries";
 import { createClient } from "@/lib/supabase/server";
-import { MAX_USED_DEVICE_PHOTOS } from "@/lib/trade-in/constants";
 import {
-  mockHasPendingOffer,
-  mockInsertOffer,
-} from "@/lib/trade-in/mock";
+  validateTradeInDevices,
+  type TradeInDeviceInput,
+} from "@/lib/trade-in/devices";
+import { mockInsertOffers } from "@/lib/trade-in/mock";
+import { isLiveOffer } from "@/lib/trade-in/offer-state";
+import { listUsedDeviceOffersForReservation } from "@/lib/trade-in/queries";
 
 const BUCKET = "used-device-photos";
+const MAX_PHOTO_BYTES = 6 * 1024 * 1024;
 
-function parseBrlToCents(raw: string): number | null {
-  const normalized = raw.replace(/\./g, "").replace(",", ".").trim();
-  const n = Number(normalized);
-  if (!Number.isFinite(n) || n <= 0) return null;
-  return Math.round(n * 100);
-}
+type DevicePayload = Omit<TradeInDeviceInput, "photoCount">;
 
 function mapSubmitRpcError(message: string | undefined): string {
   if (!message) return "Não foi possível enviar.";
   const m = message.toLowerCase();
-  if (m.includes("create_used_device_offer")) {
-    return "Recurso de avaliação ainda não está ativo no banco. Aplique a migration 023_trade_in_client_submit.";
+  if (m.includes("create_used_device_offers")) {
+    return "Recurso de avaliação ainda não está ativo no banco. Aplique a migration 030_trade_in_multiple_devices.";
   }
   return message;
+}
+
+function parseDevices(raw: string): DevicePayload[] | null {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return parsed.map((item) => {
+      const d = (item ?? {}) as Record<string, unknown>;
+      return {
+        deviceModel: String(d.deviceModel ?? ""),
+        imei: String(d.imei ?? ""),
+        expectedBrl: String(d.expectedBrl ?? ""),
+        minimumBrl: String(d.minimumBrl ?? ""),
+        maintenanceOptions: Array.isArray(d.maintenanceOptions)
+          ? d.maintenanceOptions.map(String)
+          : [],
+        liquidExposure: typeof d.liquidExposure === "boolean" ? d.liquidExposure : null,
+        batteryHealthPct: d.batteryHealthPct == null ? "" : String(d.batteryHealthPct),
+        batteryHealthReason: d.batteryHealthReason == null ? null : String(d.batteryHealthReason),
+      };
+    });
+  } catch {
+    return null;
+  }
 }
 
 export async function POST(req: Request) {
@@ -36,63 +58,19 @@ export async function POST(req: Request) {
   try {
     const form = await req.formData();
     const reservationId = String(form.get("reservation_id") ?? "").trim();
-    const deviceModel = String(form.get("device_model") ?? "").trim();
-    const imei = String(form.get("imei") ?? "").trim().replace(/\s/g, "");
-    const expectedCents = parseBrlToCents(String(form.get("expected_value_brl") ?? ""));
-    const minimumCents = parseBrlToCents(String(form.get("minimum_value_brl") ?? ""));
-    const maintenanceRaw = String(form.get("maintenance_options") ?? "[]");
-    const liquidRaw = String(form.get("liquid_exposure") ?? "").trim();
-    if (liquidRaw !== "true" && liquidRaw !== "false") {
-      return NextResponse.json(
-        { ok: false, error: "Selecione Sim ou Não para exposição a líquidos." },
-        { status: 400 },
-      );
-    }
-    const liquidExposure = liquidRaw === "true";
-
-    let maintenanceOptions: string[] = [];
-    try {
-      maintenanceOptions = JSON.parse(maintenanceRaw) as string[];
-      if (!Array.isArray(maintenanceOptions)) maintenanceOptions = [];
-    } catch {
-      maintenanceOptions = [];
+    const payload = parseDevices(String(form.get("devices") ?? ""));
+    if (!reservationId || !payload) {
+      return NextResponse.json({ ok: false, error: "Dados inválidos." }, { status: 400 });
     }
 
-    if (!reservationId || !deviceModel || !imei) {
+    const files = payload.map((_, index) =>
+      form
+        .getAll(`photos_${index}`)
+        .filter((f): f is File => f instanceof File && f.size > 0),
+    );
+    if (files.some((list) => list.some((file) => file.size > MAX_PHOTO_BYTES))) {
       return NextResponse.json(
-        { ok: false, error: "Preencha modelo e IMEI." },
-        { status: 400 },
-      );
-    }
-    if (!expectedCents || !minimumCents) {
-      return NextResponse.json(
-        { ok: false, error: "Informe valores esperado e mínimo válidos." },
-        { status: 400 },
-      );
-    }
-    if (minimumCents > expectedCents) {
-      return NextResponse.json(
-        { ok: false, error: "O valor mínimo não pode ser maior que o esperado." },
-        { status: 400 },
-      );
-    }
-    if (maintenanceOptions.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Selecione ao menos uma opção de manutenção." },
-        { status: 400 },
-      );
-    }
-
-    const files = form.getAll("photos").filter((f): f is File => f instanceof File && f.size > 0);
-    if (files.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Envie ao menos uma foto do aparelho." },
-        { status: 400 },
-      );
-    }
-    if (files.length > MAX_USED_DEVICE_PHOTOS) {
-      return NextResponse.json(
-        { ok: false, error: `Máximo de ${MAX_USED_DEVICE_PHOTOS} fotos.` },
+        { ok: false, error: "Cada foto deve ter no máximo 6 MB." },
         { status: 400 },
       );
     }
@@ -117,78 +95,85 @@ export async function POST(req: Request) {
       );
     }
 
+    const { offers: existing } = await listUsedDeviceOffersForReservation(reservationId, user.id);
+    const live = existing.filter(isLiveOffer);
+    const validated = validateTradeInDevices(
+      payload.map((device, index) => ({ ...device, photoCount: files[index]!.length })),
+      { liveCount: live.length, liveImeis: live.map((o) => o.imei) },
+    );
+    if (!validated.ok) {
+      return NextResponse.json({ ok: false, error: validated.error }, { status: 400 });
+    }
+    const devices = validated.devices;
+
     if (USE_MOCK_AUTH) {
-      if (mockHasPendingOffer(reservationId, user.id)) {
-        return NextResponse.json(
-          { ok: false, error: "Você já tem uma solicitação pendente de avaliação." },
-          { status: 400 },
-        );
-      }
-      const { id: offerId } = mockInsertOffer({
+      const { ids } = mockInsertOffers({
         userId: user.id,
         reservationId,
-        deviceModel,
-        imei,
-        expectedCents,
-        minimumCents,
-        maintenanceOptions,
-        liquidExposure,
-        photoCount: files.length,
+        devices: devices.map((device, index) => ({ device, photoCount: files[index]!.length })),
       });
-      return NextResponse.json({ ok: true, offer_id: offerId });
+      return NextResponse.json({ ok: true, offer_ids: ids });
     }
 
     const supabase = await createClient();
-    const offerId = crypto.randomUUID();
-    const photoPaths: string[] = [];
+    const uploaded: string[] = [];
+    const removeUploaded = async () => {
+      if (uploaded.length) await supabase.storage.from(BUCKET).remove(uploaded);
+    };
 
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
-      if (file.size > 6 * 1024 * 1024) {
-        return NextResponse.json(
-          { ok: false, error: "Cada foto deve ter no máximo 6 MB." },
-          { status: 400 },
-        );
+    const rpcDevices = [];
+    for (const [index, device] of devices.entries()) {
+      const offerId = crypto.randomUUID();
+      const photoPaths: string[] = [];
+      for (const [photoIndex, file] of files[index]!.entries()) {
+        const ext = file.type.includes("png") ? "png" : "jpg";
+        const path = `${user.id}/${offerId}/${photoIndex}.${ext}`;
+        const bytes = Buffer.from(await file.arrayBuffer());
+        const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, bytes, {
+          contentType: file.type || "image/jpeg",
+          upsert: false,
+        });
+        if (uploadError) {
+          await removeUploaded();
+          return NextResponse.json(
+            { ok: false, error: `Falha no upload: ${uploadError.message}` },
+            { status: 400 },
+          );
+        }
+        uploaded.push(path);
+        photoPaths.push(path);
       }
-      const ext = file.type.includes("png") ? "png" : "jpg";
-      const path = `${user.id}/${offerId}/${i}.${ext}`;
-      const bytes = Buffer.from(await file.arrayBuffer());
-      const { error: uploadError } = await supabase.storage.from(BUCKET).upload(path, bytes, {
-        contentType: file.type || "image/jpeg",
-        upsert: false,
+      rpcDevices.push({
+        id: offerId,
+        device_model: device.deviceModel,
+        imei: device.imei,
+        expected_value_cents: device.expectedCents,
+        minimum_value_cents: device.minimumCents,
+        maintenance_options: device.maintenanceOptions,
+        liquid_exposure: device.liquidExposure,
+        photo_paths: photoPaths,
+        battery_health_pct: device.battery.pct,
+        battery_health_reason: device.battery.reason,
       });
-      if (uploadError) {
-        return NextResponse.json(
-          { ok: false, error: `Falha no upload: ${uploadError.message}` },
-          { status: 400 },
-        );
-      }
-      photoPaths.push(path);
     }
 
-    const { data: rpcId, error: rpcError } = await supabase.rpc("create_used_device_offer", {
-      p_offer_id: offerId,
+    const { data: rpcIds, error: rpcError } = await supabase.rpc("create_used_device_offers", {
       p_reservation_id: reservationId,
-      p_device_model: deviceModel,
-      p_imei: imei,
-      p_expected_value_cents: expectedCents,
-      p_minimum_value_cents: minimumCents,
-      p_maintenance_options: maintenanceOptions,
-      p_liquid_exposure: liquidExposure,
-      p_photo_paths: photoPaths,
+      p_devices: rpcDevices,
     });
 
     if (rpcError) {
-      for (const path of photoPaths) {
-        await supabase.storage.from(BUCKET).remove([path]);
-      }
+      await removeUploaded();
       return NextResponse.json(
         { ok: false, error: mapSubmitRpcError(rpcError.message) },
         { status: 400 },
       );
     }
 
-    return NextResponse.json({ ok: true, offer_id: (rpcId as string) ?? offerId });
+    return NextResponse.json({
+      ok: true,
+      offer_ids: (rpcIds as string[] | null) ?? rpcDevices.map((d) => d.id),
+    });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "Falha ao enviar." },

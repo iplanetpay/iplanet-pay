@@ -15,7 +15,6 @@ import { Canvas, useFrame } from "@react-three/fiber";
 import {
   ContactShadows,
   Environment,
-  Html,
   OrbitControls,
   useGLTF,
   Center,
@@ -117,14 +116,24 @@ function IphoneModel({
   );
 }
 
+/** Mounts only once the model suspense resolves. */
+function ModelReady({ onReady }: { onReady: () => void }) {
+  useEffect(() => {
+    onReady();
+  }, [onReady]);
+  return null;
+}
+
 function Scene({
   controlsEnabled,
   onUserInteract,
+  onModelReady,
   view,
   mobileLayout,
 }: {
   controlsEnabled: boolean;
   onUserInteract: () => void;
+  onModelReady: () => void;
   view: ViewProfile;
   mobileLayout: boolean;
 }) {
@@ -164,21 +173,15 @@ function Scene({
         penumbra={0.9}
         color="#f8fafc"
       />
-      <Suspense
-        fallback={
-          <Html center>
-            <span className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#111] shadow-md">
-              Carregando modelo…
-            </span>
-          </Html>
-        }
-      >
+      {/* A drei <Html> fallback unmounts its own React root mid-commit and throws removeChild. */}
+      <Suspense fallback={null}>
         <IphoneModel
           spinning={!controlsEnabled}
           view={view}
           mobilePreview={mobileLayout && !controlsEnabled}
         />
         <Environment preset="studio" environmentIntensity={0.28} />
+        <ModelReady onReady={onModelReady} />
       </Suspense>
       <ContactShadows
         position={[0, view.shadowY, 0]}
@@ -294,6 +297,8 @@ function ViewerFrame({
   const blockLenisScroll = controlsEnabled;
   const shellRef = useRef<HTMLDivElement>(null);
   const [nearViewport, setNearViewport] = useState(false);
+  const [modelReady, setModelReady] = useState(false);
+  const markModelReady = useCallback(() => setModelReady(true), []);
 
   useEffect(() => {
     const el = shellRef.current;
@@ -338,10 +343,19 @@ function ViewerFrame({
         <Scene
           controlsEnabled={controlsEnabled}
           onUserInteract={onUserInteract}
+          onModelReady={markModelReady}
           view={view}
           mobileLayout={mobileLayout}
         />
       </Canvas>
+
+      {modelReady ? null : (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+          <span className="rounded-full bg-white/90 px-4 py-2 text-sm font-medium text-[#111] shadow-md">
+            Carregando modelo…
+          </span>
+        </div>
+      )}
 
       {showExploreButton ? <ExploreButtons onActivate={onActivate} /> : null}
       {footerHint}

@@ -2,7 +2,8 @@ import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
 import { Pill } from "@/components/ui/pill";
 import { getCurrentUser } from "@/lib/auth/session";
-import { getAporteRanking, getUserTickets, daysUntilNextRaffle } from "@/lib/raffle/queries";
+import { getAporteRanking, getUserRaffleBalance, daysUntilNextRaffle } from "@/lib/raffle/queries";
+import { RAFFLE_ELIGIBILITY_MESSAGE } from "@/lib/raffle/utils";
 import { formatCentsBRL } from "@/lib/utils";
 
 export const metadata = { title: "Ranking de aportes" };
@@ -10,7 +11,8 @@ export const metadata = { title: "Ranking de aportes" };
 export default async function RankingPage() {
   const user = await getCurrentUser();
   const { rows, error } = await getAporteRanking(100);
-  const myTickets = user ? await getUserTickets(user.id) : 0;
+  const myBalance = user ? await getUserRaffleBalance(user.id) : null;
+  const myTickets = myBalance?.tickets ?? 0;
   const myIndex = user ? rows.findIndex((r) => r.user_id === user.id) : -1;
 
   return (
@@ -20,6 +22,10 @@ export default async function RankingPage() {
         title="Ranking de aportes"
         description={`Próximo sorteio em ${daysUntilNextRaffle()} dias (todo dia 1). Cada R$ 100 aportados = 1 ficha.`}
       />
+
+      <Card className="border-[var(--accent)]/30 bg-[var(--bg-subtle)] text-sm text-[var(--ink)]">
+        {RAFFLE_ELIGIBILITY_MESSAGE}
+      </Card>
 
       {user ? (
         <Card className="flex flex-wrap items-center justify-between gap-3">
@@ -32,6 +38,9 @@ export default async function RankingPage() {
           <div>
             <p className="text-sm text-[var(--ink-muted)]">Suas fichas</p>
             <p className="text-2xl font-bold text-[var(--accent)]">{myTickets}</p>
+            {myBalance?.eligible ? null : (
+              <p className="text-xs text-[var(--ink-muted)]">Ainda fora do sorteio</p>
+            )}
           </div>
         </Card>
       ) : null}

@@ -1,9 +1,9 @@
-import type { InstallmentResolution, InstallmentStatus } from "../calendar-marks.ts";
+import type { InstallmentStatus } from "../calendar-marks.ts";
 import { resolveContributionSlots } from "../calendar-marks.ts";
+import { goalContributions, settleGoalSlot } from "../goal-calendar.ts";
 import {
   applyEarlyPayments,
   installmentCentsAt,
-  type AppliedInstallment,
   type ContributionPlan,
   type PlanContribution,
 } from "../../reservations/contribution-plan.ts";
@@ -19,9 +19,9 @@ export interface ClimbGoalInput {
   id: string;
   name: string;
   productName: string;
-  /** Preço do produto, em centavos. */
+  /** Valor da meta, em centavos. */
   targetCents: number;
-  /** Valor já confirmado na reserva, em centavos. */
+  /** Valor aportado desde o início da meta, em centavos. */
   savedCents: number;
   /** Dia civil de São Paulo, yyyy-mm-dd. */
   today: string;
@@ -35,9 +35,7 @@ export interface ClimbGoalInput {
  * hoje ou amanhã fica quase atrasado; 100% do preço conquista a meta.
  */
 export function climbGoalFromPlan(input: ClimbGoalInput): GoalState {
-  const contributions = input.contributions.filter(
-    (contribution) => contribution.amountCents > 0,
-  );
+  const contributions = goalContributions(input.contributions, input.plan.dates[0] ?? "");
   const slots = resolveContributionSlots({
     dates: input.plan.dates,
     today: input.today,
@@ -52,8 +50,9 @@ export function climbGoalFromPlan(input: ClimbGoalInput): GoalState {
   });
   const deposits: Deposit[] = slots.map((slot, index) => {
     const row = applied[index];
-    const settled = settleClimbSlot(slot, row);
-    const amountCents = row?.baseCents ?? installmentCentsAt(input.plan, index);
+    const settled = settleGoalSlot(slot, row);
+    const baseCents = row?.baseCents ?? installmentCentsAt(input.plan, index);
+    const amountCents = row && !row.paid ? row.dueCents : baseCents;
     return {
       id: `${input.id}-${settled.dueDate}`,
       dueDate: settled.dueDate,
@@ -85,21 +84,6 @@ export function climbGoalFromPlan(input: ClimbGoalInput): GoalState {
     deposits,
     daysLate: status === "late" ? climbDaysLate(input.today, deposits) : 0,
     streak: climbStreak(deposits),
-  };
-}
-
-/** Pagamento antecipado que quita a parcela segue a mesma regra do calendário. */
-export function settleClimbSlot(
-  slot: InstallmentResolution,
-  row: Pick<AppliedInstallment, "paid" | "settledOn"> | undefined,
-): InstallmentResolution {
-  if (!row?.paid) return slot;
-  const late = row.settledOn != null && row.settledOn > slot.dueDate;
-  return {
-    ...slot,
-    status: late ? "late_payment" : "on_time",
-    paidOn: row.settledOn,
-    missedDays: late ? slot.missedDays : [],
   };
 }
 

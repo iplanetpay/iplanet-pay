@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { getCurrentUser } from "@/lib/auth/session";
+import { mockRecordDraw } from "@/lib/raffle/mock";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export async function POST(request: Request) {
@@ -22,6 +24,11 @@ export async function POST(request: Request) {
 
   if (!body.winner_user_id || !body.winner_name) {
     return NextResponse.json({ ok: false, error: "Vencedor inválido" }, { status: 400 });
+  }
+
+  if (USE_MOCK_AUTH) {
+    const draw = mockRecordDraw(body.winner_user_id, body.winner_name);
+    return NextResponse.json({ ok: true, draw: { id: draw.id } });
   }
 
   const drawMonth = new Date();

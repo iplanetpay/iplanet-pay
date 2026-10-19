@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
+import { WhatsappGoalNotices } from "@/components/admin/whatsapp-goal-notices";
+import { WhatsappLeadSchedule } from "@/components/admin/whatsapp-lead-schedule";
+import {
+  formatLeadPhoneList,
+  toggleAllLeads,
+  toggleLeadSelection,
+} from "@/lib/whatsapp/lead-selection";
+import { templateLabel, templateNamePatch } from "@/lib/whatsapp/template-name";
+import type { BroadcastAudience } from "@/lib/whatsapp/admin";
 import type { WhatsappTemplate } from "@/types/database";
 
 function previewBody(body: string) {
@@ -16,16 +25,12 @@ function previewBody(body: string) {
     .replace(/\{\{produto\}\}/g, "iPhone 16")
     .replace(/\{\{valor\}\}/g, "R$ 250,00")
     .replace(/\{\{pix\}\}/g, "Pix disponível no app")
-    .replace(/\{\{meta\}\}/g, "Meu iPhone");
+    .replace(/\{\{meta\}\}/g, "Meu iPhone")
+    .replace(/\{\{reserva\}\}/g, "iPhone 16")
+    .replace(/\{\{data\}\}/g, "20 de out. de 2026");
 }
 
-export function templateLabel(name: string) {
-  return name
-    .replace(/[_-]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
-}
+type Lead = { user_id: string; full_name: string; phone: string; active: boolean };
 
 type DispatchResult = { phone: string; name: string; ok: boolean; error?: string };
 
@@ -48,12 +53,22 @@ export function WhatsappAdminPanel({
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [audience, setAudience] = useState<"clients_phone" | "active_goals" | "paste">("clients_phone");
+  const [audience, setAudience] = useState<BroadcastAudience>("clients_phone");
   const [paste, setPaste] = useState("");
   const [broadcastTpl, setBroadcastTpl] = useState(initial[0]?.id ?? "");
   const [newTplName, setNewTplName] = useState("");
   const [newTplBody, setNewTplBody] = useState("");
-  const [leads, setLeads] = useState<Array<{ user_id: string; full_name: string; phone: string; active: boolean }>>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [scheduleLead, setScheduleLead] = useState<Lead | null>(null);
+  const [selectedLeads, setSelectedLeads] = useState<Set<string>>(() => new Set());
+  const selectedPhones = useMemo(
+    () =>
+      formatLeadPhoneList(
+        leads.filter((lead) => selectedLeads.has(lead.user_id)).map((lead) => lead.phone),
+      ),
+    [leads, selectedLeads],
+  );
+  const closeSchedule = useCallback(() => setScheduleLead(null), []);
   const [progress, setProgress] = useState<number | null>(null);
   const [logOpen, setLogOpen] = useState(false);
   const [results, setResults] = useState<DispatchResult[]>([]);
@@ -86,6 +101,7 @@ export function WhatsappAdminPanel({
   async function saveTemplate(e: React.FormEvent) {
     e.preventDefault();
     if (!selected) return;
+    const renamed = templateNamePatch(selected.name, name);
     setLoading(true);
     setError(null);
     setMessage(null);
@@ -93,7 +109,7 @@ export function WhatsappAdminPanel({
       const res = await fetch("/api/admin/whatsapp/templates", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: selected.id, name, body }),
+        body: JSON.stringify({ id: selected.id, name: renamed, body }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -102,7 +118,9 @@ export function WhatsappAdminPanel({
       }
       setTemplates((prev) =>
         prev.map((template) =>
-          template.id === selected.id ? { ...template, name, body } : template,
+          template.id === selected.id
+            ? { ...template, name: renamed ?? template.name, body }
+            : template,
         ),
       );
       setMessage("Template atualizado.");
@@ -185,7 +203,7 @@ export function WhatsappAdminPanel({
         body: JSON.stringify({
           template_id: broadcastTpl,
           audience: phones ? "paste" : audience,
-          paste_phones: phones ?? paste,
+          paste_phones: phones ?? (audience === "selected_leads" ? selectedPhones : paste),
         }),
       });
       const data = (await res.json()) as {
@@ -313,14 +331,34 @@ export function WhatsappAdminPanel({
         </Card>
       </section>
 
+      <WhatsappGoalNotices
+        templates={templates}
+        onSaved={(saved) =>
+          setTemplates((prev) =>
+            prev.some((template) => template.id === saved.id)
+              ? prev.map((template) => (template.id === saved.id ? saved : template))
+              : [...prev, saved],
+          )
+        }
+      />
+
       <Card>
         <h2 className="text-xl font-bold tracking-tight">Leads de disparo</h2>
-        <p className="mt-1 text-xs text-[var(--ink-muted)]">A lista atualiza sozinha.</p>
+        <p className="mt-1 text-xs text-[var(--ink-muted)]">
+          A lista atualiza sozinha. Clique no nome para ver a programação de disparos das metas.
+        </p>
         <ul className="mt-4 max-h-64 divide-y divide-[var(--line)] overflow-y-auto text-sm">
           {leads.map((lead) => (
             <li key={lead.user_id} className="flex items-center justify-between py-2">
               <span>
-                {lead.full_name} <span className="text-[var(--ink-muted)]">{lead.phone}</span>
+                <button
+                  type="button"
+                  onClick={() => setScheduleLead(lead)}
+                  className="font-semibold text-[var(--ink)] underline-offset-2 hover:underline"
+                >
+                  {lead.full_name}
+                </button>{" "}
+                <span className="text-[var(--ink-muted)]">{lead.phone}</span>
               </span>
               <Pill tone={lead.active ? "success" : "neutral"}>{lead.active ? "Ativo" : "Inativo"}</Pill>
             </li>
@@ -341,13 +379,58 @@ export function WhatsappAdminPanel({
           <Select
             label="Audiência"
             value={audience}
-            onChange={(e) => setAudience(e.target.value as "clients_phone" | "active_goals" | "paste")}
+            onChange={(e) => setAudience(e.target.value as BroadcastAudience)}
           >
             <option value="clients_phone">Clientes com telefone</option>
             <option value="active_goals">Usuários com metas ativas</option>
             <option value="paste">Colar lista de leads</option>
+            <option value="selected_leads">Seleção de Leads</option>
           </Select>
         </div>
+        {audience === "selected_leads" ? (
+          <div className="mt-3 space-y-3">
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm font-semibold">
+                Leads selecionados: {selectedLeads.size} de {leads.length}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={leads.length === 0}
+                onClick={() =>
+                  setSelectedLeads((prev) => toggleAllLeads(prev, leads.map((lead) => lead.user_id)))
+                }
+              >
+                {leads.length > 0 && leads.every((lead) => selectedLeads.has(lead.user_id))
+                  ? "Limpar seleção"
+                  : "Selecionar todos"}
+              </Button>
+            </div>
+            <ul className="max-h-64 divide-y divide-[var(--line)] overflow-y-auto rounded-lg border border-[var(--line)] text-sm">
+              {leads.map((lead) => (
+                <li key={lead.user_id}>
+                  <label className="flex cursor-pointer items-center gap-3 px-3 py-2">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4 accent-[var(--accent)]"
+                      checked={selectedLeads.has(lead.user_id)}
+                      onChange={() => setSelectedLeads((prev) => toggleLeadSelection(prev, lead.user_id))}
+                    />
+                    <span className="flex-1">{lead.full_name}</span>
+                    <span className="text-[var(--ink-muted)]">{lead.phone}</span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <div>
+              <p className="text-xs font-semibold text-[var(--ink-muted)]">Números da audiência</p>
+              <p className="mt-1 min-h-10 break-words rounded-lg bg-[var(--bg-subtle)] px-3 py-2 font-mono text-xs">
+                {selectedPhones || "Nenhum lead selecionado."}
+              </p>
+            </div>
+          </div>
+        ) : null}
         {audience === "paste" ? (
           <div className="mt-3">
             <Textarea
@@ -359,7 +442,12 @@ export function WhatsappAdminPanel({
           </div>
         ) : null}
         <div className="mt-4">
-          <Button type="button" variant="accent" disabled={loading || !broadcastTpl} onClick={() => void disparar()}>
+          <Button
+            type="button"
+            variant="accent"
+            disabled={loading || !broadcastTpl || (audience === "selected_leads" && !selectedPhones)}
+            onClick={() => void disparar()}
+          >
             Disparar
           </Button>
         </div>
@@ -403,6 +491,7 @@ export function WhatsappAdminPanel({
           </div>
         ) : null}
       </Card>
+      {scheduleLead ? <WhatsappLeadSchedule lead={scheduleLead} onClose={closeSchedule} /> : null}
     </div>
   );
 }

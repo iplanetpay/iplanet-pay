@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -20,6 +21,7 @@ import { listQuitadasForPickup } from "@/lib/reservations/queries";
 import { PickupQueue } from "@/components/reservations/pickup-queue";
 import { listStores } from "@/lib/stores/queries";
 import { getFinanceAggregates } from "@/lib/finance/queries";
+import { STAT_GRID_4 } from "@/lib/admin/stat-value";
 
 export const metadata = { title: "Admin" };
 
@@ -45,7 +47,7 @@ export default async function AdminPage() {
         size="xl"
       />
 
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className={STAT_GRID_4}>
         {[
           {
             label: "Aportes confirmados",
@@ -65,12 +67,7 @@ export default async function AdminPage() {
           },
           { label: "Lojas", value: String(stores.length) },
         ].map((stat) => (
-          <Card key={stat.label} className="bg-white">
-            <p className="text-sm text-[var(--ink-muted)]">{stat.label}</p>
-            <p className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">
-              {stat.value}
-            </p>
-          </Card>
+          <StatCard key={stat.label} label={stat.label} value={stat.value} />
         ))}
       </div>
 

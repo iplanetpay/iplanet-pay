@@ -2,6 +2,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { mockUpsertGoal } from "@/lib/goals/mock";
 import { nextReminderAt, parseReminderDay } from "@/lib/goals/reminder";
+import { syncGoalWhatsappSchedule, type ScheduleGoal } from "@/lib/goals/whatsapp-schedule-store";
 import { createClient } from "@/lib/supabase/server";
 import type { ContributionFrequency } from "@/lib/reservations/contribution-plan";
 
@@ -74,6 +75,15 @@ export async function createPaymentGoal(
   const installmentCents = Math.round(input.installment_cents);
   const installmentsCount = Math.round(input.installments_count);
   const reservationId = input.reservation_id ?? null;
+  const scheduleGoal = (id: string): ScheduleGoal => ({
+    id,
+    user_id: user.id,
+    status: "active",
+    amount_cents: amountCents,
+    frequency,
+    plan_start_date: planStartDate,
+    target_date: input.target_date,
+  });
 
   if (USE_MOCK_AUTH) {
     const saved = mockUpsertGoal({
@@ -93,6 +103,7 @@ export async function createPaymentGoal(
       planStartDate,
     });
     if (!saved.ok) return saved;
+    await syncGoalWhatsappSchedule(scheduleGoal(saved.id));
     return { ok: true, goal_id: saved.id };
   }
 
@@ -132,7 +143,9 @@ export async function createPaymentGoal(
     if (error || !data) {
       return { ok: false, error: error?.message ?? "Falha ao salvar meta." };
     }
-    return { ok: true, goal_id: data.id as string };
+    const goalId = data.id as string;
+    await syncGoalWhatsappSchedule(scheduleGoal(goalId));
+    return { ok: true, goal_id: goalId };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Falha ao salvar meta";
     return { ok: false, error: message };

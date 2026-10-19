@@ -1,6 +1,6 @@
 import type { GoalState } from '@/lib/goals/climb/types';
 import { brl, formatDate, nextDeposit, percentOf, relativeDue, statusInfo } from '@/lib/goals/climb/goal-logic';
-import { ProgressRing } from './progress-ring';
+import { PROGRESS_RING_BLUE, ProgressRing } from './progress-ring';
 
 /** Painel lateral: anel de progresso e lista agrupada (estilo iOS). */
 export function GoalStats({ goal, onDeposit }: { goal: GoalState; onDeposit?: (g: GoalState) => void }) {
@@ -21,7 +21,7 @@ export function GoalStats({ goal, onDeposit }: { goal: GoalState; onDeposit?: (g
             <h2>{goal.name}</h2>
             <p className="muted">{goal.product.name}</p>
           </div>
-          <ProgressRing percent={percent} size={96} stroke={7} color={goal.status === "late" ? "#ff453a" : "#0071e3"} />
+          <ProgressRing percent={percent} size={96} stroke={7} color={goal.status === "late" ? "#ff453a" : PROGRESS_RING_BLUE} />
         </div>
         <p className="status-msg">{info.message}</p>
         <div className="amounts">
@@ -32,7 +32,7 @@ export function GoalStats({ goal, onDeposit }: { goal: GoalState; onDeposit?: (g
 
       <section className="card glass-card list">
         <div className="row">
-          <span>Falta para o topo</span>
+          <span>Falta para concluir</span>
           <strong>{goal.status === 'done' ? 'R$ 0' : brl(remaining)}</strong>
         </div>
         <div className="row">

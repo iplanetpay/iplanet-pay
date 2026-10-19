@@ -4,8 +4,10 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import { ContributionCalendar } from "@/components/reservations/contribution-calendar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { selectClimbGoal, type ClimbGoalEntry } from "@/lib/goals/climb/goal-cards";
+import type { GoalCalendarData } from "@/lib/goals/goal-calendar";
 import type {
   GoalState,
   RealWeather,
@@ -157,6 +159,8 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
     <ClimbView
       goal={shown ?? selected.goal}
       depositHref={selected.depositHref}
+      calendar={presetKey ? null : selected.calendar}
+      today={selected.today}
       presetKey={presetKey}
       setPresetKey={setPresetKey}
       weather={weather}
@@ -174,6 +178,8 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
 function ClimbView({
   goal,
   depositHref,
+  calendar = null,
+  today = "",
   presetKey,
   setPresetKey,
   weather,
@@ -188,6 +194,8 @@ function ClimbView({
 }: {
   goal: GoalState;
   depositHref: string | null;
+  calendar?: GoalCalendarData | null;
+  today?: string;
   presetKey: string | null;
   setPresetKey: (key: string | null) => void;
   weather: WeatherKind | "real";
@@ -237,6 +245,7 @@ function ClimbView({
           ) : null
         }
       />
+      {calendar ? <ContributionCalendar {...calendar} paged today={today} /> : null}
     </div>
   );
 }

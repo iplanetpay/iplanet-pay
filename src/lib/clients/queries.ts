@@ -1,5 +1,19 @@
-import { USE_MOCK_AUTH } from "@/lib/auth/mock";
-import { MOCK_USERS } from "@/lib/auth/mock";
+import { MOCK_USERS, USE_MOCK_AUTH } from "@/lib/auth/mock";
+import {
+  EMPTY_ACTIVITY,
+  mergeReferredClients,
+  type ClientActivity,
+  type ClientTradeInRow,
+  type ClientWithdrawalRow,
+} from "@/lib/clients/activity";
+import { mockClientProfile, mockClientProfiles, mockReferredBy } from "@/lib/clients/mock";
+import { mockListMine } from "@/lib/reservations/mock";
+import { mockListOffersAdmin } from "@/lib/trade-in/mock";
+import { listContributionsForReservation } from "@/lib/wallet/queries";
+import { mockListWithdrawals } from "@/lib/withdrawals/mock";
+import type { ReferralStatus } from "@/lib/referrals/types";
+import type { UsedDeviceOfferStatus } from "@/lib/trade-in/types";
+import type { WithdrawalPayoutStatus, WithdrawalStatus } from "@/lib/withdrawals/types";
 import type { ReservationStatus, Store } from "@/types/database";
 import type { UserRole } from "@/types/auth";
 
@@ -36,6 +50,8 @@ export type ClientReservationRow = {
 };
 
 export type ClientDetail = {
+  id: string | null;
+  full_name: string | null;
   email: string | null;
   cpf: string | null;
   phone: string | null;
@@ -45,6 +61,7 @@ export type ClientDetail = {
   address_number: string | null;
   birth_date: string | null;
   referral_code: string | null;
+  referred_by_id: string | null;
   referred_by_name: string | null;
   created_at: string | null;
   wallet_cents: number;
@@ -70,17 +87,22 @@ export async function searchClients(options?: {
   const limit = options?.limit ?? 100;
 
   if (USE_MOCK_AUTH) {
-    const clients: ClientListItem[] = Object.values(MOCK_USERS).map((u, i) => ({
-      id: u.id,
-      full_name: u.full_name,
-      phone: u.phone ?? null,
-      role: u.role,
-      store_id: u.store_id ?? null,
-      store_name: u.store_id ? "Mock Store" : null,
-      created_at: new Date().toISOString(),
-      reservation_count: i === 0 ? 1 : 0,
-      total_paid_cents: i === 0 ? 50000 : 0,
-    }));
+    const clients: ClientListItem[] = mockClientProfiles().map((p) => {
+      const reservations = mockListMine(p.id);
+      return {
+        id: p.id,
+        full_name: p.full_name,
+        phone: p.phone,
+        role: p.role,
+        store_id: p.store_id,
+        store_name: p.store_id ? "Mock Store" : null,
+        created_at: p.created_at,
+        reservation_count: reservations.length,
+        total_paid_cents: reservations
+          .filter((r) => r.status !== "cancelada" && r.status !== "trocada")
+          .reduce((s, r) => s + r.amount_paid_cents, 0),
+      };
+    });
     const filtered = q
       ? clients.filter(
           (c) =>
@@ -166,7 +188,29 @@ export async function listClientReservations(
   if (!userId) return { reservations: [], error: "Usuário inválido." };
 
   if (USE_MOCK_AUTH) {
-    return { reservations: [], error: null };
+    const rows = await Promise.all(
+      mockListMine(userId).map(async (r) => {
+        const { contributions } = await listContributionsForReservation(r.id);
+        return {
+          id: r.id,
+          status: r.status,
+          list_price_cents: r.list_price_cents,
+          amount_paid_cents: r.amount_paid_cents,
+          created_at: r.created_at,
+          product_name: r.product?.name ?? null,
+          image_url: r.product?.image_url ?? null,
+          store_name: r.store?.name ?? null,
+          contributions: contributions.map((c) => ({
+            id: c.id,
+            amount_cents: c.amount_cents,
+            status: c.status,
+            created_at: c.created_at,
+            confirmed_at: c.confirmed_at,
+          })),
+        };
+      }),
+    );
+    return { reservations: rows, error: null };
   }
 
   try {
@@ -245,6 +289,8 @@ export async function listClientReservations(
 }
 
 const EMPTY_DETAIL: ClientDetail = {
+  id: null,
+  full_name: null,
   email: null,
   cpf: null,
   phone: null,
@@ -254,16 +300,48 @@ const EMPTY_DETAIL: ClientDetail = {
   address_number: null,
   birth_date: null,
   referral_code: null,
+  referred_by_id: null,
   referred_by_name: null,
   created_at: null,
   wallet_cents: 0,
 };
 
+function formatCpfDigits(cpf: string | null | undefined) {
+  return cpf ? cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null;
+}
+
+function mockClientDetail(userId: string): { detail: ClientDetail; error: string | null } {
+  const profile = mockClientProfile(userId);
+  if (!profile) return { detail: EMPTY_DETAIL, error: "Cliente não encontrado." };
+  const referrer = profile.referred_by ? mockClientProfile(profile.referred_by) : null;
+  const email = Object.values(MOCK_USERS).find((u) => u.id === userId)?.email ?? null;
+  return {
+    detail: {
+      ...EMPTY_DETAIL,
+      id: profile.id,
+      full_name: profile.full_name,
+      email,
+      cpf: formatCpfDigits(profile.cpf),
+      phone: profile.phone,
+      city: profile.city,
+      state: profile.state,
+      address: profile.address,
+      address_number: profile.address_number,
+      birth_date: profile.birth_date,
+      referral_code: profile.referral_code,
+      referred_by_id: referrer?.id ?? null,
+      referred_by_name: referrer?.full_name ?? null,
+      created_at: profile.created_at,
+    },
+    error: null,
+  };
+}
+
 export async function getClientDetail(
   userId: string,
 ): Promise<{ detail: ClientDetail; error: string | null }> {
   if (!userId) return { detail: EMPTY_DETAIL, error: "Usuário inválido." };
-  if (USE_MOCK_AUTH) return { detail: EMPTY_DETAIL, error: null };
+  if (USE_MOCK_AUTH) return mockClientDetail(userId);
 
   try {
     const { createClient } = await import("@/lib/supabase/server");
@@ -271,7 +349,7 @@ export async function getClientDetail(
     const extended = await supabase
       .from("profiles")
       .select(
-        "phone, created_at, referral_code, referred_by, cpf, city, state, address, address_number, birth_date",
+        "full_name, phone, created_at, referral_code, referred_by, cpf, city, state, address, address_number, birth_date",
       )
       .eq("id", userId)
       .maybeSingle();
@@ -279,7 +357,7 @@ export async function getClientDetail(
       extended.error && /column|schema cache/i.test(extended.error.message)
         ? await supabase
             .from("profiles")
-            .select("phone, created_at, referral_code, referred_by")
+            .select("full_name, phone, created_at, referral_code, referred_by")
             .eq("id", userId)
             .maybeSingle()
         : null;
@@ -319,8 +397,10 @@ export async function getClientDetail(
     return {
       detail: {
         ...EMPTY_DETAIL,
+        id: userId,
+        full_name: profile.full_name?.trim() || null,
         email,
-        cpf: identity.cpf ? identity.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") : null,
+        cpf: formatCpfDigits(identity.cpf),
         phone: profile.phone ?? null,
         city: identity.city ?? null,
         state: identity.state ?? null,
@@ -328,6 +408,7 @@ export async function getClientDetail(
         address_number: identity.address_number ?? null,
         birth_date: identity.birth_date ?? null,
         referral_code: profile.referral_code ?? null,
+        referred_by_id: profile.referred_by ?? null,
         referred_by_name: referredByName,
         created_at: profile.created_at ?? null,
         wallet_cents: walletCents,
@@ -337,6 +418,142 @@ export async function getClientDetail(
   } catch (err) {
     const message = err instanceof Error ? err.message : "Falha ao carregar o cliente";
     return { detail: EMPTY_DETAIL, error: message };
+  }
+}
+
+function mockClientActivity(userId: string): ClientActivity {
+  return {
+    referred: mergeReferredClients(
+      mockReferredBy(userId),
+      mockReferredBy(userId)
+        .filter((p) => p.referral_status)
+        .map((p) => ({
+          referred_id: p.id,
+          status: p.referral_status as ReferralStatus,
+          created_at: p.created_at,
+        })),
+    ),
+    trade_ins: mockListOffersAdmin({})
+      .filter((o) => o.user_id === userId)
+      .map((o) => ({
+        id: o.id,
+        device_model: o.device_model,
+        status: o.status,
+        expected_value_cents: o.expected_value_cents,
+        approved_value_cents: o.approved_value_cents,
+        created_at: o.created_at,
+      })),
+    withdrawals: mockListWithdrawals(userId).map((w) => ({
+      id: w.id,
+      status: w.status,
+      payout_status: w.payout_status,
+      refund_amount_cents: w.refund_amount_cents,
+      product_name: w.product_name,
+      created_at: w.created_at,
+    })),
+  };
+}
+
+/** Referrals, trade-in offers and withdrawals of one client; each part fails soft to an empty list. */
+export async function getClientActivity(userId: string): Promise<ClientActivity> {
+  if (!userId) return EMPTY_ACTIVITY;
+  if (USE_MOCK_AUTH) return mockClientActivity(userId);
+
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const [profilesRes, referralsRes, offersRes, withdrawalsRes] = await Promise.all([
+      supabase
+        .from("profiles")
+        .select("id, full_name, created_at")
+        .eq("referred_by", userId)
+        .limit(100),
+      supabase
+        .from("referrals")
+        .select("referred_id, status, created_at")
+        .eq("referrer_id", userId)
+        .limit(100),
+      supabase
+        .from("used_device_offers")
+        .select("id, device_model, status, expected_value_cents, approved_value_cents, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+      supabase
+        .from("withdrawal_requests")
+        .select("id, reservation_id, status, payout_status, refund_amount_cents, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(50),
+    ]);
+
+    const referredProfiles = (profilesRes.data ?? []) as Array<{
+      id: string;
+      full_name: string | null;
+      created_at: string | null;
+    }>;
+    const referralRows = (referralsRes.data ?? []) as Array<{
+      referred_id: string;
+      status: ReferralStatus;
+      created_at: string;
+    }>;
+    const known = new Set(referredProfiles.map((p) => p.id));
+    const missing = referralRows.map((r) => r.referred_id).filter((id) => !known.has(id));
+    const names: Record<string, string | null> = {};
+    if (missing.length > 0) {
+      const { data } = await supabase.from("profiles").select("id, full_name").in("id", missing);
+      for (const p of data ?? []) names[p.id as string] = (p.full_name as string | null) ?? null;
+    }
+
+    const withdrawalRows = (withdrawalsRes.data ?? []) as Array<{
+      id: string;
+      reservation_id: string;
+      status: WithdrawalStatus;
+      payout_status: WithdrawalPayoutStatus;
+      refund_amount_cents: number;
+      created_at: string;
+    }>;
+    const productByReservation = new Map<string, string>();
+    const reservationIds = [...new Set(withdrawalRows.map((w) => w.reservation_id))];
+    if (reservationIds.length > 0) {
+      const { data } = await supabase
+        .from("reservations")
+        .select("id, product:products ( name )")
+        .in("id", reservationIds);
+      for (const row of data ?? []) {
+        const product = asOne(
+          row.product as { name: string } | { name: string }[] | null,
+        );
+        if (product?.name) productByReservation.set(row.id as string, product.name);
+      }
+    }
+
+    const tradeIns: ClientTradeInRow[] = (
+      (offersRes.data ?? []) as Array<{
+        id: string;
+        device_model: string;
+        status: UsedDeviceOfferStatus;
+        expected_value_cents: number;
+        approved_value_cents: number | null;
+        created_at: string;
+      }>
+    ).map((o) => ({ ...o }));
+    const withdrawals: ClientWithdrawalRow[] = withdrawalRows.map((w) => ({
+      id: w.id,
+      status: w.status,
+      payout_status: w.payout_status,
+      refund_amount_cents: w.refund_amount_cents,
+      product_name: productByReservation.get(w.reservation_id) ?? null,
+      created_at: w.created_at,
+    }));
+
+    return {
+      referred: mergeReferredClients(referredProfiles, referralRows, names),
+      trade_ins: tradeIns,
+      withdrawals,
+    };
+  } catch {
+    return EMPTY_ACTIVITY;
   }
 }
 

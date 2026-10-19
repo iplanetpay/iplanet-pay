@@ -1,3 +1,4 @@
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/admin";
 
@@ -125,6 +126,7 @@ export async function listClosings(): Promise<{
   closings: FinancialClosing[];
   error: string | null;
 }> {
+  if (USE_MOCK_AUTH) return { closings: [], error: null };
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("financial_closings")

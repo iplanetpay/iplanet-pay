@@ -1,10 +1,13 @@
 import { isContributionFrequency, type ContributionFrequency } from "../../reservations/contribution-plan.ts";
+import type { GoalCalendarData } from "../goal-calendar.ts";
 import type { GoalState } from "./types.ts";
 
-/** Uma meta já convertida para a escalada, com o link do aporte. */
+/** Uma meta já convertida para a escalada, com o link do aporte e o calendário. */
 export interface ClimbGoalEntry {
   goal: GoalState;
   depositHref: string;
+  calendar: GoalCalendarData | null;
+  today: string;
 }
 
 type ClimbableFields = {

@@ -18,6 +18,10 @@ function store(): Map<string, Contribution[]> {
   return scope.__iplanetMockContributions;
 }
 
+export function mockAllContributions(): Contribution[] {
+  return [...store().values()].flat();
+}
+
 /**
  * Mock has no Pix confirmation. A goal with no recorded aportes gets one
  * confirmed payment that covers the first installment and half of the next,

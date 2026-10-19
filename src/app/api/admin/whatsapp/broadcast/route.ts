@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { broadcastWhatsapp } from "@/lib/whatsapp/admin";
+import { broadcastWhatsapp, isBroadcastAudience } from "@/lib/whatsapp/admin";
 
 export async function POST(request: Request) {
   let body: Record<string, unknown>;
@@ -11,10 +11,13 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-  const audience = String(body.audience ?? "clients_phone") as
-    | "clients_phone"
-    | "active_goals"
-    | "paste";
+  const audience = body.audience ?? "clients_phone";
+  if (!isBroadcastAudience(audience)) {
+    return NextResponse.json(
+      { ok: false, error: "Audiência inválida." },
+      { status: 400 },
+    );
+  }
   const result = await broadcastWhatsapp({
     template_id: String(body.template_id ?? ""),
     audience,

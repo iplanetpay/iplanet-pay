@@ -12,7 +12,8 @@ import { Pill } from "@/components/ui/pill";
 import { MotionModal } from "@/components/ui/motion";
 import { formatCentsBRL } from "@/lib/utils";
 import { USED_DEVICE_STATUS_LABEL } from "@/lib/trade-in/constants";
-import { tradeInDecisionValue } from "@/lib/trade-in/offer-state";
+import { batteryHealthLabel } from "@/lib/trade-in/devices";
+import { tradeInCreditSummary, tradeInDecisionValue } from "@/lib/trade-in/offer-state";
 import type { UsedDeviceOfferWithProfile } from "@/lib/trade-in/types";
 import { maintenanceLabels } from "@/components/trade-in/used-device-offer-status";
 
@@ -22,8 +23,13 @@ const STATUS_TONE: Record<string, "lavender" | "success" | "danger"> = {
   rejected: "danger",
 };
 
-export function AdminUsedDevicePanel() {
+export function AdminUsedDevicePanel({
+  initialOfferId,
+}: {
+  initialOfferId?: string | null;
+} = {}) {
   const router = useRouter();
+  const [deepLinkPending, setDeepLinkPending] = useState(Boolean(initialOfferId));
   const [rows, setRows] = useState<UsedDeviceOfferWithProfile[]>([]);
   const [status, setStatus] = useState("all");
   const [name, setName] = useState("");
@@ -103,6 +109,14 @@ export function AdminUsedDevicePanel() {
       /* ignore */
     }
   }
+
+  useEffect(() => {
+    if (!deepLinkPending || rows.length === 0) return;
+    setDeepLinkPending(false);
+    const target = rows.find((r) => r.id === initialOfferId);
+    if (target) void openDetail(target);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- opens the linked offer once, after the first load
+  }, [rows, deepLinkPending, initialOfferId]);
 
   async function submitReview() {
     if (!active || !decision) return;
@@ -196,7 +210,14 @@ export function AdminUsedDevicePanel() {
             </li>
           ) : (
             rows.map((r) => (
-              <li key={r.id}>
+              <li
+                key={r.id}
+                className={
+                  r.id === initialOfferId
+                    ? "bg-[var(--accent-soft)]/60 ring-2 ring-inset ring-[var(--accent)]"
+                    : undefined
+                }
+              >
                 <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-4 sm:px-5">
                   <button
                     type="button"
@@ -207,7 +228,8 @@ export function AdminUsedDevicePanel() {
                       {r.client_name ?? "Cliente"}
                     </p>
                     <p className="text-sm text-[var(--ink-muted)]">
-                      {r.device_model} · {new Date(r.created_at).toLocaleString("pt-BR")}
+                      {r.device_model} · Bateria {batteryHealthLabel(r)} ·{" "}
+                      {new Date(r.created_at).toLocaleString("pt-BR")}
                     </p>
                   </button>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -283,6 +305,10 @@ export function AdminUsedDevicePanel() {
                   <p className="font-mono text-[var(--ink)]">{active.imei}</p>
                 </div>
                 <div>
+                  <p className="text-[var(--ink-muted)]">Estado da bateria</p>
+                  <p className="font-semibold text-[var(--ink)]">{batteryHealthLabel(active)}</p>
+                </div>
+                <div>
                   <p className="text-[var(--ink-muted)]">Valor desejado</p>
                   <p className="font-semibold text-[var(--accent)]">
                     {formatCentsBRL(active.expected_value_cents)}
@@ -332,7 +358,7 @@ export function AdminUsedDevicePanel() {
               {siblings.length > 0 ? (
                 <Card className="space-y-2 text-sm">
                   <p className="font-semibold text-[var(--ink)]">
-                    Reavaliação · outras avaliações deste aparelho
+                    Outros aparelhos desta reserva
                   </p>
                   {siblings.map((item) => (
                     <button
@@ -341,10 +367,13 @@ export function AdminUsedDevicePanel() {
                       className="block w-full rounded-xl border border-[var(--line)] px-3 py-2 text-left"
                       onClick={() => void openDetail(item)}
                     >
-                      {new Date(item.created_at).toLocaleDateString("pt-BR")} · {item.status} ·{" "}
-                      {formatCentsBRL(item.expected_value_cents)} · {item.photo_paths.length} fotos
+                      <span className="font-medium text-[var(--ink)]">{item.device_model}</span> ·{" "}
+                      {USED_DEVICE_STATUS_LABEL[item.status]} · Bateria {batteryHealthLabel(item)} ·{" "}
+                      {formatCentsBRL(item.approved_value_cents ?? item.expected_value_cents)} ·{" "}
+                      {new Date(item.created_at).toLocaleDateString("pt-BR")}
                     </button>
                   ))}
+                  <ReservationCreditLine offers={[active, ...siblings]} />
                 </Card>
               ) : null}
 
@@ -447,5 +476,17 @@ export function AdminUsedDevicePanel() {
         ) : null}
       </MotionModal>
     </section>
+  );
+}
+
+function ReservationCreditLine({ offers }: { offers: UsedDeviceOfferWithProfile[] }) {
+  const summary = tradeInCreditSummary(offers);
+  return (
+    <p className="pt-1 text-[var(--ink)]">
+      <span className="font-medium text-[var(--ink-muted)]">Crédito aceito na reserva: </span>
+      <span className="font-semibold">{formatCentsBRL(summary.activeCents)}</span>
+      {" "}
+      ({summary.acceptedCount} {summary.acceptedCount === 1 ? "aparelho" : "aparelhos"})
+    </p>
   );
 }

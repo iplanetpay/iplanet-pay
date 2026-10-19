@@ -3,7 +3,12 @@ import { AdminUsedDevicePanel } from "@/components/trade-in/admin-used-device-pa
 
 export const metadata = { title: "Avaliação de usados" };
 
-export default function AdminAvaliacaoUsadosPage() {
+export default async function AdminAvaliacaoUsadosPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>;
+}) {
+  const sp = await searchParams;
   return (
     <div className="space-y-8">
       <PageHeader
@@ -11,7 +16,7 @@ export default function AdminAvaliacaoUsadosPage() {
         title="Avaliação de usados"
         description="Fila de ofertas de aparelhos usados como pagamento."
       />
-      <AdminUsedDevicePanel />
+      <AdminUsedDevicePanel initialOfferId={sp.id ?? null} />
     </div>
   );
 }

@@ -60,3 +60,53 @@ export function tradeInVisual(offer: UsedDeviceOffer | null, now = Date.now()) {
     discarded: false,
   };
 }
+
+/** Pending, or approved credit that was neither discarded nor marked expired. */
+export function isLiveOffer(offer: UsedDeviceOffer): boolean {
+  if (offer.status === "pending") return true;
+  return offer.status === "approved" && !isDiscardedOffer(offer) && !isExpiredOffer(offer);
+}
+
+/** Approved within 90 days but not yet marked EXPIRADA (credit still in amount_paid_cents). */
+export function needsExpirySync(offer: UsedDeviceOffer, now = Date.now()): boolean {
+  return tradeInVisual(offer, now).expired && !isExpiredOffer(offer);
+}
+
+export type TradeInCreditSummary = {
+  /** Sum of accepted devices still valid — counts toward the reservation. */
+  activeCents: number;
+  /** Accepted devices past the 90-day cycle. */
+  expiredCents: number;
+  /** Credits still included in reservations.amount_paid_cents. */
+  inPaidCents: number;
+  acceptedCount: number;
+};
+
+export function tradeInCreditSummary(
+  offers: UsedDeviceOffer[],
+  now = Date.now(),
+): TradeInCreditSummary {
+  const summary: TradeInCreditSummary = {
+    activeCents: 0,
+    expiredCents: 0,
+    inPaidCents: 0,
+    acceptedCount: 0,
+  };
+  for (const offer of offers) {
+    const visual = tradeInVisual(offer, now);
+    if (visual.discarded || visual.creditCents <= 0) continue;
+    if (!isExpiredOffer(offer)) summary.inPaidCents += visual.creditCents;
+    if (visual.expired) {
+      summary.expiredCents += visual.creditCents;
+    } else {
+      summary.activeCents += visual.creditCents;
+      summary.acceptedCount += 1;
+    }
+  }
+  return summary;
+}
+
+/** Cash part of amount_paid_cents once trade-in credits are taken out. */
+export function tradeInCashCents(amountPaidCents: number, offers: UsedDeviceOffer[], now = Date.now()) {
+  return Math.max(0, amountPaidCents - tradeInCreditSummary(offers, now).inPaidCents);
+}

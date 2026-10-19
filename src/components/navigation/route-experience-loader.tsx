@@ -66,19 +66,15 @@ export function RouteExperienceLoader({
 
     void (async () => {
       const routes = shell ? routesForShell(shell) : [];
-      await Promise.all([
-        waitUntilPageReady(contentRef.current, {
-          imageCap: 48,
-          minVisibleMs: 700,
-          maxReadyMs: 45_000,
-          onProgress: (value) => {
-            if (!cancelled) setPercent(value);
-          },
-        }),
-        shell
-          ? warmRoutes((href) => router.prefetch(href), routes)
-          : Promise.resolve(),
-      ]);
+      await waitUntilPageReady(contentRef.current, {
+        imageCap: 48,
+        minVisibleMs: 700,
+        maxReadyMs: 45_000,
+        onProgress: (value) => {
+          if (!cancelled) setPercent(value);
+        },
+        alongside: shell ? [warmRoutes((href) => router.prefetch(href), routes)] : [],
+      });
       if (cancelled) return;
       if (shell) markShellWarm(shell);
       warmed.current = true;

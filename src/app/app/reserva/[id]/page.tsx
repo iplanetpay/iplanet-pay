@@ -12,10 +12,16 @@ import { ReservationSimulatorButton } from "@/components/reservations/reservatio
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
-import { TradeInClientActions } from "@/components/trade-in/trade-in-actions";
-import { isDiscardedOffer, isExpiredOffer, tradeInVisual } from "@/lib/trade-in/offer-state";
+import { MAX_TRADE_IN_DEVICES } from "@/lib/trade-in/devices";
+import {
+  isLiveOffer,
+  needsExpirySync,
+  tradeInCashCents,
+  tradeInCreditSummary,
+  tradeInVisual,
+} from "@/lib/trade-in/offer-state";
 import { syncTradeInExpiry } from "@/lib/trade-in/workflow";
-import { getLatestUsedDeviceOfferForReservation } from "@/lib/trade-in/queries";
+import { listUsedDeviceOffersForReservation } from "@/lib/trade-in/queries";
 import { ContributionHistoryPanel } from "@/components/wallet/contribution-history-panel";
 import { SolicitarRetiradaWizard } from "@/components/pickup/solicitar-retirada-wizard";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -36,10 +42,13 @@ import {
   getLatestPickupRequest,
   pickupStatusLabel,
 } from "@/lib/pickup/queries";
+import { shippingMethodLabel } from "@/lib/pickup/fulfillment";
 import { Package } from "lucide-react";
 import { ProductImage } from "@/components/products/product-image";
 import { ReservationGoalSection } from "@/components/reservations/reservation-goal-section";
 import { getActiveGoalForReservation } from "@/lib/goals/queries";
+import { ReservationRankingCard } from "@/components/raffle/reservation-ranking-card";
+import { getUserRaffleBalance } from "@/lib/raffle/queries";
 import {
   calendarToday,
   isContributionFrequency,
@@ -81,34 +90,26 @@ export default async function ReservaDetailPage({
   const paidWithdrawal = isOwner
     ? await getPaidWithdrawalForReservation(id)
     : null;
-  const loadedOffer =
-    isOwner && user
-      ? (await getLatestUsedDeviceOfferForReservation(id, user.id)).offer
-      : null;
+  let usedDeviceOffers =
+    isOwner && user ? (await listUsedDeviceOffersForReservation(id, user.id)).offers : [];
   let paidCents = reservation.amount_paid_cents;
-  let usedDeviceOffer = loadedOffer;
-  if (usedDeviceOffer && isOwner) {
-    const before = tradeInVisual(usedDeviceOffer);
-    if (before.expired && !isExpiredOffer(usedDeviceOffer) && !isDiscardedOffer(usedDeviceOffer)) {
-      await syncTradeInExpiry({
-        offer: usedDeviceOffer,
-        amountPaidCents: paidCents,
-        listPriceCents: reservation.list_price_cents,
-        reservationStatus: reservation.status,
-      });
-      paidCents = Math.max(0, paidCents - before.creditCents);
-      usedDeviceOffer = {
-        ...usedDeviceOffer,
-        admin_message: `EXPIRADA|${usedDeviceOffer.admin_message ?? ""}`,
-      };
-    }
+  for (const offer of usedDeviceOffers.filter((o) => needsExpirySync(o))) {
+    await syncTradeInExpiry({
+      offer,
+      amountPaidCents: paidCents,
+      cashCents: tradeInCashCents(paidCents, usedDeviceOffers),
+      listPriceCents: reservation.list_price_cents,
+      reservationStatus: reservation.status,
+    });
+    paidCents = Math.max(0, paidCents - tradeInVisual(offer).creditCents);
+    usedDeviceOffers = usedDeviceOffers.map((o) =>
+      o.id === offer.id ? { ...o, admin_message: `EXPIRADA|${o.admin_message ?? ""}` } : o,
+    );
   }
-  const tradeVisual = tradeInVisual(usedDeviceOffer);
-  const tradeCents = tradeVisual.discarded ? 0 : tradeVisual.creditCents;
-  const cashCents =
-    tradeVisual.expired || tradeVisual.discarded
-      ? paidCents
-      : Math.max(0, paidCents - tradeCents);
+  const tradeSummary = tradeInCreditSummary(usedDeviceOffers);
+  const tradeCents = tradeSummary.activeCents;
+  const expiredTradeCents = tradeSummary.expiredCents;
+  const cashCents = tradeInCashCents(paidCents, usedDeviceOffers);
   const cashProgress = reservation.list_price_cents
     ? Math.max(0, Math.min(100, Math.round((cashCents / reservation.list_price_cents) * 100)))
     : 0;
@@ -118,10 +119,7 @@ export default async function ReservaDetailPage({
   const canOfferUsedDevice =
     isOwner &&
     reservation.status === "ativa" &&
-    (!usedDeviceOffer ||
-      usedDeviceOffer.status === "rejected" ||
-      isDiscardedOffer(usedDeviceOffer) ||
-      isExpiredOffer(usedDeviceOffer));
+    usedDeviceOffers.filter(isLiveOffer).length < MAX_TRADE_IN_DEVICES;
   const canCancel = ownerCanCancelReservation(isOwner, reservation.status, cashCents);
   const canRequestSaque =
     isOwner &&
@@ -130,11 +128,8 @@ export default async function ReservaDetailPage({
   const canSwitchDevice =
     reservation.status === "ativa" &&
     (isOwner || user?.role === "staff" || user?.role === "admin");
-  const effectiveRemaining = Math.max(
-    0,
-    reservation.list_price_cents - cashCents - (tradeVisual.expired ? 0 : tradeCents),
-  );
-  const effectiveProgress = cashProgress + (tradeVisual.expired ? 0 : tradeProgress);
+  const effectiveRemaining = Math.max(0, reservation.list_price_cents - cashCents - tradeCents);
+  const effectiveProgress = cashProgress + tradeProgress;
   const canAportar = isOwner && reservation.status === "ativa" && effectiveRemaining > 0;
   const canConfirmRetirada =
     reservation.status === "quitada" &&
@@ -146,6 +141,10 @@ export default async function ReservaDetailPage({
     ? await listCatalogProducts()
     : { products: [] };
   const goal = isOwner ? await getActiveGoalForReservation(reservation.id) : null;
+  const raffleBalance = isOwner && user ? await getUserRaffleBalance(user.id) : null;
+  const reservationConfirmedCents = contributions
+    .filter((c) => c.status === "confirmed")
+    .reduce((sum, c) => sum + c.amount_cents, 0);
 
   return (
     <div className="space-y-8">
@@ -186,12 +185,14 @@ export default async function ReservaDetailPage({
         {pickupRequest ? (
           <div className="rounded-[var(--radius-card)] border border-[var(--accent)]/30 bg-[var(--bg-subtle)] px-4 py-3">
             <p className="font-semibold text-[var(--ink)]">
-              Retirada / envio — {pickupStatusLabel(pickupRequest.status)}
+              Retirada / envio — {pickupStatusLabel(pickupRequest.status, pickupRequest.mode)}
             </p>
             <p className="mt-1 text-sm text-[var(--ink-muted)]">
               {pickupRequest.mode === "store"
-                ? `Compareça à ${storeName} com documento com foto.`
-                : `Envio ${pickupRequest.shipping_method ?? ""} — frete ${formatCentsBRL(pickupRequest.freight_cents + pickupRequest.insurance_cents)}.`}
+                ? pickupRequest.status === "ready_pickup"
+                  ? `Compareça à ${storeName} com documento com foto.`
+                  : `Estamos preparando seu aparelho na ${storeName}. Avisaremos quando estiver pronto.`
+                : `Envio ${shippingMethodLabel(pickupRequest.shipping_method)} — frete ${formatCentsBRL(pickupRequest.freight_cents + pickupRequest.insurance_cents)}.`}
             </p>
           </div>
         ) : reservation.status === "quitada" ? (
@@ -264,22 +265,17 @@ export default async function ReservaDetailPage({
           <p>
             Pago: {formatCentsBRL(cashCents)}
             {tradeCents > 0 ? (
-              <span className={tradeVisual.tone === "red" ? "font-semibold text-[#e11d48]" : "font-semibold text-[#e0a100]"}>
+              <span className="font-semibold text-[#e0a100]">
                 {" "}+ {formatCentsBRL(tradeCents)}
               </span>
             ) : null}
+            {expiredTradeCents > 0 ? (
+              <span className="font-semibold text-[#e11d48]">
+                {" "}+ {formatCentsBRL(expiredTradeCents)}
+              </span>
+            ) : null}
           </p>
-          <p>
-            Restante:{" "}
-            {formatCentsBRL(
-              Math.max(
-                0,
-                reservation.list_price_cents -
-                  cashCents -
-                  (tradeVisual.expired ? 0 : tradeCents),
-              ),
-            )}
-          </p>
+          <p>Restante: {formatCentsBRL(effectiveRemaining)}</p>
           <p>
             Criada em{" "}
             {new Date(reservation.created_at).toLocaleDateString("pt-BR")}
@@ -309,17 +305,12 @@ export default async function ReservaDetailPage({
           </p>
         )}
 
-        {isOwner && (canOfferUsedDevice || usedDeviceOffer) ? (
-          <div className="space-y-3">
-            <UsedDeviceOfferStatus
-              reservationId={reservation.id}
-              offer={usedDeviceOffer}
-              canSubmitNew={canOfferUsedDevice}
-            />
-            {usedDeviceOffer ? (
-              <TradeInClientActions offer={usedDeviceOffer} amountPaidCents={paidCents} />
-            ) : null}
-          </div>
+        {isOwner && (canOfferUsedDevice || usedDeviceOffers.length > 0) ? (
+          <UsedDeviceOfferStatus
+            reservationId={reservation.id}
+            offers={usedDeviceOffers}
+            canSubmitNew={canOfferUsedDevice}
+          />
         ) : null}
 
         {isOwner && reservation.status === "ativa" ? (
@@ -385,6 +376,14 @@ export default async function ReservaDetailPage({
           />
         ) : null}
       </Card>
+
+      {isOwner ? (
+        <ReservationRankingCard
+          contributedCents={reservationConfirmedCents}
+          listPriceCents={reservation.list_price_cents}
+          tickets={raffleBalance?.tickets ?? 0}
+        />
+      ) : null}
 
       {isOwner ? (
         <ReservationGoalSection

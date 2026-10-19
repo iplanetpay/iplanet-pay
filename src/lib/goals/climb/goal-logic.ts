@@ -55,7 +55,7 @@ export function statusInfo(status: GoalStatus): { label: string; tone: 'good' | 
     case 'late':
       return { label: 'Atrasada', tone: 'bad', message: 'Faça o aporte para voltar ao ritmo.' };
     case "done":
-      return { label: "Conquistada", tone: "blue", message: "Você chegou ao topo. Parabéns!" };
+      return { label: "Conquistada", tone: "blue", message: "Você conquistou a meta. Parabéns!" };
     default: {
       const exhaustive: never = status;
       throw new Error(`Status inválido: ${String(exhaustive)}`);

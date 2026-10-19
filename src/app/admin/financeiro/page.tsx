@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ContributionList } from "@/components/wallet/contribution-list";
@@ -11,10 +12,16 @@ import { formatCentsBRL } from "@/lib/utils";
 import { CreditCard, ArrowLeft } from "lucide-react";
 import { FinancialClosingPanel } from "@/components/finance/financial-closing-panel";
 import { listClosings } from "@/lib/finance/closing";
+import { STAT_GRID_4 } from "@/lib/admin/stat-value";
 
 export const metadata = { title: "Financeiro" };
 
-export default async function AdminFinanceiroPage() {
+export default async function AdminFinanceiroPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ saque?: string }>;
+}) {
+  const sp = await searchParams;
   const [{ aggregates, error }, withdrawals, { closings }] = await Promise.all([
     getFinanceAggregates(40),
     listWithdrawalRequests(80),
@@ -44,7 +51,7 @@ export default async function AdminFinanceiroPage() {
         <p className="text-sm text-[var(--danger)]">{withdrawals.error}</p>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+      <div className={STAT_GRID_4}>
         {[
           {
             label: "Confirmados (soma)",
@@ -63,16 +70,12 @@ export default async function AdminFinanceiroPage() {
             value: `${withdrawals.pending_count} · ${formatCentsBRL(withdrawals.pending_refund_sum_cents)}`,
           },
         ].map((stat) => (
-          <Card key={stat.label} className="bg-white">
-            <p className="text-sm text-[var(--ink-muted)]">{stat.label}</p>
-            <p className="mt-2 text-2xl font-bold tracking-tight md:text-3xl">
-              {stat.value}
-            </p>
-          </Card>
+          <StatCard key={stat.label} label={stat.label} value={stat.value} maxRem={1.875} />
         ))}
       </div>
 
       <AdminSaquesPanel
+        highlightId={sp.saque ?? null}
         items={withdrawals.items}
         pendingCount={withdrawals.pending_count}
         pendingRefundSumCents={withdrawals.pending_refund_sum_cents}

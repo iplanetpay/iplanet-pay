@@ -49,6 +49,8 @@ export function ProductImage({
             "h-full w-full object-contain p-1.5 mix-blend-multiply",
             imgClassName,
           )}
+          // A cached image on a repeat visit can switch loading="lazy" to "eager" before hydration.
+          suppressHydrationWarning
         />
       ) : (
         <div

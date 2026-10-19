@@ -1,13 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, QrCode } from "lucide-react";
+import { ArrowRight, ChevronLeft, ChevronRight, QrCode } from "lucide-react";
 import { ProductHeroCard } from "@/components/ui/product-hero-card";
 import { ProductImage } from "@/components/products/product-image";
 import { ProgressRing } from "@/components/ui/progress-ring";
 import { Button } from "@/components/ui/button";
+import {
+  reservationKeyDelta,
+  showReservationArrows,
+  stepReservationIndex,
+} from "@/lib/reservations/hero-carousel";
 import { cn } from "@/lib/utils";
 
 export type ActiveHeroItem = {
@@ -36,20 +41,40 @@ export function ActiveHeroCarousel({ items }: { items: ActiveHeroItem[] }) {
     return () => window.clearTimeout(id);
   }, [items, router]);
 
+  // Restarts on every index change so a manual step gets a full ROTATE_MS.
   useEffect(() => {
     if (count <= 1) return;
     const id = window.setInterval(() => {
-      setIndex((i) => (i + 1) % count);
+      setIndex((i) => stepReservationIndex(i, 1, count));
     }, ROTATE_MS);
     return () => window.clearInterval(id);
-  }, [count]);
+  }, [count, index]);
 
   if (count === 0) return null;
 
-  const safeIndex = ((index % count) + count) % count;
+  const safeIndex = stepReservationIndex(index, 0, count);
+  const arrows = showReservationArrows(count);
+
+  function step(delta: number) {
+    if (!arrows) return;
+    setIndex((prev) => stepReservationIndex(prev, delta, count));
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    const delta = reservationKeyDelta(event.key);
+    if (delta === 0 || !arrows) return;
+    event.preventDefault();
+    step(delta);
+  }
 
   return (
-    <div className="space-y-3">
+    <div
+      className="space-y-3"
+      role="region"
+      aria-roledescription="carrossel"
+      aria-label="Reservas ativas"
+      onKeyDown={onKeyDown}
+    >
       <div className="grid">
         {items.map((hero, i) => {
           const active = i === safeIndex;
@@ -106,28 +131,46 @@ export function ActiveHeroCarousel({ items }: { items: ActiveHeroItem[] }) {
         })}
       </div>
 
-      {count > 1 ? (
-        <div
-          className="flex items-center justify-center gap-2"
-          role="tablist"
-          aria-label="Reservas ativas"
-        >
-          {items.map((item, i) => (
-            <button
-              key={item.id}
-              type="button"
-              role="tab"
-              aria-selected={i === safeIndex}
-              aria-label={`Reserva ${i + 1} de ${count}`}
-              className={cn(
-                "h-2.5 rounded-full transition-all",
-                i === safeIndex
-                  ? "w-6 bg-[var(--accent)]"
-                  : "w-2.5 bg-[var(--line)] hover:bg-[var(--ink-muted)]",
-              )}
-              onClick={() => setIndex(i)}
-            />
-          ))}
+      {arrows ? (
+        <div className="flex items-center justify-center gap-3">
+          <button
+            type="button"
+            aria-label="Reserva anterior"
+            onClick={() => step(-1)}
+            className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full border border-black/5 bg-white/85 text-[var(--ink)] shadow-[0_8px_24px_rgba(17,17,17,0.12)] backdrop-blur-md transition active:scale-90"
+          >
+            <ChevronLeft className="h-5 w-5" aria-hidden />
+          </button>
+          <div
+            className="flex items-center justify-center gap-2"
+            role="tablist"
+            aria-label="Escolher reserva"
+          >
+            {items.map((item, i) => (
+              <button
+                key={item.id}
+                type="button"
+                role="tab"
+                aria-selected={i === safeIndex}
+                aria-label={`Reserva ${i + 1} de ${count}`}
+                className={cn(
+                  "h-2.5 rounded-full transition-all",
+                  i === safeIndex
+                    ? "w-6 bg-[var(--accent)]"
+                    : "w-2.5 bg-[var(--line)] hover:bg-[var(--ink-muted)]",
+                )}
+                onClick={() => setIndex(i)}
+              />
+            ))}
+          </div>
+          <button
+            type="button"
+            aria-label="Próxima reserva"
+            onClick={() => step(1)}
+            className="flex h-10 w-10 shrink-0 touch-manipulation items-center justify-center rounded-full bg-[var(--ink)] text-white shadow-[0_10px_28px_rgba(17,17,17,0.28)] transition hover:scale-105 active:scale-90"
+          >
+            <ChevronRight className="h-5 w-5" aria-hidden />
+          </button>
         </div>
       ) : null}
     </div>

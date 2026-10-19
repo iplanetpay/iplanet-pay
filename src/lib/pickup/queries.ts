@@ -1,4 +1,9 @@
 import { createServiceClient } from "@/lib/supabase/admin";
+import {
+  fulfillmentStatusLabel,
+  isFulfillmentMode,
+  isFulfillmentStatus,
+} from "@/lib/pickup/fulfillment";
 
 export type PickupRequestRow = {
   id: string;
@@ -10,16 +15,9 @@ export type PickupRequestRow = {
   created_at: string;
 };
 
-const PICKUP_STATUS_LABEL: Record<string, string> = {
-  pending: "Aguardando pagamento do frete",
-  ready_pickup: "Pronto para retirada na loja",
-  shipped: "Enviado",
-  delivered: "Entregue",
-  cancelled: "Cancelado",
-};
-
-export function pickupStatusLabel(status: string): string {
-  return PICKUP_STATUS_LABEL[status] ?? status;
+export function pickupStatusLabel(status: string, mode: string = "store"): string {
+  if (!isFulfillmentStatus(status)) return status;
+  return fulfillmentStatusLabel(status, isFulfillmentMode(mode) ? mode : "store");
 }
 
 export async function getLatestPickupRequest(

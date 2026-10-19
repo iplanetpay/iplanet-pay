@@ -1,5 +1,6 @@
 import { climbGoalFromPlan } from "@/lib/goals/climb/adapter";
 import { isClimbableGoal, type ClimbGoalEntry } from "@/lib/goals/climb/goal-cards";
+import { buildGoalSchedule } from "@/lib/goals/goal-calendar";
 import { listPaymentGoalsForUser } from "@/lib/goals/queries";
 import { getReservationById } from "@/lib/reservations/queries";
 import { buildContributionPlan, calendarToday, isoDateInTimeZone } from "@/lib/reservations/contribution-plan";
@@ -21,6 +22,8 @@ async function entryFor(goal: PaymentGoal): Promise<ClimbGoalEntry | null> {
     const { contributions } = await listContributionsForReservation(reservationId);
     const { reservation } = await getReservationById(reservationId);
     if (!reservation) return null;
+    const today = calendarToday();
+    const marks = confirmedMarks(contributions);
     const plan = buildContributionPlan({
       targetCents: goal.amount_cents,
       contributedCents: 0,
@@ -28,19 +31,28 @@ async function entryFor(goal: PaymentGoal): Promise<ClimbGoalEntry | null> {
       endDate: goal.target_date,
       frequency: goal.frequency,
     });
-    const targetCents =
-      reservation.list_price_cents > 0 ? reservation.list_price_cents : goal.amount_cents;
+    const schedule = buildGoalSchedule({
+      name: goal.name,
+      amountCents: goal.amount_cents,
+      startDate: goal.plan_start_date,
+      targetDate: goal.target_date,
+      frequency: goal.frequency,
+      contributions: marks,
+      today,
+    });
     return {
       depositHref: `/app/reserva/${reservationId}`,
+      calendar: schedule.calendar,
+      today,
       goal: climbGoalFromPlan({
         id: goal.id,
         name: goal.name,
         productName: reservation.product?.name ?? "Reserva",
-        targetCents,
-        savedCents: reservation.amount_paid_cents,
-        today: calendarToday(),
+        targetCents: goal.amount_cents,
+        savedCents: schedule.savedCents,
+        today,
         plan,
-        contributions: confirmedMarks(contributions),
+        contributions: schedule.contributions,
       }),
     };
   } catch {

@@ -1,7 +1,14 @@
 import { getCurrentUser } from "@/lib/auth/session";
-import { USE_MOCK_AUTH } from "@/lib/auth/mock";
+import { MOCK_USERS, USE_MOCK_AUTH } from "@/lib/auth/mock";
+import {
+  DEFAULT_GOAL_NOTICE_BODIES,
+  GOAL_NOTICE_TEMPLATE_NAMES,
+  type GoalScheduleListItem,
+} from "@/lib/goals/whatsapp-schedule";
+import { listGoalScheduleForUser } from "@/lib/goals/whatsapp-schedule-store";
 import type { WhatsappTemplate } from "@/types/database";
 import { enqueueWhatsapp, renderTemplate, whatsappConfigured } from "./client";
+import { selectedLeadPhones } from "./lead-selection";
 import { formatCentsBRL } from "@/lib/utils";
 
 export async function listWhatsappTemplates(): Promise<{
@@ -20,6 +27,20 @@ export async function listWhatsappTemplates(): Promise<{
           name: "primeiro_aporte",
           kind: "aviso",
           body: "Oi {{nome}}! Aporte {{valor}} em {{produto}}.",
+          active: true,
+        },
+        {
+          id: "mock-meta-vespera",
+          name: GOAL_NOTICE_TEMPLATE_NAMES.day_before,
+          kind: "cobranca",
+          body: DEFAULT_GOAL_NOTICE_BODIES.day_before,
+          active: true,
+        },
+        {
+          id: "mock-meta-atraso",
+          name: GOAL_NOTICE_TEMPLATE_NAMES.late,
+          kind: "cobranca",
+          body: DEFAULT_GOAL_NOTICE_BODIES.late,
           active: true,
         },
       ],
@@ -104,6 +125,20 @@ export async function listWhatsappBroadcastLeads(): Promise<{
           active: true,
           last_activity_at: new Date().toISOString(),
         },
+        {
+          user_id: MOCK_USERS.cliente.id,
+          full_name: MOCK_USERS.cliente.full_name ?? "Cliente",
+          phone: MOCK_USERS.cliente.phone ?? "",
+          active: true,
+          last_activity_at: new Date().toISOString(),
+        },
+        {
+          user_id: "3",
+          full_name: "João Pereira",
+          phone: "(21) 98888-7777",
+          active: false,
+          last_activity_at: null,
+        },
       ],
       error: null,
     };
@@ -153,6 +188,18 @@ export async function listWhatsappBroadcastLeads(): Promise<{
       error: err instanceof Error ? err.message : "Falha",
     };
   }
+}
+
+export async function listLeadGoalSchedule(userId: string): Promise<{
+  rows: GoalScheduleListItem[];
+  error: string | null;
+}> {
+  const user = await getCurrentUser();
+  if (!user || user.role !== "admin") {
+    return { rows: [], error: "Somente admin." };
+  }
+  if (!userId.trim()) return { rows: [], error: "Cliente inválido." };
+  return listGoalScheduleForUser(userId.trim());
 }
 
 export async function deleteWhatsappTemplate(
@@ -205,7 +252,16 @@ export async function updateWhatsappTemplate(input: {
   }
 }
 
-export type BroadcastAudience = "clients_phone" | "active_goals" | "paste";
+export type BroadcastAudience = "clients_phone" | "active_goals" | "paste" | "selected_leads";
+
+export function isBroadcastAudience(value: unknown): value is BroadcastAudience {
+  return (
+    value === "clients_phone" ||
+    value === "active_goals" ||
+    value === "paste" ||
+    value === "selected_leads"
+  );
+}
 
 export async function broadcastWhatsapp(input: {
   template_id: string;
@@ -244,7 +300,30 @@ export async function broadcastWhatsapp(input: {
     const phones: Array<{ phone: string; nome: string; produto: string; meta: string }> =
       [];
 
-    if (input.audience === "paste") {
+    if (input.audience === "selected_leads") {
+      const wanted = selectedLeadPhones((input.paste_phones ?? "").split(/[\s,;]+/));
+      if (wanted.length === 0) {
+        return { ok: false, error: "Selecione ao menos um lead." };
+      }
+      const { data: profiles } = await admin
+        .from("profiles")
+        .select("full_name, phone")
+        .eq("role", "cliente")
+        .not("phone", "is", null);
+      const names = new Map<string, string>();
+      for (const p of profiles ?? []) {
+        const [phone] = selectedLeadPhones([p.phone]);
+        if (phone && !names.has(phone)) names.set(phone, p.full_name?.split(" ")[0] || "olá");
+      }
+      for (const phone of wanted) {
+        phones.push({
+          phone,
+          nome: names.get(phone) ?? "olá",
+          produto: "iPlanet Pay",
+          meta: "sua conta",
+        });
+      }
+    } else if (input.audience === "paste") {
       const raw = (input.paste_phones ?? "")
         .split(/[\s,;]+/)
         .map((s) => s.trim())

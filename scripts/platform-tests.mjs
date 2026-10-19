@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { normalizeBrazilPhone } from "../src/lib/phone.ts";
 import { ownerCanCancelReservation } from "../src/lib/reservations/cancel-policy.ts";
 import { referralActivated } from "../src/lib/referrals/status.ts";
@@ -1023,7 +1023,7 @@ test("climb status is late when a deposit is overdue and near late the day befor
   assert.match(brl(100).replace(/\s/g, " "), /R\$ 100(?!,)/);
 });
 
-test("Guia and Termos de uso live in the footer", () => {
+test("Guia and Termos de uso live in the desktop footer and the mobile header menu", () => {
   assert.deepEqual(
     LEGAL_FOOTER_LINKS.map((link) => link.label),
     ["Guia", "Termos de uso"],
@@ -1041,7 +1041,18 @@ test("Guia and Termos de uso live in the footer", () => {
     new URL("../src/components/landing/liquid-glass-footer.tsx", import.meta.url),
     "utf8",
   );
+  const footer = readFileSync(
+    new URL("../src/components/ui/legal-footer.tsx", import.meta.url),
+    "utf8",
+  );
+  const headerMenu = readFileSync(
+    new URL("../src/components/auth/cliente-header-menu.tsx", import.meta.url),
+    "utf8",
+  );
   assert.match(shell, /<LegalFooter \/>/);
+  assert.match(footer, /<footer className="[^"]*\bhidden md:block\b/);
+  assert.match(headerMenu, /LEGAL_FOOTER_LINKS/);
+  assert.ok(headerMenu.indexOf("LEGAL_FOOTER_LINKS.map") > headerMenu.indexOf("Sair"));
   assert.equal(layout.includes('href="/ajuda"'), false);
   assert.match(landing, /LEGAL_FOOTER_LINKS/);
 });
@@ -1207,5 +1218,17 @@ test("the metas grid opens the goal in the link and skips an unknown id", () => 
     false,
   );
 });
+
+const suitesDir = new URL("./tests/", import.meta.url);
+if (existsSync(suitesDir)) {
+  const suites = readdirSync(suitesDir)
+    .filter((file) => file.endsWith(".test.mjs"))
+    .sort();
+  for (const file of suites) {
+    // Suites are discovered at runtime so each area can own its own file.
+    const suite = await import(new URL(file, suitesDir).href);
+    await suite.default(test);
+  }
+}
 
 console.log(`\n${passed} test(s) passed.`);

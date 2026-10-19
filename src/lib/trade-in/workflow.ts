@@ -3,6 +3,7 @@ import type { UsedDeviceOffer } from "@/lib/trade-in/types";
 import {
   isDiscardedOffer,
   isExpiredOffer,
+  needsExpirySync,
   tradeInVisual,
 } from "@/lib/trade-in/offer-state";
 
@@ -15,21 +16,21 @@ export {
   TRADE_IN_VALID_DAYS,
 } from "@/lib/trade-in/offer-state";
 
+/** `cashCents` is amount_paid_cents without any trade-in credit of the reservation. */
 export async function syncTradeInExpiry(input: {
   offer: UsedDeviceOffer;
   amountPaidCents: number;
+  cashCents: number;
   listPriceCents: number;
   reservationStatus: string;
 }): Promise<void> {
-  const visual = tradeInVisual(input.offer);
-  if (!visual.expired || isExpiredOffer(input.offer) || isDiscardedOffer(input.offer)) return;
+  if (!needsExpirySync(input.offer)) return;
   if (input.reservationStatus !== "ativa" && input.reservationStatus !== "quitada") return;
-  const cash = Math.max(0, input.amountPaidCents - visual.creditCents);
-  if (cash >= input.listPriceCents) return;
+  if (input.cashCents >= input.listPriceCents) return;
 
   const admin = tryCreateServiceClient();
   if (!admin) return;
-  const nextPaid = Math.max(0, input.amountPaidCents - visual.creditCents);
+  const nextPaid = Math.max(0, input.amountPaidCents - tradeInVisual(input.offer).creditCents);
   const previous = input.offer.admin_message ?? "";
   await admin
     .from("used_device_offers")

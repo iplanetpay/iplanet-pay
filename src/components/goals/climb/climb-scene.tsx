@@ -168,9 +168,6 @@ export function ClimbScene({ size, ppu, percent, status, deposits, mountainFill,
           <text x={start.x} y={start.y + 18 / ppu} textAnchor="middle" fontSize={fs} fontWeight="500" fill="#6e6e73" className="svg-label">
             Início
           </text>
-          <text x={summit.x + 30 * unit} y={summit.y - 62 * unit} textAnchor="start" fontSize={fs} fontWeight="600" fill="#6e6e73" className="svg-label">
-            Topo
-          </text>
         </g>
 
         {/* brilho suave ao concluir */}

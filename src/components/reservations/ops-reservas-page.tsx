@@ -10,6 +10,7 @@ import {
   isReservationStatus,
   type ReservationStatus,
 } from "@/lib/reservations/types";
+import type { ClientArea } from "@/lib/clients/activity";
 import { Bookmark } from "lucide-react";
 
 export async function OpsReservasPageBody({
@@ -18,12 +19,14 @@ export async function OpsReservasPageBody({
   description,
   searchParams,
   lockStoreId,
+  clientDetailArea,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   searchParams: Promise<{ status?: string; store?: string }>;
   lockStoreId?: string | null;
+  clientDetailArea?: ClientArea;
 }) {
   const sp = await searchParams;
   const status =
@@ -58,6 +61,7 @@ export async function OpsReservasPageBody({
             reservations={reservations}
             stores={stores}
             lockStoreId={lockStoreId}
+            clientDetailArea={clientDetailArea}
           />
         </Suspense>
       )}

@@ -1,9 +1,12 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { Search, CalendarCheck, Plus, Minus } from "lucide-react";
+import { Search, CalendarCheck, Plus, Minus, X } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { MotionModal } from "@/components/ui/motion";
+import { ClientDetailView } from "@/components/clients/client-detail-view";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -13,6 +16,8 @@ import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirad
 import { ContributionList } from "@/components/wallet/contribution-list";
 import { formatCentsBRL } from "@/lib/utils";
 import type { Contribution } from "@/lib/wallet/types";
+import { STAT_GRID_3 } from "@/lib/admin/stat-value";
+import type { ClientArea } from "@/lib/clients/activity";
 import {
   ALL_RESERVATION_STATUSES,
   STATUS_LABEL,
@@ -31,17 +36,21 @@ export function OpsReservasPanel({
   lockStoreId,
   showCancel = true,
   showRetirada = true,
+  clientDetailArea,
 }: {
   reservations: ReservationOpsRow[];
   stores: ReservationStore[];
   lockStoreId?: string | null;
   showCancel?: boolean;
   showRetirada?: boolean;
+  clientDetailArea?: ClientArea;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [q, setQ] = useState("");
+  const [clientModal, setClientModal] = useState<{ id: string; name: string } | null>(null);
+  const closeClientModal = useCallback(() => setClientModal(null), []);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [contribById, setContribById] = useState<
     Record<string, Contribution[] | "loading" | "error">
@@ -141,6 +150,7 @@ export function OpsReservasPanel({
 
   function ClientCell({ r }: { r: ReservationOpsRow }) {
     const open = expandedId === r.id;
+    const client = r.client;
     return (
       <div className="flex items-start gap-2">
         <button
@@ -154,7 +164,18 @@ export function OpsReservasPanel({
           {open ? <Minus className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
         </button>
         <div className="min-w-0">
-          <p className="font-medium">{r.client?.full_name ?? "Cliente"}</p>
+          {clientDetailArea && client?.id ? (
+            <button
+              type="button"
+              onClick={() => setClientModal({ id: client.id, name: client.full_name })}
+              className="text-left font-medium text-[var(--ink)] underline-offset-2 hover:text-[var(--accent)] hover:underline"
+              aria-label={`Ver cliente ${client.full_name}`}
+            >
+              {client.full_name}
+            </button>
+          ) : (
+            <p className="font-medium">{r.client?.full_name ?? "Cliente"}</p>
+          )}
           <p className="text-xs text-[var(--ink-muted)]">
             {r.client?.phone ?? r.client?.email ?? "—"}
           </p>
@@ -165,7 +186,7 @@ export function OpsReservasPanel({
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className={STAT_GRID_3}>
         {(
           [
             ["Ativas", counts.ativa, "text-[var(--accent)]"],
@@ -173,12 +194,13 @@ export function OpsReservasPanel({
             ["Retiradas", counts.retirada, ""],
           ] as const
         ).map(([label, value, cls]) => (
-          <Card key={label} className="bg-white">
-            <p className="text-sm text-[var(--ink-muted)]">{label}</p>
-            <p className={`mt-1 text-3xl font-bold tracking-tight ${cls}`}>
-              {value}
-            </p>
-          </Card>
+          <StatCard
+            key={label}
+            label={label}
+            value={String(value)}
+            valueClassName={cls}
+            maxRem={1.875}
+          />
         ))}
       </div>
 
@@ -348,6 +370,41 @@ export function OpsReservasPanel({
           </div>
         </>
       )}
+
+      {clientDetailArea ? (
+        <MotionModal
+          open={!!clientModal}
+          onClose={closeClientModal}
+          labelledBy="cliente-modal-title"
+          className="max-w-2xl"
+        >
+          {clientModal ? (
+            <>
+              <header className="flex items-center justify-between gap-3 border-b border-[var(--line)] px-5 py-4">
+                <h2 id="cliente-modal-title" className="text-lg font-bold">
+                  Cliente
+                </h2>
+                <button
+                  type="button"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[var(--line)] text-[var(--ink-muted)] hover:bg-[var(--bg-subtle)]"
+                  aria-label="Fechar"
+                  onClick={closeClientModal}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </header>
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5">
+                <ClientDetailView
+                  clientId={clientModal.id}
+                  area={clientDetailArea}
+                  fallbackName={clientModal.name}
+                  onSelectClient={(id) => setClientModal({ id, name: "Cliente" })}
+                />
+              </div>
+            </>
+          ) : null}
+        </MotionModal>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { getCurrentUser } from "@/lib/auth/session";
+import { mockReviewOffer } from "@/lib/trade-in/mock";
 import { getTradeInServiceClient } from "@/lib/trade-in/queries";
+import { sendCounterOffer } from "@/lib/trade-in/workflow";
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
@@ -17,8 +20,18 @@ export async function POST(req: Request) {
 
   const offerId = body.offerId?.trim();
   const action = body.action;
-  if (!offerId || !action) {
+  if (!offerId || !action || !["approve", "reject", "counter"].includes(action)) {
     return NextResponse.json({ ok: false, error: "Dados inválidos." }, { status: 400 });
+  }
+
+  if (USE_MOCK_AUTH) {
+    const result = mockReviewOffer({
+      offerId,
+      action,
+      message: body.adminMessage ?? "",
+      valueCents: body.approvedValueCents ?? null,
+    });
+    return NextResponse.json(result, { status: result.ok ? 200 : 400 });
   }
 
   try {
@@ -49,7 +62,6 @@ export async function POST(req: Request) {
     }
 
     if (action === "counter") {
-      const { sendCounterOffer } = await import("@/lib/trade-in/workflow");
       const result = await sendCounterOffer({
         offerId,
         message: body.adminMessage ?? "",

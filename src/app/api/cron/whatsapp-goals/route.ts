@@ -7,6 +7,8 @@ import {
 } from "@/lib/whatsapp/client";
 import { formatCentsBRL } from "@/lib/utils";
 import { advanceReminderAt, nextReminderAt } from "@/lib/goals/reminder";
+import { processDueGoalSchedule } from "@/lib/goals/whatsapp-schedule-dispatch";
+import { backfillGoalSchedules } from "@/lib/goals/whatsapp-schedule-store";
 
 /**
  * Cron: process due goal reminders.
@@ -41,6 +43,9 @@ async function run(request: Request) {
     const now = new Date().toISOString();
 
     const processed = await processDueWhatsappQueue();
+
+    const goalsBackfilled = await backfillGoalSchedules();
+    const goalSchedule = await processDueGoalSchedule(admin);
 
     // 2) Goals with reminder_at due
     const { data: dueGoals } = await admin
@@ -139,6 +144,8 @@ async function run(request: Request) {
       ok: true,
       queue_processed: processed,
       goals_enqueued: enqueued,
+      goal_schedule: goalSchedule,
+      goals_backfilled: goalsBackfilled,
       api_configured: whatsappConfigured(),
       message:
         "Lembretes processados (Evolution quando EVOLUTION_API_* está definido).",

@@ -4,6 +4,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Menu, Settings, X } from "lucide-react";
+import { LEGAL_FOOTER_LINKS } from "@/lib/navigation/legal-footer";
 
 export function ClienteHeaderMenu() {
   const router = useRouter();
@@ -71,6 +72,21 @@ export function ClienteHeaderMenu() {
           >
             Sair
           </button>
+          <div className="mt-1 flex items-center gap-1 border-t border-[var(--line)] px-1 pt-2 text-xs text-[var(--ink-muted)]">
+            {LEGAL_FOOTER_LINKS.map((link, index) => (
+              <span key={link.href} className="flex items-center gap-1">
+                {index > 0 ? <span aria-hidden>·</span> : null}
+                <Link
+                  href={link.href}
+                  role="menuitem"
+                  className="inline-flex h-9 items-center rounded-xl px-2 underline hover:bg-[var(--bg-subtle)]"
+                  onClick={() => setOpen(false)}
+                >
+                  {link.label}
+                </Link>
+              </span>
+            ))}
+          </div>
         </div>
       ) : null}
     </div>

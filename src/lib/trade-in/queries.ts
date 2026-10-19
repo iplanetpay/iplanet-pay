@@ -2,8 +2,8 @@ import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { createClient } from "@/lib/supabase/server";
 import { tryCreateServiceClient } from "@/lib/supabase/admin";
 import {
-  mockGetLatestOfferForReservation,
   mockListOffersAdmin,
+  mockListOffersForReservation,
 } from "@/lib/trade-in/mock";
 import type { UsedDeviceOffer, UsedDeviceOfferWithProfile } from "@/lib/trade-in/types";
 
@@ -18,6 +18,8 @@ const OFFER_SELECT = `
   maintenance_options,
   liquid_exposure,
   photo_paths,
+  battery_health_pct,
+  battery_health_reason,
   status,
   admin_message,
   approved_value_cents,
@@ -46,12 +48,13 @@ async function attachProfilesToOffers(
   });
 }
 
-export async function getLatestUsedDeviceOfferForReservation(
+/** Every device the client offered on the reservation, oldest first. */
+export async function listUsedDeviceOffersForReservation(
   reservationId: string,
   userId: string,
-): Promise<{ offer: UsedDeviceOffer | null; error?: string }> {
+): Promise<{ offers: UsedDeviceOffer[]; error?: string }> {
   if (USE_MOCK_AUTH) {
-    return { offer: mockGetLatestOfferForReservation(reservationId, userId) };
+    return { offers: mockListOffersForReservation(reservationId, userId) };
   }
 
   const supabase = await createClient();
@@ -60,14 +63,12 @@ export async function getLatestUsedDeviceOfferForReservation(
     .select(OFFER_SELECT)
     .eq("reservation_id", reservationId)
     .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+    .order("created_at", { ascending: true });
 
   if (error) {
-    return { offer: null, error: error.message };
+    return { offers: [], error: error.message };
   }
-  return { offer: (data as UsedDeviceOffer | null) ?? null };
+  return { offers: (data ?? []) as UsedDeviceOffer[] };
 }
 
 export async function listUsedDeviceOffersAdmin(filters: {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
+import { hasOpenFulfillment, initialFulfillmentStatus } from "@/lib/pickup/fulfillment";
 import { createServiceClient } from "@/lib/supabase/admin";
 
 export async function POST(
@@ -74,6 +75,17 @@ export async function POST(
     );
   }
 
+  const { data: existing } = await supabase
+    .from("pickup_requests")
+    .select("status")
+    .eq("reservation_id", reservationId);
+  if (hasOpenFulfillment(existing ?? [])) {
+    return NextResponse.json(
+      { ok: false, error: "Já existe uma retirada ou envio em andamento para esta reserva." },
+      { status: 409 },
+    );
+  }
+
   const loanSignedAt =
     pct >= 70 && pct < 100 && body.loan_contract_signed ? new Date().toISOString() : null;
 
@@ -86,7 +98,7 @@ export async function POST(
     freight_cents: body.mode === "shipping" ? body.freight_cents ?? 0 : 0,
     insurance_cents: body.mode === "shipping" ? body.insurance_cents ?? 0 : 0,
     loan_contract_signed_at: loanSignedAt,
-    status: body.mode === "store" ? "ready_pickup" : "pending",
+    status: initialFulfillmentStatus(body.mode),
   });
 
   if (insErr) {

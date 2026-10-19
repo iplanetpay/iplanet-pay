@@ -274,7 +274,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-.metas-climb .status-pill .ring {
+.metas-climb .status-pill .progress-ring {
   flex: none;
 }
 
@@ -335,17 +335,20 @@
   z-index: 1;
 }
 
-.metas-climb .ring {
+.metas-climb .progress-ring,
+.metas-goals .progress-ring {
   position: relative;
   display: inline-grid;
   place-items: center;
 }
 
-.metas-climb .ring svg {
+.metas-climb .progress-ring svg,
+.metas-goals .progress-ring svg {
   display: block;
 }
 
-.metas-climb .ring-num {
+.metas-climb .ring-num,
+.metas-goals .ring-num {
   position: absolute;
   inset: 0;
   display: grid;
@@ -354,12 +357,19 @@
   font-weight: 600;
   letter-spacing: -0.03em;
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: #1d1d1f;
   grid-auto-flow: column;
   align-content: center;
   justify-content: center;
 }
 
-.metas-climb .ring-num small {
+.metas-goals .ring-num {
+  font-size: 22px;
+}
+
+.metas-climb .ring-num small,
+.metas-goals .ring-num small {
   font-size: 0.55em;
   color: var(--muted);
   margin-left: 1px;
@@ -741,32 +751,6 @@
   display: inline-grid;
   place-items: center;
   line-height: 0;
-}
-
-.metas-goals .tone-good {
-  color: var(--green);
-}
-
-.metas-goals .tone-warn {
-  color: var(--orange);
-}
-
-.metas-goals .tone-bad {
-  color: var(--red);
-}
-
-.metas-goals .tone-blue {
-  color: var(--blue);
-}
-
-.metas-goals .ring {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-}
-
-.metas-goals .ring svg {
-  display: block;
 }
 
 .metas-goals .goal-card-name {

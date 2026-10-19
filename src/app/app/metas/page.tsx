@@ -22,7 +22,7 @@ export default async function MetasPage({
       <PageHeader
         eyebrow="Jornada"
         title={selected ? selected.goal.name : "Metas"}
-        description={selected ? undefined : "Escolha uma meta para ver a subida até o topo."}
+        description={selected ? undefined : "Escolha uma meta para ver a subida e o calendário de aportes."}
         showBack={Boolean(selected)}
         backForceHref="/app/metas"
       />

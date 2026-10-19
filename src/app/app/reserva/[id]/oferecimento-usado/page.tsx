@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getReservationById } from "@/lib/reservations/queries";
-import { getLatestUsedDeviceOfferForReservation } from "@/lib/trade-in/queries";
+import { MAX_TRADE_IN_DEVICES } from "@/lib/trade-in/devices";
+import { isLiveOffer } from "@/lib/trade-in/offer-state";
+import { listUsedDeviceOffersForReservation } from "@/lib/trade-in/queries";
 import { PageHeader } from "@/components/ui/page-header";
 import { UsedDeviceOfferForm } from "@/components/trade-in/used-device-offer-form";
 
@@ -27,8 +29,9 @@ export default async function OferecimentoUsadoPage({
     redirect(`/app/reserva/${id}`);
   }
 
-  const { offer } = await getLatestUsedDeviceOfferForReservation(id, user.id);
-  if (offer?.status === "pending") {
+  const { offers } = await listUsedDeviceOffersForReservation(id, user.id);
+  const live = offers.filter(isLiveOffer);
+  if (live.length >= MAX_TRADE_IN_DEVICES) {
     redirect(`/app/reserva/${id}`);
   }
 
@@ -42,12 +45,15 @@ export default async function OferecimentoUsadoPage({
         description={
           reavaliar
             ? "Envie novas fotos e informe um novo valor proposto."
-            : "Use seu aparelho atual como parte do pagamento."
+            : "Use um ou mais aparelhos como parte do pagamento."
         }
       />
       <UsedDeviceOfferForm
         reservationId={id}
         backHref={`/app/reserva/${id}`}
+        liveCount={live.length}
+        liveImeis={live.map((o) => o.imei)}
+        maxDevices={MAX_TRADE_IN_DEVICES}
       />
     </div>
   );

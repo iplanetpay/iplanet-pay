@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { USE_MOCK_AUTH, getCurrentUser } from "@/lib/auth/session";
+import { createClient } from "@/lib/supabase/server";
 import {
   couponNotice,
   isNoticeKind,
@@ -23,7 +24,10 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Acesso negado" }, { status: 403 });
   }
 
-  const { createClient } = await import("@/lib/supabase/server");
+  if (USE_MOCK_AUTH) {
+    return NextResponse.json({ ok: true, unavailable: true, notices: [], coupons: [], winner: null });
+  }
+
   const supabase = await createClient();
 
   const [noticesRes, couponsRes, drawRes] = await Promise.all([
@@ -90,7 +94,13 @@ export async function POST(request: Request) {
     code?: string;
   };
 
-  const { createClient } = await import("@/lib/supabase/server");
+  if (USE_MOCK_AUTH) {
+    return NextResponse.json(
+      { ok: false, error: "Avisos não são salvos no modo demonstração." },
+      { status: 400 },
+    );
+  }
+
   const supabase = await createClient();
 
   if (body.action === "coupon") {

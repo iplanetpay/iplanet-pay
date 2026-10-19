@@ -8,13 +8,7 @@ import { formatCentsBRL } from "@/lib/utils";
 import type { UsedDeviceOffer } from "@/lib/trade-in/types";
 import { isCounterOffer, isDiscardedOffer, isExpiredOffer } from "@/lib/trade-in/offer-state";
 
-export function TradeInClientActions({
-  offer,
-  amountPaidCents,
-}: {
-  offer: UsedDeviceOffer;
-  amountPaidCents: number;
-}) {
+export function TradeInClientActions({ offer }: { offer: UsedDeviceOffer }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +93,6 @@ export function TradeInClientActions({
       ) : null}
 
       {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
-      <span className="sr-only">{formatCentsBRL(amountPaidCents)}</span>
     </div>
   );
 }

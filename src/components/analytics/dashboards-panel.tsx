@@ -19,6 +19,8 @@ import {
   YAxis,
 } from "recharts";
 import { Card } from "@/components/ui/card";
+import { StatCard } from "@/components/ui/stat-card";
+import { STAT_GRID_4 } from "@/lib/admin/stat-value";
 import type { AnalyticsSummary } from "@/lib/analytics/queries";
 
 const COLORS = ["#0071e3", "#111111", "#5c5c66", "#25d366", "#a78bfa"];
@@ -53,20 +55,19 @@ export function DashboardsPanel({ summary }: { summary: AnalyticsSummary }) {
 
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className={STAT_GRID_4}>
         {[
           ["Page views", summary.page_views],
           ["Cliques produto", summary.product_clicks],
           ["Inícios de aporte", summary.contribution_starts],
           ["Novos usuários", summary.new_users || summary.signups],
         ].map(([label, value]) => (
-          <Card
+          <StatCard
             key={String(label)}
-            className="relative overflow-hidden bg-white shadow-[0_20px_50px_rgba(17,17,17,0.08)] [transform:perspective(800px)_rotateX(2deg)]"
-          >
-            <p className="text-sm text-[var(--ink-muted)]">{label}</p>
-            <p className="mt-2 text-4xl font-bold tracking-tight">{value}</p>
-          </Card>
+            label={String(label)}
+            value={Number(value).toLocaleString("pt-BR")}
+            className="relative overflow-hidden shadow-[0_20px_50px_rgba(17,17,17,0.08)] [transform:perspective(800px)_rotateX(2deg)]"
+          />
         ))}
       </div>
 

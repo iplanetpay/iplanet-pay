@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/session";
+import { USE_MOCK_AUTH, getCurrentUser } from "@/lib/auth/session";
 import { isNoticeKind } from "@/lib/notices/copy";
+import { createClient } from "@/lib/supabase/server";
 
 function missingTable(message: string) {
   return /relation|does not exist|schema cache|column/i.test(message);
@@ -12,7 +13,8 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Entre para continuar." }, { status: 401 });
   }
 
-  const { createClient } = await import("@/lib/supabase/server");
+  if (USE_MOCK_AUTH) return NextResponse.json({ ok: true, notices: [], unavailable: true });
+
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("platform_notices")

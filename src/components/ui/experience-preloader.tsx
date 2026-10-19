@@ -1,7 +1,19 @@
 "use client";
 
+import { useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+
+const noopSubscribe = () => () => {};
+
+/** False on the server and during hydration, true afterwards: both sides render the same first HTML. */
+function useHydrated() {
+  return useSyncExternalStore(
+    noopSubscribe,
+    () => true,
+    () => false,
+  );
+}
 
 function SkeletonBar({ className }: { className?: string }) {
   return (
@@ -100,7 +112,7 @@ function LoadingSpinner({ percent }: { percent?: number }) {
   const value = known ? Math.max(0, Math.min(100, Math.round(percent))) : undefined;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[260] flex items-center justify-center">
+    <div className="pointer-events-none fixed inset-0 z-[260] flex flex-col items-center justify-center gap-3">
       <div
         className="experience-spinner h-12 w-12 rounded-full border-[3px] border-[var(--line)] border-t-[var(--accent)]"
         role="progressbar"
@@ -113,6 +125,15 @@ function LoadingSpinner({ percent }: { percent?: number }) {
             : "Carregando experiência"
         }
       />
+      {value != null ? (
+        <span
+          className="text-sm font-semibold tabular-nums text-[var(--ink-muted)]"
+          data-preloader-percent
+          aria-hidden
+        >
+          {value}%
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -162,9 +183,10 @@ export function ExperiencePreloaderOverlay({
   active: boolean;
   percent?: number;
 }) {
-  if (!active || typeof document === "undefined") return null;
+  const hydrated = useHydrated();
+  if (!active) return null;
 
-  return createPortal(
+  const overlay = (
     <div
       className="experience-preloader-overlay fixed inset-0 z-[120] flex flex-col bg-[var(--bg)]"
       aria-busy="true"
@@ -175,7 +197,8 @@ export function ExperiencePreloaderOverlay({
         className="h-dvh"
         percent={percent}
       />
-    </div>,
-    document.body,
+    </div>
   );
+  // Inline until hydrated so the server HTML already covers the page; then on <body>.
+  return hydrated ? createPortal(overlay, document.body) : overlay;
 }

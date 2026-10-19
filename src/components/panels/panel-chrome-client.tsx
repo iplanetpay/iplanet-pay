@@ -13,6 +13,7 @@ const ADMIN_NAV: SidebarItem[] = [
   { href: "/admin", label: "Overview", icon: "layout-dashboard" },
   { href: "/admin/dashboards", label: "Dashboards", icon: "bar-chart" },
   { href: "/admin/reservas", label: "Reservas", icon: "bookmark" },
+  { href: "/admin/retirada-envio", label: "Retirada/Envio", icon: "truck" },
   { href: "/admin/avaliacao-usados", label: "Avaliação de usados", icon: "smartphone" },
   { href: "/admin/clientes", label: "Clientes", icon: "users" },
   { href: "/admin/produtos", label: "Produtos", icon: "package" },

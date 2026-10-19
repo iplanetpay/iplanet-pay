@@ -19,14 +19,14 @@ export default async function AdminIndicacoesPage() {
 
   return (
     <div className="space-y-8">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <PageHeader
           eyebrow="Admin"
           title="Indicações"
           description="Lista leve de referrals (somente leitura)."
           size="xl"
         />
-        <Link href="/admin">
+        <Link href="/admin" className="shrink-0 self-start">
           <Button variant="outline" size="sm" leftIcon={<ArrowLeft className="h-4 w-4" />}>
             Voltar
           </Button>

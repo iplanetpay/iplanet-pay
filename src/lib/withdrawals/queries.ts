@@ -1,4 +1,6 @@
 import { WITHDRAWAL_SELECT, type WithdrawalRequest } from "./types";
+import { USE_MOCK_AUTH } from "@/lib/auth/mock";
+import { mockListWithdrawals } from "@/lib/withdrawals/mock";
 import type { ReservationStatus } from "@/lib/reservations/types";
 
 export interface WithdrawalWithDetails extends WithdrawalRequest {
@@ -18,6 +20,16 @@ export async function listWithdrawalRequests(limit = 80): Promise<{
     pending_refund_sum_cents: 0,
     error: null as string | null,
   };
+  if (USE_MOCK_AUTH) {
+    const items = mockListWithdrawals().slice(0, limit);
+    const pending = items.filter((i) => i.status === "pending");
+    return {
+      items,
+      pending_count: pending.length,
+      pending_refund_sum_cents: pending.reduce((s, i) => s + i.refund_amount_cents, 0),
+      error: null,
+    };
+  }
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();

@@ -14,6 +14,7 @@ import { formatCentsBRL } from "@/lib/utils";
 import type { AdminProduct } from "@/lib/catalog/admin-products";
 import type { ProductCategory } from "@/types/database";
 import { ProductVariantsPanel } from "@/components/admin/product-variants-panel";
+import { ImportRulesButton, ProductsTransferBar } from "@/components/admin/products-transfer";
 
 const NEW_CAT = "__new__";
 
@@ -573,11 +574,14 @@ export function ProdutosAdminPanel({
 
       <section>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">Produtos</h2>
-            <p className="text-sm text-[var(--ink-muted)]">
-              {products.length} cadastrado(s)
-            </p>
+          <div className="space-y-3">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight">Produtos</h2>
+              <p className="text-sm text-[var(--ink-muted)]">
+                {products.length} cadastrado(s)
+              </p>
+            </div>
+            <ProductsTransferBar />
           </div>
           <Input
             label="Buscar"
@@ -638,6 +642,9 @@ export function ProdutosAdminPanel({
             ))}
           </div>
         )}
+        <div className="mt-4">
+          <ImportRulesButton />
+        </div>
       </section>
     </div>
   );

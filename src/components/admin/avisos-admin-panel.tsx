@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { EmptyState } from "@/components/ui/empty-state";
+import { readJson } from "@/lib/http/read-json";
 import {
   NOTICE_KIND_LABEL,
   couponNotice,
@@ -54,14 +55,14 @@ export function AvisosAdminPanel() {
 
   async function reload() {
     const res = await fetch("/api/admin/avisos");
-    const data = (await res.json()) as {
+    const data = await readJson<{
       ok?: boolean;
       error?: string;
       unavailable?: boolean;
       notices?: NoticeRow[];
       coupons?: Coupon[];
       winner?: Winner;
-    };
+    }>(res);
     if (!res.ok || !data.ok) {
       setMessage(data.error ?? "Não foi possível carregar os avisos.");
       return;
@@ -85,7 +86,7 @@ export function AvisosAdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
-      const data = (await res.json()) as { ok?: boolean; error?: string };
+      const data = await readJson<{ ok?: boolean; error?: string }>(res);
       if (!res.ok || !data.ok) {
         setMessage(data.error ?? "Não foi possível salvar.");
         return;

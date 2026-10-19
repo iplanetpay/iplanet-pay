@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -22,12 +22,21 @@ export function AdminSaquesPanel({
   items,
   pendingCount,
   pendingRefundSumCents,
+  highlightId,
 }: {
   items: WithdrawalWithDetails[];
   pendingCount: number;
   pendingRefundSumCents: number;
+  highlightId?: string | null;
 }) {
   const router = useRouter();
+
+  useEffect(() => {
+    if (!highlightId) return;
+    document
+      .getElementById(`saque-${highlightId}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightId]);
   const [active, setActive] = useState<WithdrawalWithDetails | null>(null);
   const [action, setAction] = useState<"approve" | "reject" | null>(null);
   const [password, setPassword] = useState("");
@@ -97,9 +106,18 @@ export function AdminSaquesPanel({
         <Card className="overflow-x-auto p-0">
           <ul className="divide-y divide-[var(--line)]">
             {items.map((w) => (
-              <li key={w.id} className="space-y-2 px-4 py-4 sm:px-5">
+              <li
+                key={w.id}
+                id={`saque-${w.id}`}
+                aria-current={w.id === highlightId ? "true" : undefined}
+                className={`scroll-mt-24 space-y-2 px-4 py-4 sm:px-5 ${
+                  w.id === highlightId
+                    ? "bg-[var(--accent-soft)]/60 ring-2 ring-inset ring-[var(--accent)]"
+                    : ""
+                }`}
+              >
                 <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-semibold">
                       {w.client_name ?? "Cliente"} ·{" "}
                       {w.product_name ?? "Produto"}
@@ -114,7 +132,7 @@ export function AdminSaquesPanel({
                       ] ?? w.payout_status}
                     </p>
                   </div>
-                  <div className="text-right text-sm">
+                  <div className="text-sm sm:text-right">
                     <p>
                       Total {formatCentsBRL(w.total_paid_cents)} · taxa{" "}
                       {formatCentsBRL(w.fee_amount_cents)}
@@ -124,7 +142,7 @@ export function AdminSaquesPanel({
                     </p>
                   </div>
                 </div>
-                <p className="text-sm text-[var(--ink-muted)]">
+                <p className="text-sm text-[var(--ink-muted)] [overflow-wrap:anywhere]">
                   <span className="uppercase">{w.pix_key_type}</span>:{" "}
                   <span className="font-mono text-[var(--ink)]">{w.pix_key}</span>
                   {" · "}

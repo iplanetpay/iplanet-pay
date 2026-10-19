@@ -1,3 +1,4 @@
+import { MOCK_USERS } from "@/lib/auth/mock";
 import { MOCK_CATALOG } from "@/lib/catalog/products";
 import type {
   ReservationOpsRow,
@@ -269,13 +270,16 @@ export function mockListOps(options?: {
     .filter((r) => !storeId || r.store_id === storeId)
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit)
-    .map((r) => ({
-      ...r,
-      client: {
-        id: r.user_id,
-        full_name: "Cliente demo",
-        phone: null,
-        email: "cliente@iplanet.demo",
-      },
-    }));
+    .map((r) => {
+      const user = Object.values(MOCK_USERS).find((u) => u.id === r.user_id);
+      return {
+        ...r,
+        client: {
+          id: r.user_id,
+          full_name: user?.full_name ?? "Cliente demo",
+          phone: user?.phone ?? null,
+          email: user?.email ?? "cliente@iplanet.demo",
+        },
+      };
+    });
 }
