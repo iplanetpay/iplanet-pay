@@ -1,0 +1,11 @@
+{
+  "": {
+    "swift-dependencies": "/workspace/ios/IPlanetCore/.build/x86_64-unknown-linux-gnu/debug/IPlanetCoreTests.build/master.swiftdeps"
+  },
+  "/workspace/ios/IPlanetCore/Tests/IPlanetCoreTests/CoreTests.swift": {
+    "dependencies": "/workspace/ios/IPlanetCore/.build/x86_64-unknown-linux-gnu/debug/IPlanetCoreTests.build/CoreTests.d",
+    "object": "/workspace/ios/IPlanetCore/.build/x86_64-unknown-linux-gnu/debug/IPlanetCoreTests.build/CoreTests.swift.o",
+    "swiftmodule": "/workspace/ios/IPlanetCore/.build/x86_64-unknown-linux-gnu/debug/IPlanetCoreTests.build/CoreTests~partial.swiftmodule",
+    "swift-dependencies": "/workspace/ios/IPlanetCore/.build/x86_64-unknown-linux-gnu/debug/IPlanetCoreTests.build/CoreTests.swiftdeps"
+  }
+}
