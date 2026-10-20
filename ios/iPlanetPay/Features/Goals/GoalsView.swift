@@ -1,46 +1,68 @@
+import IPlanetCore
 import SwiftUI
 
 struct GoalsView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @State private var goals: [PaymentGoal] = []
     @State private var products: [Product] = []
+    @State private var reservations: [ReservationRow] = []
+    @State private var contributions: [Contribution] = []
     @State private var error: String?
     @State private var loading = true
     @State private var showSimulator = false
+    @State private var selected: PaymentGoal?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Metas de aporte")
+                    Text("Metas")
                         .font(.largeTitle.weight(.bold))
-                    Text("Calcule o valor de cada aporte e acompanhe a meta do produto.")
+                    Text("Simule os aportes e acompanhe a subida.")
                         .foregroundStyle(Brand.inkMuted)
-                    Button("Abrir simulador") { showSimulator = true }
-                        .buttonStyle(PrimaryButtonStyle())
-                    if let error { Text(error).foregroundStyle(Brand.danger) }
-                    if loading { ProgressView() }
-                    if goals.isEmpty && !loading {
-                        EmptyPane(title: "Nenhuma meta", message: "Use o simulador para criar a meta de um produto do catálogo.")
-                    }
-                    ForEach(goals) { goal in
-                        BrandCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text(goal.name).font(.headline)
-                                    Spacer()
-                                    StatusPill(text: goal.status, tone: goal.status == "active" ? .accent : .neutral)
-                                }
-                                Text("\(goal.installmentsCount)x de \(Money.format(cents: goal.installmentCents))")
-                                Text("Alvo \(Money.format(cents: goal.amountCents)) · até \(goal.targetDate)")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Brand.inkMuted)
-                                if goal.status == "active" {
-                                    Button("Pausar") {
-                                        Task { await setStatus(goal, "paused") }
+                    if let selected {
+                        GoalDetail(
+                            goal: selected,
+                            reservation: reservations.first { $0.id == selected.reservationId },
+                            contributions: contributions
+                        ) {
+                            self.selected = nil
+                            router.goalID = nil
+                        }
+                    } else {
+                        Button("Abrir simulador") { showSimulator = true }
+                            .buttonStyle(PrimaryButtonStyle(fill: Brand.accent))
+                        if let error { Text(error).foregroundStyle(Brand.danger) }
+                        if loading { ProgressView() }
+                        if goals.isEmpty && !loading {
+                            EmptyPane(
+                                title: "Nenhuma meta ainda",
+                                message: "Simule os aportes e crie uma meta para acompanhar a subida."
+                            )
+                        }
+                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                            ForEach(goals) { goal in
+                                let snapshot = GoalSnapshot.make(
+                                    goal: goal,
+                                    reservation: reservations.first { $0.id == goal.reservationId },
+                                    contributions: contributions
+                                )
+                                Button {
+                                    selected = goal
+                                } label: {
+                                    VStack(spacing: 8) {
+                                        ProgressRing(percent: snapshot.percent, caption: "", size: 88)
+                                        Text(goal.name)
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundStyle(Brand.ink)
+                                            .multilineTextAlignment(.center)
                                     }
-                                    .font(.subheadline.weight(.semibold))
+                                    .frame(maxWidth: .infinity, minHeight: 44)
+                                    .padding(.vertical, 8)
                                 }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("\(goal.name), \(snapshot.status.label), \(Int(snapshot.percent.rounded()))%")
                             }
                         }
                     }
@@ -51,6 +73,10 @@ struct GoalsView: View {
             .navigationTitle("Metas")
             .refreshable { await load() }
             .task { await load() }
+            .onChange(of: router.goalID) { _, id in
+                guard let id else { return }
+                selected = goals.first { $0.id == id }
+            }
             .sheet(isPresented: $showSimulator) {
                 SimulatorSheet(products: products) {
                     showSimulator = false
@@ -67,105 +93,135 @@ struct GoalsView: View {
         do {
             goals = try await Repository.goals(userId: userId)
             products = try await Repository.products()
+            reservations = try await Repository.myReservations(userId: userId)
+            contributions = try await Repository.myContributions(userId: userId)
+            if let id = router.goalID {
+                selected = goals.first { $0.id == id }
+            }
             error = nil
-        } catch {
-            self.error = describeError(error)
-        }
-    }
-
-    private func setStatus(_ goal: PaymentGoal, _ status: String) async {
-        guard let userId = session.profile?.id else { return }
-        do {
-            try await Repository.setGoalStatus(id: goal.id, userId: userId, status: status)
-            await load()
         } catch {
             self.error = describeError(error)
         }
     }
 }
 
-struct SimulatorSheet: View {
-    let products: [Product]
-    var onDone: () -> Void
-    @Environment(SessionStore.self) private var session
-    @State private var productId: UUID?
-    @State private var installments = 10
-    @State private var target = Calendar.current.date(byAdding: .month, value: 10, to: Date()) ?? Date()
-    @State private var phone = ""
-    @State private var message: String?
-    @State private var busy = false
+private struct GoalDetail: View {
+    let goal: PaymentGoal
+    let reservation: ReservationRow?
+    let contributions: [Contribution]
+    var onBack: () -> Void
+    @State private var monthIndex = 0
+    @State private var showAll = false
 
     var body: some View {
-        NavigationStack {
-            Form {
-                Picker("Produto", selection: $productId) {
-                    Text("Escolha").tag(Optional<UUID>.none)
-                    ForEach(products) { product in
-                        Text(product.name).tag(Optional(product.id))
-                    }
-                }
-                Stepper("Parcelas: \(installments)", value: $installments, in: 1...60)
-                DatePicker("Data alvo", selection: $target, displayedComponents: .date)
-                if let product = selected {
-                    Text("Cada aporte: \(Money.format(cents: installment(for: product)))")
-                        .font(.headline)
-                    Text("Total \(Money.format(cents: product.listPriceCents))")
-                        .foregroundStyle(Brand.inkMuted)
-                }
-                TextField("WhatsApp (opcional)", text: $phone)
-                if let message { Text(message).foregroundStyle(Brand.danger) }
-                Button(busy ? "Salvando…" : "Salvar meta") {
-                    Task { await save() }
-                }
-                .disabled(busy || productId == nil)
-            }
-            .navigationTitle("Simulador")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Fechar") { onDone() }
-                }
-            }
-            .onAppear {
-                if productId == nil { productId = products.first?.id }
-                phone = session.profile?.phone ?? ""
+        let snapshot = GoalSnapshot.make(goal: goal, reservation: reservation, contributions: contributions)
+        let health = goalHealth(snapshot.status)
+        VStack(alignment: .leading, spacing: 16) {
+            Button("Voltar") { onBack() }
+                .frame(minHeight: 44)
+            ClimbSceneView(percent: snapshot.percent, health: health)
+            StatusPill(text: snapshot.status.label, tone: snapshot.tone)
+            Text(goal.name).font(.title2.weight(.bold))
+            Text(reservation?.product?.name ?? "Produto")
+                .foregroundStyle(Brand.inkMuted)
+            Text(snapshot.status.message)
+            Text("\(Money.format(cents: snapshot.savedCents)) de \(Money.format(cents: snapshot.targetCents))")
+                .font(.headline)
+            sidePanel(snapshot)
+            if let plan = snapshot.plan {
+                calendar(plan: plan, snapshot: snapshot)
             }
         }
     }
 
-    private var selected: Product? {
-        products.first { $0.id == productId }
+    private func goalHealth(_ status: ClimbStatus) -> GoalHealth {
+        switch status {
+        case .onTrack: .onTrack
+        case .nearLate: .nearLate
+        case .late: .late
+        case .done: .complete
+        }
     }
 
-    private func installment(for product: Product) -> Int {
-        let count = max(1, installments)
-        return Int(ceil(Double(product.listPriceCents) / Double(count)))
+    private func sidePanel(_ snapshot: GoalSnapshot) -> some View {
+        let remaining = max(0, snapshot.targetCents - snapshot.savedCents)
+        let next = snapshot.plan.flatMap { plan in
+            let rows = ContributionPlanMath.applyEarlyPayments(
+                installments: plan.dates.enumerated().map { index, date in
+                    let cents = (try? ContributionPlanMath.installmentCentsAt(plan, index: index)) ?? plan.amountPerInstallmentCents
+                    return (dueDate: date, amountCents: cents)
+                },
+                contributions: snapshot.contributions
+            )
+            return rows.first { !$0.paid }
+        }
+        return BrandCard {
+            VStack(alignment: .leading, spacing: 10) {
+                row("Falta para concluir", snapshot.status == .done ? "R$ 0" : Money.format(cents: remaining))
+                if let next, snapshot.status != .done {
+                    row(
+                        snapshot.status == .late ? "Aporte em atraso" : "Próximo aporte",
+                        "\(next.dueDate) · \(Money.format(cents: next.dueCents))"
+                    )
+                    Text(ClimbLogic.relativeDue(next.dueDate, today: CivilDate.calendarToday()))
+                        .font(.caption)
+                        .foregroundStyle(Brand.inkMuted)
+                } else {
+                    row(snapshot.status == .late ? "Aporte em atraso" : "Próximo aporte", "—")
+                }
+            }
+        }
     }
 
-    private func save() async {
-        guard let userId = session.profile?.id, let product = selected else { return }
-        busy = true
-        defer { busy = false }
-        let day = Calendar.current.component(.day, from: target)
-        let draft = GoalDraft(
-            existingId: nil,
-            userId: userId,
-            productId: product.id,
-            reservationId: nil,
-            name: product.name,
-            targetDate: DatesPT.isoDay(target),
-            reminderDay: min(30, max(1, day)),
-            amountCents: product.listPriceCents,
-            installmentCents: installment(for: product),
-            installmentsCount: installments,
-            frequency: "monthly",
-            planStartDate: DatesPT.isoDay(Date()),
-            whatsappPhone: BrazilPhone.normalize(phone)
-        )
-        do {
-            try await Repository.saveGoal(draft)
-            onDone()
-        } catch {
-            message = describeError(error)
+    private func row(_ title: String, _ value: String) -> some View {
+        HStack {
+            Text(title).foregroundStyle(Brand.inkMuted)
+            Spacer()
+            Text(value).fontWeight(.semibold)
+        }
+    }
+
+    private func calendar(plan: ContributionPlan, snapshot: GoalSnapshot) -> some View {
+        let today = CivilDate.calendarToday()
+        let slots = GoalCalendarMath.resolveSlots(dates: plan.dates, today: today, contributions: snapshot.contributions)
+        let months = GoalCalendarMath.planMonthKeys(plan.dates)
+        let upcoming = slots.first { $0.status == .upcoming }?.dueDate
+        let index = months.isEmpty ? 0 : min(monthIndex, months.count - 1)
+        let visible = showAll ? months : (months.isEmpty ? [] : [months[index]])
+        return BrandCard {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Calendário de aportes").font(.headline)
+                if months.count > 1 {
+                    HStack {
+                        Button("Mês anterior") {
+                            monthIndex = GoalCalendarMath.stepMonthIndex(index, delta: -1, count: months.count)
+                        }
+                        .frame(minHeight: 44)
+                        Spacer()
+                        Button("Próximo mês") {
+                            monthIndex = GoalCalendarMath.stepMonthIndex(index, delta: 1, count: months.count)
+                        }
+                        .frame(minHeight: 44)
+                    }
+                    Button(showAll ? "Mostrar um mês" : "Mostrar todos") { showAll.toggle() }
+                        .frame(minHeight: 44)
+                }
+                ForEach(visible, id: \.self) { month in
+                    Text(month).font(.subheadline.weight(.semibold))
+                    ForEach(slots.filter { $0.dueDate.hasPrefix(month) }, id: \.dueDate) { slot in
+                        HStack {
+                            Text(slot.dueDate)
+                            Spacer()
+                            Text(slot.status.label)
+                                .foregroundStyle(Brand.inkMuted)
+                        }
+                        .font(.subheadline)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            monthIndex = GoalCalendarMath.defaultMonthIndex(months: months, today: today, upcomingDate: upcoming)
         }
     }
 }

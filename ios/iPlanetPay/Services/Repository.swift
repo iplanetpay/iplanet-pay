@@ -140,30 +140,19 @@ enum Repository {
     }
 
     static func createReservation(productId: UUID, storeId: UUID) async throws -> UUID {
-        let id: UUID = try await client
-            .rpc("create_reservation", params: RPC.CreateReservation(pProductId: productId, pStoreId: storeId))
-            .execute()
-            .value
-        return id
+        try await WebAPI.createReservation(productId: productId, storeId: storeId)
     }
 
     static func cancelReservation(id: UUID) async throws {
-        try await client.rpc("cancel_reservation", params: RPC.ReservationID(pReservationId: id)).execute()
+        try await WebAPI.cancelReservation(id: id)
     }
 
     static func switchReservation(id: UUID, productId: UUID) async throws -> UUID {
-        let newId: UUID = try await client
-            .rpc(
-                "switch_reservation",
-                params: RPC.SwitchReservation(pOldReservationId: id, pNewProductId: productId)
-            )
-            .execute()
-            .value
-        return newId
+        try await WebAPI.switchReservation(id: id, productId: productId)
     }
 
     static func confirmRetirada(id: UUID) async throws {
-        try await client.rpc("confirm_retirada", params: RPC.ReservationID(pReservationId: id)).execute()
+        try await WebAPI.confirmRetirada(id: id)
     }
 
     static func contributions(reservationId: UUID) async throws -> [Contribution] {
@@ -201,15 +190,8 @@ enum Repository {
         return rows
     }
 
-    static func createContribution(reservationId: UUID, amountCents: Int) async throws -> UUID {
-        let id: UUID = try await client
-            .rpc(
-                "create_contribution",
-                params: RPC.CreateContribution(pReservationId: reservationId, pAmountCents: amountCents)
-            )
-            .execute()
-            .value
-        return id
+    static func createContribution(reservationId: UUID, amountCents: Int, contractId: UUID? = nil) async throws -> WebAPI.PixResponse {
+        try await WebAPI.generatePix(reservationId: reservationId, amountCents: amountCents, contractId: contractId)
     }
 
     static func adminConfirmContribution(id: UUID) async throws {
@@ -219,39 +201,8 @@ enum Repository {
     }
 
     static func acceptAporteContract(userId: UUID, reservationId: UUID) async throws -> UUID {
-        struct Insert: Encodable {
-            let userId: UUID
-            let reservationId: UUID
-            let contractVersion: String
-            let contractText: String
-            let scrolledToEnd: Bool
-            let userAgent: String
-            let acceptLanguage: String
-            let fingerprint: [String: String]
-        }
-        let row = Insert(
-            userId: userId,
-            reservationId: reservationId,
-            contractVersion: LegalCopy.aporteContractVersion,
-            contractText: LegalCopy.aporteContract,
-            scrolledToEnd: true,
-            userAgent: "iPlanetPay-iOS",
-            acceptLanguage: "pt-BR",
-            fingerprint: [
-                "platform": "ios",
-                "bundle": AppConfig.bundleID,
-            ]
-        )
-        let created: [IDRow] = try await client
-            .from("aporte_contracts")
-            .insert(row)
-            .select("id")
-            .execute()
-            .value
-        guard let id = created.first?.id else {
-            throw RepoError("Não foi possível registrar o contrato do aporte.")
-        }
-        return id
+        _ = userId
+        return try await WebAPI.acceptContract(reservationId: reservationId)
     }
 
     static func linkContract(id: UUID, contributionId: UUID, userId: UUID) async throws {
@@ -287,16 +238,16 @@ enum Repository {
     }
 
     static func saveGoal(_ goal: GoalDraft) async throws {
-        if let id = goal.existingId {
-            try await client
-                .from("payment_goals")
-                .update(goal.updateRow)
-                .eq("id", value: id)
-                .eq("user_id", value: goal.userId)
-                .execute()
-        } else {
-            try await client.from("payment_goals").insert(goal.insertRow).execute()
-        }
+        _ = try await WebAPI.saveGoal(
+            WebAPI.GoalBody(
+                name: goal.name,
+                productId: goal.productId,
+                startDate: goal.planStartDate,
+                targetDate: goal.targetDate,
+                frequency: goal.frequency,
+                reservationId: goal.reservationId
+            )
+        )
     }
 
     static func setGoalStatus(id: UUID, userId: UUID, status: String) async throws {
@@ -355,13 +306,11 @@ enum Repository {
     }
 
     static func applyReferral(code: String) async throws {
-        try await client.rpc("apply_referral_code", params: RPC.ReferralCode(pCode: code)).execute()
+        try await WebAPI.applyReferral(code: code)
     }
 
     static func applyBonus(reservationId: UUID) async throws {
-        try await client
-            .rpc("apply_referral_bonus_to_reservation", params: RPC.ReservationID(pReservationId: reservationId))
-            .execute()
+        try await WebAPI.applyBonus(reservationId: reservationId)
     }
 
     static func notices() async throws -> [Notice] {
@@ -386,11 +335,8 @@ enum Repository {
     }
 
     static func markNoticeRead(noticeId: UUID, userId: UUID) async throws {
-        let row: [String: String] = [
-            "notice_id": noticeId.uuidString,
-            "user_id": userId.uuidString,
-        ]
-        try await client.from("platform_notice_reads").insert(row).execute()
+        _ = userId
+        try await WebAPI.markNoticeRead(id: noticeId)
     }
 
     static func publishNotice(kind: String, title: String, body: String, coupon: String?, author: UUID) async throws {
@@ -418,13 +364,21 @@ enum Repository {
     }
 
     static func requestWithdrawal(_ params: RPC.Withdrawal) async throws {
-        try await client.rpc("request_withdrawal", params: params).execute()
+        try await WebAPI.requestWithdrawal(
+            WebAPI.WithdrawalBody(
+                reservationId: params.pReservationId,
+                pixKey: params.pPixKey,
+                pixKeyType: params.pPixKeyType,
+                holderFullName: params.pHolderFullName,
+                holderCpf: params.pHolderCpf
+            )
+        )
     }
 
     static func offers(reservationId: UUID) async throws -> [UsedDeviceOffer] {
         let rows: [UsedDeviceOffer] = try await client
             .from("used_device_offers")
-            .select("id, reservation_id, device_model, imei, expected_value_cents, minimum_value_cents, status, admin_message, approved_value_cents, battery_health_pct, created_at")
+            .select("id, reservation_id, device_model, imei, expected_value_cents, minimum_value_cents, status, admin_message, approved_value_cents, battery_health_pct, reviewed_at, created_at")
             .eq("reservation_id", value: reservationId)
             .order("created_at", ascending: false)
             .execute()
@@ -432,8 +386,12 @@ enum Repository {
         return rows
     }
 
-    static func submitTradeIn(_ params: RPC.TradeIn) async throws {
-        try await client.rpc("create_used_device_offers", params: params).execute()
+    static func respondTradeIn(offerId: UUID, action: String, expectedCents: Int? = nil) async throws {
+        try await WebAPI.respondTradeIn(offerId: offerId, action: action, expectedCents: expectedCents)
+    }
+
+    static func submitTradeIn(reservationId: UUID, devices: [WebAPI.TradeInDevice]) async throws {
+        try await WebAPI.submitTradeIn(reservationId: reservationId, devices: devices)
     }
 
     static func uploadPhoto(bucket: String, path: String, data: Data) async throws {

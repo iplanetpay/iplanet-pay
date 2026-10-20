@@ -1,3 +1,5 @@
+import CoreImage.CIFilterBuiltins
+import IPlanetCore
 import PhotosUI
 import SwiftUI
 import UIKit
@@ -18,6 +20,9 @@ struct ReservationDetailView: View {
     @State private var showTradeIn = false
     @State private var showWithdraw = false
     @State private var showSwitch = false
+    @State private var showSimulator = false
+    @State private var showPickup = false
+    @State private var goals: [PaymentGoal] = []
 
     var body: some View {
         ScrollView {
@@ -39,6 +44,7 @@ struct ReservationDetailView: View {
         }
         .background(Brand.backgroundSubtle)
         .navigationTitle("Reserva")
+        .task(id: pendingWatch) { await watchPendingPix() }
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
@@ -69,6 +75,31 @@ struct ReservationDetailView: View {
                 Task { await switchTo(productId) }
             }
         }
+        .sheet(isPresented: $showSimulator) {
+            if let reservation {
+                SimulatorSheet(
+                    products: products,
+                    locked: SimulatorLock(
+                        reservationId: reservation.id,
+                        productId: reservation.productId,
+                        productName: reservation.product?.name ?? "Produto da reserva",
+                        listPriceCents: reservation.listPriceCents,
+                        contributedCents: reservation.amountPaidCents
+                    )
+                ) {
+                    showSimulator = false
+                    Task { await load() }
+                }
+            }
+        }
+        .sheet(isPresented: $showPickup) {
+            if let reservation {
+                PickupSheet(reservation: reservation) {
+                    showPickup = false
+                    Task { await load() }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -84,14 +115,21 @@ struct ReservationDetailView: View {
             .foregroundStyle(Brand.inkMuted)
         Text(reservation.store?.name ?? "Loja")
             .font(.subheadline)
-        ProgressTrack(value: reservation.progress)
-        Text("\(Money.format(cents: reservation.amountPaidCents)) de \(Money.format(cents: reservation.listPriceCents))")
+        ProgressRing(percent: reservation.progress * 100, caption: "Aportes")
+        Text("Total: \(Money.format(cents: reservation.listPriceCents))")
+        Text("Pago: \(Money.format(cents: reservation.amountPaidCents))")
             .font(.headline)
-        Text("Faltam \(Money.format(cents: reservation.remainingCents))")
+        Text("Restante: \(Money.format(cents: reservation.remainingCents))")
             .foregroundStyle(Brand.inkMuted)
+        if let created = reservation.createdAt {
+            Text("Criada em \(DatesPT.medium(created))")
+                .font(.subheadline)
+                .foregroundStyle(Brand.inkMuted)
+        }
+        aporteBlock(reservation)
         if reservation.status == "ativa" {
-            Button("Fazer aporte") { showAporte = true }
-                .buttonStyle(PrimaryButtonStyle())
+            Button("Simulador de aportes") { showSimulator = true }
+                .buttonStyle(SecondaryButtonStyle())
             Button("Trocar aparelho") { showSwitch = true }
                 .buttonStyle(SecondaryButtonStyle())
             Button("Oferecer usado") { showTradeIn = true }
@@ -99,7 +137,19 @@ struct ReservationDetailView: View {
             Button("Cancelar reserva", role: .destructive) {
                 Task { await cancel() }
             }
+            .frame(minHeight: 44)
             .frame(maxWidth: .infinity)
+        }
+        if reservation.progress >= 0.7 || reservation.status == "quitada",
+           pickups.isEmpty,
+           reservation.status != "retirada",
+           reservation.status != "sacada" {
+            Button("Solicitar retirada") { showPickup = true }
+                .buttonStyle(PrimaryButtonStyle(fill: Brand.accent))
+        }
+        RankingCard(reservation: reservation)
+        if let goal = goals.first(where: { $0.reservationId == reservation.id }) ?? goals.first(where: { $0.productId == reservation.productId }) {
+            ReservationGoalCard(goal: goal, reservation: reservation, contributions: contributions)
         }
         if reservation.amountPaidCents >= 100_000 {
             Button("Pedir saque") { showWithdraw = true }
@@ -117,7 +167,7 @@ struct ReservationDetailView: View {
             }
             .buttonStyle(SecondaryButtonStyle())
         }
-        sectionTitle("Aportes")
+        sectionTitle("Histórico de aportes")
         if contributions.isEmpty {
             Text("Nenhum aporte ainda. O mínimo é R$ 5,00.")
                 .foregroundStyle(Brand.inkMuted)
@@ -136,21 +186,24 @@ struct ReservationDetailView: View {
                             .font(.caption)
                             .foregroundStyle(Brand.inkMuted)
                     }
-                    if let code = contribution.pixCode, !code.isEmpty {
+                    if let code = contribution.pixCode, !code.isEmpty, contribution.status == "pending" {
                         Text(code)
                             .font(.caption.monospaced())
                             .textSelection(.enabled)
-                        Button("Copiar Pix") {
+                        Button("Copiar código Pix") {
                             UIPasteboard.general.string = code
                             info = "Código Pix copiado."
                         }
                         .font(.subheadline.weight(.semibold))
-                    }
-                    if let image = qrImage(contribution.pixQrBase64) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: 220)
+                        .frame(minHeight: 44)
+                        if let image = PixCodeImage.make(code) {
+                            Image(uiImage: image)
+                                .interpolation(.none)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 220)
+                                .accessibilityLabel("QR Code do Pix")
+                        }
                     }
                     if session.isAdmin && contribution.status == "pending" {
                         Button("Confirmar aporte") {
@@ -174,6 +227,16 @@ struct ReservationDetailView: View {
                         Text(offer.statusLabel)
                         Text("Esperado \(Money.format(cents: offer.expectedValueCents))")
                             .font(.subheadline)
+                        if offer.isCounterOffer, let proposed = offer.approvedValueCents {
+                            Text("Contra-proposta: \(Money.format(cents: proposed))")
+                                .font(.subheadline.weight(.semibold))
+                            HStack {
+                                Button("Aceitar") { Task { await respond(offer, "accept") } }
+                                    .buttonStyle(PrimaryButtonStyle())
+                                Button("Recusar") { Task { await respond(offer, "reject") } }
+                                    .buttonStyle(SecondaryButtonStyle())
+                            }
+                        }
                     }
                 }
             }
@@ -183,19 +246,43 @@ struct ReservationDetailView: View {
             ForEach(pickups) { pickup in
                 BrandCard {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text(pickup.modeLabel).font(.headline)
-                        Text(pickup.status)
-                        if let tracking = pickup.trackingCode {
+                        Text("Retirada / envio — \(pickup.label)")
+                            .font(.headline)
+                        if let tracking = pickup.trackingCode, !tracking.isEmpty {
                             Text("Rastreio \(tracking)")
                         }
                     }
                 }
             }
-        } else if reservation.progress >= 0.7 {
-            Text("Pedido de retirada ou envio continua no site, porque a gravação usa o servidor. Acompanhe o status aqui.")
-                .font(.footnote)
+        }
+    }
+
+    @ViewBuilder
+    private func aporteBlock(_ reservation: ReservationRow) -> some View {
+        if reservation.status == "ativa" {
+            if session.profile?.identityComplete != true {
+                Text("Complete seu cadastro antes de fazer um aporte.")
+                    .font(.subheadline)
+                    .foregroundStyle(Brand.inkMuted)
+            } else {
+                Button("Gerar aporte Pix") { showAporte = true }
+                    .buttonStyle(PrimaryButtonStyle())
+            }
+        } else {
+            Text(closedAporteMessage(reservation.status))
+                .font(.subheadline)
                 .foregroundStyle(Brand.inkMuted)
-            Link("Abrir reserva no Safari", destination: AppConfig.web("/app/reserva/\(reservation.id.uuidString)"))
+        }
+    }
+
+    private func closedAporteMessage(_ status: String) -> String {
+        switch status {
+        case "quitada": "Reserva quitada — aportes encerrados."
+        case "retirada": "Reserva concluída."
+        case "trocada": "Esta reserva foi trocada — aportes encerrados aqui."
+        case "saque_pendente": "Saque em análise — aportes pausados."
+        case "sacada": "Reserva sacada — aportes encerrados."
+        default: "Não é possível gerar Pix nesta reserva."
         }
     }
 
@@ -213,13 +300,31 @@ struct ReservationDetailView: View {
         }
     }
 
-    private func qrImage(_ raw: String?) -> UIImage? {
-        guard var raw, !raw.isEmpty else { return nil }
-        if let range = raw.range(of: "base64,") {
-            raw = String(raw[range.upperBound...])
+    private var pendingWatch: String {
+        contributions.filter { $0.status == "pending" }.map(\.id.uuidString).joined(separator: ",")
+    }
+
+    private func watchPendingPix() async {
+        guard contributions.contains(where: { $0.status == "pending" }) else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            guard let fresh = try? await Repository.contributions(reservationId: reservationID) else { continue }
+            let wasPending = Set(contributions.filter { $0.status == "pending" }.map(\.id))
+            let nowConfirmed = fresh.contains { wasPending.contains($0.id) && $0.status == "confirmed" }
+            contributions = fresh
+            if nowConfirmed {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                info = "Aporte confirmado."
+                if let userId = session.profile?.id {
+                    reservation = try? await Repository.reservation(id: reservationID)
+                    _ = userId
+                } else {
+                    reservation = try? await Repository.reservation(id: reservationID)
+                }
+                return
+            }
         }
-        guard let data = Data(base64Encoded: raw) else { return nil }
-        return UIImage(data: data)
     }
 
     private func load() async {
@@ -231,6 +336,9 @@ struct ReservationDetailView: View {
             offers = try await Repository.offers(reservationId: reservationID)
             pickups = try await Repository.pickups(reservationId: reservationID)
             products = try await Repository.products()
+            if let userId = session.profile?.id {
+                goals = try await Repository.goals(userId: userId)
+            }
             error = nil
         } catch {
             self.error = describeError(error)
@@ -276,6 +384,15 @@ struct ReservationDetailView: View {
         }
     }
 
+    private func respond(_ offer: UsedDeviceOffer, _ action: String) async {
+        do {
+            try await Repository.respondTradeIn(offerId: offer.id, action: action)
+            await load()
+        } catch {
+            self.error = describeError(error)
+        }
+    }
+
     private func applyBonus() async {
         do {
             try await Repository.applyBonus(reservationId: reservationID)
@@ -297,7 +414,10 @@ struct AporteSheet: View {
     @State private var contractFrame: CGRect = .zero
     @State private var contractViewport: CGFloat = 0
     @State private var message: String?
+    @State private var messageIsSuccess = false
     @State private var busy = false
+    @State private var pix: WebAPI.PixResponse?
+    @State private var watching: UUID?
 
     var body: some View {
         NavigationStack {
@@ -341,14 +461,32 @@ struct AporteSheet: View {
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 Toggle("Li o contrato até o fim e aceito este aporte", isOn: $accepted)
                     .disabled(!reachedEnd)
+                if let pix, let code = pix.pix?.copyPaste, !code.isEmpty {
+                    Text("Valor \(Money.format(cents: pix.amountCents ?? 0))")
+                        .font(.headline)
+                    if let image = PixCodeImage.make(code) {
+                        Image(uiImage: image)
+                            .interpolation(.none)
+                            .resizable()
+                            .scaledToFit()
+                            .frame(maxWidth: 240)
+                            .accessibilityLabel("QR Code do Pix")
+                    }
+                    Button("Copiar código Pix") {
+                        UIPasteboard.general.string = code
+                    }
+                    .buttonStyle(SecondaryButtonStyle())
+                }
                 if let message {
-                    Text(message).foregroundStyle(Brand.danger)
+                    Text(message).foregroundStyle(messageIsSuccess ? Brand.success : Brand.danger)
                 }
-                Button(busy ? "Criando…" : "Criar aporte") {
-                    Task { await submit() }
+                if pix == nil {
+                    Button(busy ? "Criando…" : "Criar aporte") {
+                        Task { await submit() }
+                    }
+                    .buttonStyle(PrimaryButtonStyle())
+                    .disabled(busy || !accepted)
                 }
-                .buttonStyle(PrimaryButtonStyle())
-                .disabled(busy || !accepted)
                 Text(LegalCopy.pixServerNote)
                     .font(.footnote)
                     .foregroundStyle(Brand.inkMuted)
@@ -361,6 +499,7 @@ struct AporteSheet: View {
                     Button("Fechar") { onDone() }
                 }
             }
+            .task(id: watching) { await watch() }
         }
     }
 
@@ -371,23 +510,51 @@ struct AporteSheet: View {
 
     private func submit() async {
         guard let userId = session.profile?.id else { return }
-        if session.signedInWithSocial && session.profile?.identityComplete != true {
+        if session.profile?.identityComplete != true {
             message = "Complete seu cadastro antes de fazer um aporte."
+            messageIsSuccess = false
             return
         }
         guard let cents = Money.cents(from: amount), cents >= LegalCopy.minimumContributionCents || cents == reservation.remainingCents else {
             message = "Valor mínimo de R$ 5,00 por aporte."
+            messageIsSuccess = false
             return
         }
         busy = true
         defer { busy = false }
         do {
             let contractId = try await Repository.acceptAporteContract(userId: userId, reservationId: reservation.id)
-            let contributionId = try await Repository.createContribution(reservationId: reservation.id, amountCents: cents)
-            try? await Repository.linkContract(id: contractId, contributionId: contributionId, userId: userId)
-            onDone()
+            let generated = try await Repository.createContribution(
+                reservationId: reservation.id,
+                amountCents: cents,
+                contractId: contractId
+            )
+            pix = generated
+            watching = generated.contributionId
+            if generated.pix?.copyPaste == nil {
+                message = generated.error ?? "O Pix foi registrado, mas o código ainda não está disponível."
+                messageIsSuccess = false
+            } else {
+                message = nil
+            }
         } catch {
             message = describeError(error)
+            messageIsSuccess = false
+        }
+    }
+
+    private func watch() async {
+        guard let watching else { return }
+        while !Task.isCancelled {
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            guard let rows = try? await Repository.contributions(reservationId: reservation.id) else { continue }
+            if rows.contains(where: { $0.id == watching && $0.status == "confirmed" }) {
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+                message = "Aporte confirmado."
+                messageIsSuccess = true
+                return
+            }
         }
     }
 }
@@ -505,6 +672,7 @@ struct TradeInSheet: View {
     @State private var picker: [PhotosPickerItem] = []
     @State private var message: String?
     @State private var busy = false
+    @State private var queued: [WebAPI.TradeInDevice] = []
 
     private let options: [(String, String)] = [
         ("troca_tela", "Troca de tela"),
@@ -542,13 +710,18 @@ struct TradeInSheet: View {
                 .onChange(of: picker) { _, items in
                     Task { await loadPhotos(items) }
                 }
+                if !queued.isEmpty {
+                    Text("\(queued.count) de 5 aparelhos nesta avaliação")
+                }
                 if let message {
                     Text(message).foregroundStyle(Brand.danger)
                 }
+                Button("Adicionar aparelho") { addDevice() }
+                    .disabled(queued.count >= 5)
                 Button(busy ? "Enviando…" : "Enviar avaliação") {
                     Task { await submit() }
                 }
-                .disabled(busy)
+                .disabled(busy || (queued.isEmpty && model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
             }
             .navigationTitle("Usado")
             .toolbar {
@@ -578,64 +751,86 @@ struct TradeInSheet: View {
         photos = loaded
     }
 
-    private func submit() async {
-        guard let userId = session.profile?.id else { return }
+    private func currentDevice() -> WebAPI.TradeInDevice? {
         let trimmedModel = model.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedImei = imei.filter { !$0.isWhitespace }
         guard !trimmedModel.isEmpty, !trimmedImei.isEmpty else {
             message = "Preencha modelo e IMEI."
-            return
+            return nil
         }
         guard let expectedCents = Money.cents(from: expected), let minimumCents = Money.cents(from: minimum),
               expectedCents > 0, minimumCents > 0 else {
             message = "Informe valores esperado e mínimo válidos."
-            return
+            return nil
         }
         guard minimumCents <= expectedCents else {
             message = "O valor mínimo não pode ser maior que o esperado."
-            return
+            return nil
         }
         guard !maintenance.isEmpty else {
             message = "Selecione ao menos uma opção de manutenção."
-            return
+            return nil
         }
         let batteryValue = Int(battery)
         let reason = batteryReason.isEmpty ? nil : batteryReason
         if reason == nil {
             guard let batteryValue, (0...100).contains(batteryValue) else {
                 message = "Informe a saúde da bateria entre 0 e 100, ou escolha que não sabe."
-                return
+                return nil
             }
         }
         guard !photos.isEmpty else {
             message = "Envie ao menos uma foto do aparelho."
+            return nil
+        }
+        _ = batteryValue
+        return WebAPI.TradeInDevice(
+            deviceModel: trimmedModel,
+            imei: trimmedImei,
+            expectedBrl: expected.trimmingCharacters(in: .whitespacesAndNewlines),
+            minimumBrl: minimum.trimmingCharacters(in: .whitespacesAndNewlines),
+            maintenanceOptions: Array(maintenance),
+            liquidExposure: liquid,
+            batteryHealthPct: reason == nil ? battery : "",
+            batteryHealthReason: reason,
+            photos: photos
+        )
+    }
+
+    private func addDevice() {
+        guard queued.count < 5 else {
+            message = "A avaliação aceita até 5 aparelhos."
             return
         }
-        let offerId = UUID()
-        let owner = userId.uuidString.lowercased()
-        let offer = offerId.uuidString.lowercased()
+        guard let device = currentDevice() else { return }
+        queued.append(device)
+        model = ""
+        imei = ""
+        expected = ""
+        minimum = ""
+        liquid = false
+        battery = ""
+        batteryReason = ""
+        maintenance = []
+        photos = []
+        picker = []
+        message = "Aparelho adicionado. Envie a avaliação ou inclua outro."
+    }
+
+    private func submit() async {
+        var devices = queued
+        if !model.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || devices.isEmpty {
+            guard let device = currentDevice() else { return }
+            devices.append(device)
+        }
+        guard !devices.isEmpty, devices.count <= 5 else {
+            message = "A avaliação aceita até 5 aparelhos."
+            return
+        }
         busy = true
         defer { busy = false }
         do {
-            var paths: [String] = []
-            for (index, data) in photos.enumerated() {
-                let path = "\(owner)/\(offer)/\(index).jpg"
-                try await Repository.uploadPhoto(bucket: "used-device-photos", path: path, data: data)
-                paths.append(path)
-            }
-            let device = RPC.TradeIn.Device(
-                id: offerId,
-                deviceModel: trimmedModel,
-                imei: trimmedImei,
-                expectedValueCents: expectedCents,
-                minimumValueCents: minimumCents,
-                maintenanceOptions: Array(maintenance),
-                liquidExposure: liquid,
-                photoPaths: paths,
-                batteryHealthPct: reason == nil ? batteryValue : nil,
-                batteryHealthReason: reason
-            )
-            try await Repository.submitTradeIn(RPC.TradeIn(pReservationId: reservationID, pDevices: [device]))
+            try await Repository.submitTradeIn(reservationId: reservationID, devices: devices)
             onDone()
         } catch {
             message = describeError(error)

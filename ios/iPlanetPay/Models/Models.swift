@@ -1,4 +1,5 @@
 import Foundation
+import IPlanetCore
 
 enum UserRole: String, Codable, Sendable, Hashable {
     case cliente
@@ -300,7 +301,12 @@ struct UsedDeviceOffer: Codable, Identifiable, Hashable, Sendable {
     var adminMessage: String?
     var approvedValueCents: Int?
     var batteryHealthPct: Int?
+    var reviewedAt: Date?
     var createdAt: Date?
+
+    var isCounterOffer: Bool {
+        status == "pending" && reviewedAt != nil && (approvedValueCents ?? 0) > 0
+    }
 
     var statusLabel: String {
         switch status {
@@ -323,6 +329,15 @@ struct PickupRequest: Codable, Identifiable, Hashable, Sendable {
     var createdAt: Date?
 
     var modeLabel: String { mode == "shipping" ? "Envio" : "Retirada na loja" }
+
+    var label: String {
+        let fulfillment = FulfillmentStatus(rawValue: status)
+        let fulfillmentMode = FulfillmentMode(rawValue: mode) ?? .store
+        if let fulfillment {
+            return FulfillmentRules.statusLabel(fulfillment, mode: fulfillmentMode)
+        }
+        return status
+    }
 }
 
 struct RaffleDraw: Codable, Identifiable, Hashable, Sendable {
