@@ -1,15 +1,14 @@
-import type { RealWeather, TimeOfDayPreset, WeatherKind } from '@/lib/goals/climb/types';
+import type { TimeOfDayPreset } from '@/lib/goals/climb/types';
 import { GOAL_PRESETS } from '@/lib/goals/climb/dev-presets';
-import { WEATHER_LABEL } from '@/lib/goals/climb/weather';
+import { SPACE_LABEL, type SpaceCondition } from '@/lib/goals/climb/space-journey';
 
 interface Props {
   presetKey: string;
   onPreset: (k: string) => void;
-  weather: WeatherKind | 'real';
-  onWeather: (w: WeatherKind | 'real') => void;
+  weather: SpaceCondition | 'real';
+  onWeather: (w: SpaceCondition | 'real') => void;
   time: TimeOfDayPreset;
   onTime: (t: TimeOfDayPreset) => void;
-  real: RealWeather | null;
 }
 
 const TIMES: Array<[TimeOfDayPreset, string]> = [
@@ -21,8 +20,8 @@ const TIMES: Array<[TimeOfDayPreset, string]> = [
 ];
 
 /** Painel de testes (recolhido por padrão). Não faz parte do produto. */
-export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTime, real }: Props) {
-  const kinds = Object.keys(WEATHER_LABEL) as WeatherKind[];
+export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTime }: Props) {
+  const kinds = Object.keys(SPACE_LABEL) as SpaceCondition[];
   return (
     <details className="demo glass-card" aria-label="Painel de testes">
       <summary>
@@ -51,14 +50,14 @@ export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTim
           </div>
         </div>
         <div className="demo-row">
-          <span className="demo-k">Clima</span>
+          <span className="demo-k">Espaço</span>
           <div className="chips">
             <button type="button" className={weather === "real" ? "on" : ""} onClick={() => onWeather("real")} data-weather="real">
-              Real + regra da meta
+              Regra da meta
             </button>
             {kinds.map((k) => (
               <button type="button" key={k} className={weather === k ? "on" : ""} onClick={() => onWeather(k)} data-weather={k}>
-                {WEATHER_LABEL[k]}
+                {SPACE_LABEL[k]}
               </button>
             ))}
           </div>
@@ -73,11 +72,6 @@ export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTim
             ))}
           </div>
         </div>
-        <p className="demo-note">
-          {real
-            ? `Clima real (${real.source}, ${real.place}): ${WEATHER_LABEL[real.kind]}, ${Math.round(real.temperatureC)}°C, vento ${Math.round(real.windKmh)} km/h — hora local ${Math.floor(real.localHour)}:${String(Math.round((real.localHour % 1) * 60) % 60).padStart(2, '0')}.`
-            : 'Carregando clima real…'}
-        </p>
       </div>
     </details>
   );
