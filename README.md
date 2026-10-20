@@ -80,6 +80,55 @@ App wiring: `signInWithOAuth({ provider: 'google' })` → `/auth/callback` (PKCE
 
 Perfil: trigger `handle_new_user` cria `profiles` com role `cliente` (admins existentes preservados).
 
+## App iOS (SwiftUI)
+
+O app nativo fica em `ios/` e fala com o **mesmo Supabase** do PWA, pelo pacote oficial `supabase-swift` (Swift Package Manager, versão 2.55.4). Não usa Capacitor, CocoaPods nem WebView. O build web/PWA não muda.
+
+Abra no Mac (Xcode 27): `ios/iPlanetPay.xcodeproj`.
+
+### Simulador
+
+```bash
+cd /caminho/do/iplanet-pay
+open ios/iPlanetPay.xcodeproj
+```
+
+1. Na primeira abertura, o Xcode baixa o pacote `supabase-swift` (precisa de internet). Espere o resolve terminar.
+2. No seletor de destino, escolha um **iPhone Simulator** (iOS 18 ou superior; o projeto foi feito para o Xcode 27).
+3. Confira **Signing & Capabilities**: *Automatically manage signing* já vem marcado e **Team** fica vazio. No simulador, Run assina localmente sem time.
+4. Aperte **Run** (⌘R).
+
+A URL, a anon key e a URL do site vêm de `ios/Config/Secrets.xcconfig` (já preenchido com os mesmos valores públicos do app web). O exemplo está em `ios/Config/Secrets.xcconfig.example`.
+
+### iPhone físico
+
+1. Conecte o iPhone e selecione-o como destino.
+2. Em **Signing & Capabilities**, escolha o seu **Team**.
+3. No iPhone: Ajustes → Geral → VPN e gerenciamento de dispositivo → confiar no desenvolvedor.
+4. Run.
+
+### App Store (depois)
+
+- Bundle id: `com.iplanetpay.app`. Nome na tela: **iPlanet Pay**.
+- Ícone: `ios/iPlanetPay/Assets.xcassets/AppIcon.appiconset` (a partir de `public/icons`).
+- Archive com o destino **Any iOS Device**, depois Organizer → Distribute App.
+- Preencha a conta Apple Developer, privacidade (fotos da biblioteca) e a classificação. O app não declara criptografia própria (`ITSAppUsesNonExemptEncryption` = false); o login usa HTTPS.
+- Deep link do app: `iplanetpay://auth-callback` (login Google, confirmação de e-mail e senha), `iplanetpay://reserva/<uuid>` e `iplanetpay://catalogo`. Universal Links ficam para uma etapa seguinte: é preciso um arquivo `apple-app-site-association` no site e a capability Associated Domains. Isso não foi ligado agora para o simulador assinar sem capability extra.
+
+### Supabase (obrigatório para o login do app)
+
+No dashboard do projeto `zjnikfrledckmjahwnsb`:
+
+Authentication → URL Configuration → **Redirect URLs**, inclua:
+
+- `iplanetpay://auth-callback`
+
+Authentication → Providers → Google: o redirect do Google Cloud continua `https://zjnikfrledckmjahwnsb.supabase.co/auth/v1/callback`. O app só precisa da URL acima na lista de redirects do Supabase.
+
+Se “Confirm email” estiver ligado, o link do e-mail precisa cair nesse redirect para abrir o app. Sem isso, a conta é criada e o usuário confirma no navegador e depois entra com e-mail e senha.
+
+O QR Code Pix continua no servidor (Mercado Pago). O app cria o aporte pendente via RPC `create_contribution` e mostra o código quando ele já está na linha. Não coloque `MERCADOPAGO_ACCESS_TOKEN` no app.
+
 ## Migrations
 
 `supabase/migrations/001` … `017` — projeto live `zjnikfrledckmjahwnsb`.

@@ -1,0 +1,47 @@
+# Opcional. O Xcode abre ios/iPlanetPay.xcodeproj direto, sem XcodeGen e sem CocoaPods.
+# Este arquivo descreve o mesmo alvo, caso você queira regenerar o projeto no Mac:
+#   brew install xcodegen && cd ios && xcodegen generate
+name: iPlanetPay
+options:
+  bundleIdPrefix: com.iplanetpay
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+configs:
+  Debug: Config/Debug.xcconfig
+  Release: Config/Release.xcconfig
+packages:
+  supabase-swift:
+    url: https://github.com/supabase/supabase-swift
+    exactVersion: 2.55.4
+targets:
+  iPlanetPay:
+    type: application
+    platform: iOS
+    sources:
+      - path: iPlanetPay
+        excludes:
+          - Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.iplanetpay.app
+        PRODUCT_NAME: iPlanet Pay
+        INFOPLIST_FILE: iPlanetPay/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        DEVELOPMENT_TEAM: ""
+        TARGETED_DEVICE_FAMILY: "1,2"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: Accent
+    dependencies:
+      - package: supabase-swift
+        product: Supabase
+    scheme:
+      gatherCoverageData: false
