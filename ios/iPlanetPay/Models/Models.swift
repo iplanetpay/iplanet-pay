@@ -80,6 +80,16 @@ struct Product: Codable, Identifiable, Hashable, Sendable {
     }
 }
 
+struct ProductVariant: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var productId: UUID
+    var model: String?
+    var color: String?
+    var storage: String?
+    var priceCents: Int
+    var active: Bool
+}
+
 struct Store: Codable, Identifiable, Hashable, Sendable {
     let id: UUID
     var name: String

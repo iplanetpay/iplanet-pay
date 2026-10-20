@@ -53,6 +53,16 @@ enum Repository {
         return rows
     }
 
+    /// Variantes ativas (cores extras por produto), como `listProductSwatches` no site.
+    static func productVariants() async throws -> [ProductVariant] {
+        try await client
+            .from("product_variants")
+            .select("id, product_id, model, color, storage, price_cents, active")
+            .eq("active", value: true)
+            .execute()
+            .value
+    }
+
     static func allProducts() async throws -> [Product] {
         let rows: [Product] = try await client
             .from("products")
