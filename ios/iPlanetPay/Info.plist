@@ -77,6 +77,8 @@
 	<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>A iPlanet Pay usa suas fotos para o avatar e para a avaliação de aparelhos usados.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>A iPlanet Pay usa a câmera para fotografar o aparelho usado na avaliação.</string>
 	<key>SUPABASE_URL</key>
 	<string>$(SUPABASE_URL)</string>
 	<key>SUPABASE_ANON_KEY</key>

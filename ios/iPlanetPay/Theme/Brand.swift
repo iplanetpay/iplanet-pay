@@ -11,6 +11,7 @@ enum Brand {
     static let success = Color("Success")
     static let danger = Color("Danger")
     static let lavender = Color("Lavender")
+    static let whatsapp = Color(red: 37 / 255, green: 211 / 255, blue: 102 / 255)
 
     static let cardRadius: CGFloat = 24
 }
@@ -45,7 +46,7 @@ struct BrandCard<Content: View>: View {
 }
 
 struct PrimaryButtonStyle: ButtonStyle {
-    var fill: Color = Brand.accent
+    var fill: Color = Brand.ink
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label

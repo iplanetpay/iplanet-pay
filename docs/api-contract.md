@@ -57,7 +57,7 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/referrals/apply-bonus` | sim | `reservation_id` | usa o bônus na reserva |
 | `POST /api/trade-in/submit` | sim | até 5 aparelhos: modelo, IMEI, valores em centavos, manutenção, bateria (0–100 ou `unknown` / `not_applicable`), fotos já enviadas | oferta criada |
 | `POST /api/trade-in/photos` | sim | `multipart` da foto, caminho com o id do usuário | `path` |
-| `POST /api/trade-in/respond` | sim | `offer_id`, `action` `accept`\|`decline` | resposta à contra-proposta |
+| `POST /api/trade-in/respond` | sim | `offerId`, `action` `accept`\|`reject`\|`resubmit`\|`discard`, `expectedCents?` | resposta à contra-proposta |
 | `GET /api/notices` | sim | — | `notices[]` com `id`, `kind`, `title`, `body`, `couponCode`, `createdAt`, `read` |
 | `POST /api/notices/read` | sim | `notice_id` | marca como lido |
 | `GET /api/weather` | sim | `lat`, `lon` opcionais | `source` `openweather`\|`fallback`\|`needs_location`, `kind?`. A chave do OpenWeather fica no servidor |

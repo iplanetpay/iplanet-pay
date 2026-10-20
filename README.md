@@ -117,7 +117,15 @@ Sign in with Apple pede a capability no App ID (`com.iplanetpay.app`). Sem conta
 - Ícone: `ios/iPlanetPay/Assets.xcassets/AppIcon.appiconset` (a partir de `public/icons`).
 - Archive com o destino **Any iOS Device**, depois Organizer → Distribute App.
 - Preencha a conta Apple Developer, privacidade (fotos da biblioteca) e a classificação. O app não declara criptografia própria (`ITSAppUsesNonExemptEncryption` = false); o login usa HTTPS.
-- Deep link do app: `iplanetpay://auth-callback` (Google, confirmação de e-mail e senha), `iplanetpay://reserva/<uuid>` e `iplanetpay://catalogo`. Universal Links ficam para uma etapa seguinte: é preciso um arquivo `apple-app-site-association` no site e a capability Associated Domains. Isso não foi ligado agora para o simulador assinar sem capability extra.
+- Deep link do app: `iplanetpay://auth-callback` (Google, confirmação de e-mail, link mágico e senha), `iplanetpay://reserva/<uuid>` e `iplanetpay://catalogo`. Universal Links ficam para uma etapa seguinte: é preciso um arquivo `apple-app-site-association` no site e a capability Associated Domains. Isso não foi ligado agora para o simulador assinar sem capability extra.
+
+### Checklist antes do TestFlight
+
+1. Publicar na Vercel o aceite de `Authorization: Bearer` nas rotas da API. Sem esse deploy, login nativo, Pix, meta, saque, retirada e troca de usado falham no app.
+2. Não há migração nova para aplicar.
+3. Não há envio APNs no backend (o lembrete de meta segue pelo cron de WhatsApp). O app não pede push.
+4. Conferir no simulador iPhone 16 (390×844): abas Início, Catálogo, Carteira, Metas, Indicações e Conta; carrossel; Pix com QR local; metas com cena e calendário; atalho Admin só abre o site.
+5. Conta Apple Developer paga ainda não existe: Sign in with Apple fica no código e será ligado depois. Google continua no fluxo OAuth do navegador.
 
 ### Supabase (projeto `xeeogfmmasvgbpmodqym`)
 
