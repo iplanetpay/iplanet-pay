@@ -117,7 +117,7 @@ struct ReservationDetailView: View {
             Spacer()
             StatusPill(text: reservation.statusLabel, tone: tone(reservation.status))
         }
-        Text(reservation.product?.subtitle ?? "")
+        Text(VariantMatrix.label(fromNotes: reservation.notes) ?? reservation.product?.subtitle ?? "")
             .foregroundStyle(Brand.inkMuted)
         Text(reservation.store?.name ?? "Loja")
             .font(.subheadline)

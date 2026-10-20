@@ -21,6 +21,15 @@ final class SpaceJourneyTests: XCTestCase {
         let a = p.sample(target: 0.5, elapsed: 0.5), b = p.sample(target: 0.5, elapsed: 1.0)
         XCTAssertEqual(a.speed, b.speed, accuracy: 1e-9)
         XCTAssertEqual(b.progress, 2 * a.progress, accuracy: 1e-9)
+        // A parada começa na velocidade do cruzeiro (sem salto).
+        let cruise = RocketMotionProfile.cruiseSeconds / p.pace
+        let before = p.sample(target: 0.5, elapsed: cruise - 1e-6)
+        let after = p.sample(target: 0.5, elapsed: cruise + 1e-6)
+        XCTAssertEqual(before.speed, after.speed, accuracy: 1e-4)
+        XCTAssertEqual(before.progress, after.progress, accuracy: 1e-4)
+        let easing = p.sample(target: 0.5, elapsed: cruise + 0.8)
+        XCTAssertLessThan(easing.speed, a.speed)
+        XCTAssertEqual(p.sample(target: 0.5, elapsed: p.duration + 0.01).progress, 0.5)
         let end = p.sample(target: 0.5, elapsed: 10)
         XCTAssertEqual(end.progress, 0.5)
         XCTAssertEqual(end.flame, 0)

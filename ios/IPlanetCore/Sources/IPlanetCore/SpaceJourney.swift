@@ -38,12 +38,19 @@ public struct RocketMotionProfile: Equatable, Sendable {
         }
     }
 
+    public static let cruiseSeconds = 2.4
+    /// Parada cúbica que começa na mesma velocidade do cruzeiro (sem tranco), como no site.
+    public static let easeSeconds = cruiseSeconds * 0.18 * 3 / 0.82
+
+    /// Tempo total da viagem até parar.
+    public var duration: Double { (RocketMotionProfile.cruiseSeconds + RocketMotionProfile.easeSeconds) / pace }
+
     /// Progresso, velocidade e intensidade da chama em `elapsed` segundos: cruzeiro constante e parada suave.
     public func sample(target: Double, elapsed: Double) -> (progress: Double, speed: Double, flame: Double) {
         let target = max(0, min(1, target))
         guard target > 0, elapsed > 0 else { return (elapsed > 0 ? target : 0, 0, 0) }
-        let cruise = 2.4 / pace
-        let ease = 0.85 / pace
+        let cruise = RocketMotionProfile.cruiseSeconds / pace
+        let ease = RocketMotionProfile.easeSeconds / pace
         if elapsed >= cruise + ease { return (target, 0, 0) }
         let cruiseSpeed = target * 0.82 / cruise
         let maxSpeed = 0.82 / cruise

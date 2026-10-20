@@ -96,6 +96,7 @@ enum WebAPI {
     struct ReservationBody: Encodable, Sendable {
         var productId: UUID
         var storeId: UUID
+        var variantId: UUID?
     }
 
     struct ReservationIDBody: Encodable, Sendable {
@@ -224,10 +225,10 @@ enum WebAPI {
         let _: StatusResponse = try await send(method: "PATCH", path: "/api/profile", body: body, authorize: true)
     }
 
-    static func createReservation(productId: UUID, storeId: UUID) async throws -> UUID {
+    static func createReservation(productId: UUID, storeId: UUID, variantId: UUID? = nil) async throws -> UUID {
         let response: StatusResponse = try await post(
             path: "/api/reservations",
-            body: ReservationBody(productId: productId, storeId: storeId),
+            body: ReservationBody(productId: productId, storeId: storeId, variantId: variantId),
             authorize: true
         )
         guard let id = response.id else { throw Failure(message: "A reserva não foi criada.") }

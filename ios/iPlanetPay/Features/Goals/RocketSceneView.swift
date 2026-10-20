@@ -81,7 +81,7 @@ struct RocketSceneView: View {
                     selected: selected,
                     reduce: reduceMotion,
                     celebrate: status == .done && motion.progress > 0.98,
-                    landedFor: max(0, elapsed - (2.4 + 0.85) / profile.pace),
+                    landedFor: max(0, elapsed - profile.duration),
                     time: reduceMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate,
                     rocket: pose,
                     pulseIndex: nextIndex

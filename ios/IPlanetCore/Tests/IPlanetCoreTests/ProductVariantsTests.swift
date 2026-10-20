@@ -31,6 +31,24 @@ final class ProductVariantsTests: XCTestCase {
         XCTAssertEqual(matrix.select(color: "Azul", storage: "1TB", changed: .storage)?.productId, c)
     }
 
+    func testVariantIdsPricesAndFallback() {
+        let v1 = UUID(), v2 = UUID()
+        let m = VariantMatrix(options: [
+            VariantOption(productId: a, color: "Lavanda", storage: "256 GB", priceCents: 799_900, imageUrl: nil),
+            VariantOption(productId: a, variantId: v1, color: "Lavanda", storage: "512 GB", priceCents: 949_900, imageUrl: nil),
+            VariantOption(productId: a, variantId: v2, color: "Preto", storage: "256 GB", priceCents: 799_900, imageUrl: nil),
+            VariantOption(productId: a, variantId: UUID(), color: "Azul", storage: "128 GB", priceCents: 0, imageUrl: nil),
+        ])
+        XCTAssertEqual(m.colors, ["Lavanda", "Preto"])
+        XCTAssertNil(m.resolve(color: "Lavanda", storage: "256 GB")?.variantId)
+        XCTAssertEqual(m.resolve(color: "Lavanda", storage: "512 GB")?.priceCents, 949_900)
+        let black = m.select(color: "Preto", storage: "512 GB", changed: .color)
+        XCTAssertEqual(black?.variantId, v2)
+        XCTAssertEqual(black.map(VariantMatrix.label), "256 GB · Preto")
+        XCTAssertEqual(VariantMatrix.label(fromNotes: "Variante: 256 GB · Preto"), "256 GB · Preto")
+        XCTAssertNil(VariantMatrix.label(fromNotes: "outra coisa"))
+    }
+
     func testCapacityAndSwatch() {
         XCTAssertEqual(VariantMatrix.capacityGB("1TB"), 1024)
         XCTAssertEqual(VariantMatrix.capacityGB("64 GB"), 64)

@@ -161,9 +161,10 @@ struct ProductReserveSheet: View {
             guard let owner = family.first(where: { $0.id == variant.productId }) else { continue }
             options.append(VariantOption(
                 productId: owner.id,
+                variantId: variant.id,
                 color: variant.color ?? owner.color ?? "",
                 storage: (variant.storage?.isEmpty == false ? variant.storage : nil) ?? owner.storage,
-                priceCents: owner.listPriceCents,
+                priceCents: variant.priceCents,
                 imageUrl: owner.imageUrl
             ))
         }
@@ -171,6 +172,11 @@ struct ProductReserveSheet: View {
     }
 
     /// Produto que vai para a reserva conforme a combinação escolhida.
+    /// Combinação escolhida (com o id da variante e o preço dela).
+    private var chosen: VariantOption? { matrix.resolve(color: color, storage: storage) }
+
+    private var priceCents: Int { chosen?.priceCents ?? product.listPriceCents }
+
     private var product: Product {
         let id = matrix.resolve(color: color, storage: storage)?.productId ?? initial.id
         return family.first { $0.id == id } ?? initial
@@ -190,7 +196,7 @@ struct ProductReserveSheet: View {
                     Text(product.name).font(.title.weight(.bold))
                     Text(subtitle).foregroundStyle(Brand.inkMuted)
                         .contentTransition(.opacity)
-                    Text(Money.format(cents: product.listPriceCents))
+                    Text(Money.format(cents: priceCents))
                         .font(.title2.weight(.bold))
                         .contentTransition(.numericText())
                     variantPickers
@@ -214,7 +220,7 @@ struct ProductReserveSheet: View {
                     if let message {
                         Text(message).foregroundStyle(Brand.danger)
                     }
-                    Button(busy ? "Reservando…" : "Reservar") {
+                    Button(busy ? "Reservando…" : (chosen?.variantId != nil ? "Reservar \(VariantMatrix.label(chosen!))" : "Reservar")) {
                         Task { await reserve() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
@@ -341,7 +347,7 @@ struct ProductReserveSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let id = try await Repository.createReservation(productId: product.id, storeId: storeId)
+            let id = try await Repository.createReservation(productId: product.id, storeId: storeId, variantId: chosen?.variantId)
             onCreated(id)
         } catch {
             message = describeError(error)

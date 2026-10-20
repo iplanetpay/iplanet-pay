@@ -149,8 +149,8 @@ enum Repository {
         return rows.first
     }
 
-    static func createReservation(productId: UUID, storeId: UUID) async throws -> UUID {
-        try await WebAPI.createReservation(productId: productId, storeId: storeId)
+    static func createReservation(productId: UUID, storeId: UUID, variantId: UUID? = nil) async throws -> UUID {
+        try await WebAPI.createReservation(productId: productId, storeId: storeId, variantId: variantId)
     }
 
     static func cancelReservation(id: UUID) async throws {

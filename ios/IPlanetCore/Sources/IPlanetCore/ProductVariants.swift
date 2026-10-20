@@ -3,13 +3,16 @@ import Foundation
 /// Uma combinação Cor × Armazenamento que leva a um produto reservável (linha de `products`).
 public struct VariantOption: Equatable, Sendable {
     public var productId: UUID
+    /// Id em `product_variants`; `nil` = o próprio produto.
+    public var variantId: UUID?
     public var color: String
     public var storage: String
     public var priceCents: Int
     public var imageUrl: String?
 
-    public init(productId: UUID, color: String, storage: String, priceCents: Int, imageUrl: String?) {
+    public init(productId: UUID, variantId: UUID? = nil, color: String, storage: String, priceCents: Int, imageUrl: String?) {
         self.productId = productId
+        self.variantId = variantId
         self.color = color
         self.storage = storage
         self.priceCents = priceCents
@@ -25,7 +28,7 @@ public struct VariantMatrix: Equatable, Sendable {
     public private(set) var storages: [String] = []
 
     public init(options input: [VariantOption]) {
-        for option in input {
+        for option in input where option.priceCents > 0 {
             let color = option.color.trimmingCharacters(in: .whitespacesAndNewlines)
             let storage = option.storage.trimmingCharacters(in: .whitespacesAndNewlines)
             var clean = option
@@ -51,9 +54,30 @@ public struct VariantMatrix: Equatable, Sendable {
     public func select(color: String?, storage: String?, changed: Dimension) -> VariantOption? {
         if let exact = resolve(color: color, storage: storage) { return exact }
         switch changed {
-        case .color: return options.first { match($0.color, color) } ?? options.first
+        case .color:
+            // Mantém o armazenamento se existir na cor; senão o menor disponível (como no site).
+            return options.filter { match($0.color, color) }
+                .min { VariantMatrix.capacityGB($0.storage) < VariantMatrix.capacityGB($1.storage) } ?? options.first
         case .storage: return options.first { match($0.storage, storage) } ?? options.first
         }
+    }
+
+    /// "256 GB · Preto", igual a `variantLabel` do site.
+    public static func label(_ option: VariantOption) -> String {
+        [option.storage, option.color].filter { !$0.isEmpty }.joined(separator: " · ")
+    }
+
+    /// A função create_reservation grava "Variante: 256 GB · Preto" nas notas da reserva.
+    public static func label(fromNotes notes: String?) -> String? {
+        guard let notes else { return nil }
+        for line in notes.components(separatedBy: .newlines) {
+            let trimmed = line.trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("Variante:") {
+                let value = trimmed.dropFirst("Variante:".count).trimmingCharacters(in: .whitespaces)
+                return value.isEmpty ? nil : value
+            }
+        }
+        return nil
     }
 
     public enum Dimension: Sendable { case color, storage }
