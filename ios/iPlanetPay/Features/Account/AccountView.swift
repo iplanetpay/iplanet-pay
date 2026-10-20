@@ -3,6 +3,7 @@ import UIKit
 
 struct AccountView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
         NavigationStack {
@@ -38,6 +39,11 @@ struct AccountView: View {
                 Section {
                     Button("Sair", role: .destructive) {
                         Task { await session.signOut() }
+                    }
+                    Button {
+                        router.overlay = .support
+                    } label: {
+                        Label("Suporte", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
             }

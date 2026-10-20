@@ -262,6 +262,7 @@ enum AppOverlay: String, Identifiable {
     case settings
     case terms
     case admin
+    case support
 
     var id: String { rawValue }
 }

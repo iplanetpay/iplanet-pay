@@ -117,6 +117,9 @@ struct ClientShell: View {
                     TermsView()
                 case .admin:
                     AdminLinkView()
+                case .support:
+                    SupportChatView()
+                        .toolbar(.hidden, for: .navigationBar)
                 }
             }
         }

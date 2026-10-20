@@ -41,6 +41,7 @@ struct ClientHeader: View {
                 Button("Sair", role: .destructive) {
                     Task { await session.signOut() }
                 }
+                Button("Suporte") { router.overlay = .support }
                 Divider()
                 Button("Guia · Termos de uso") { router.overlay = .terms }
                 if session.isAdmin {
