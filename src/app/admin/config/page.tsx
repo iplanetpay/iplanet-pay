@@ -6,6 +6,8 @@ import {
   SupportAndAgentSettingsForm,
 } from "@/components/admin/settings-form";
 import { getAppSettings } from "@/lib/settings/queries";
+import { SupportAiSettingsForm } from "@/components/admin/support-ai-form";
+import { loadSupportAiAdmin } from "@/lib/support-ai/admin-queries";
 
 export const metadata = { title: "Configurações" };
 
@@ -17,6 +19,8 @@ export default async function AdminConfigPage() {
     "whatsapp_admin",
     "admin_whatsapp_e164",
   ]);
+
+  const supportAi = await loadSupportAiAdmin();
 
   const whatsappAdminConfigured = Boolean(
     (settings.whatsapp_admin ?? "").trim() ||
@@ -49,6 +53,10 @@ export default async function AdminConfigPage() {
           initialAgentEnabled={settings.agent_enabled === "true"}
           whatsappAdminConfigured={whatsappAdminConfigured}
         />
+      </section>
+
+      <section>
+        <SupportAiSettingsForm initial={supportAi} />
       </section>
     </div>
   );
