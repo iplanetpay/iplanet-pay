@@ -8,6 +8,18 @@ public enum MoneyFormat {
         formatter.currencyCode = "BRL"
         return formatter.string(from: NSNumber(value: Double(cents) / 100)) ?? "R$ 0,00"
     }
+
+    /// Whole reais stay without cents. Broken amounts keep two digits.
+    public static func reais(_ cents: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.numberStyle = .currency
+        formatter.currencyCode = "BRL"
+        let fraction = abs(cents) % 100 == 0 ? 0 : 2
+        formatter.minimumFractionDigits = fraction
+        formatter.maximumFractionDigits = fraction
+        return formatter.string(from: NSNumber(value: Double(cents) / 100)) ?? "R$ 0"
+    }
 }
 
 public enum PhoneRules {

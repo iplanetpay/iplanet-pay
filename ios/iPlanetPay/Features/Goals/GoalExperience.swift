@@ -9,6 +9,34 @@ struct SimulatorLock: Sendable {
     var contributedCents: Int
 }
 
+enum GoalLinks {
+    static func paid(_ contributions: [Contribution]) -> [PlanContribution] {
+        contributions.compactMap { item in
+            guard item.status == "confirmed" else { return nil }
+            let day = CivilDay.string(from: item.confirmedAt ?? item.createdAt ?? Date())
+            return PlanContribution(paidOn: day, amountCents: item.amountCents)
+        }
+    }
+
+    static func schedule(
+        goal: PaymentGoal,
+        contributions: [Contribution],
+        today: String = CivilDate.calendarToday()
+    ) -> GoalSchedule? {
+        let frequency = ContributionFrequency(rawValue: goal.frequency ?? "monthly") ?? .monthly
+        let start = goal.planStartDate ?? today
+        return try? GoalScheduleMath.build(
+            name: goal.name,
+            amountCents: goal.amountCents,
+            startDate: start,
+            targetDate: goal.targetDate,
+            frequency: frequency,
+            contributions: paid(contributions),
+            today: today
+        )
+    }
+}
+
 struct GoalSnapshot: Sendable {
     var status: ClimbStatus
     var savedCents: Int
@@ -17,36 +45,17 @@ struct GoalSnapshot: Sendable {
     var plan: ContributionPlan?
     var contributions: [PlanContribution]
     var tone: StatusPill.PillTone
+    var schedule: GoalSchedule?
 
-    static func make(goal: PaymentGoal, reservation: ReservationRow?, contributions: [Contribution]) -> GoalSnapshot {
-        let target = reservation?.listPriceCents ?? goal.amountCents
-        let saved = reservation?.amountPaidCents ?? 0
-        let percent = target > 0 ? min(100, Double(saved) / Double(target) * 100) : 0
-        let start = goal.planStartDate ?? CivilDate.calendarToday()
-        let paid = GoalCalendarMath.goalContributions(
-            contributions.compactMap { item -> PlanContribution? in
-                guard item.status == "confirmed" else { return nil }
-                let day = CivilDay.string(from: item.confirmedAt ?? item.createdAt ?? Date())
-                return PlanContribution(paidOn: day, amountCents: item.amountCents)
-            },
-            startDate: start
-        )
-        let frequency = ContributionFrequency(rawValue: goal.frequency ?? "monthly") ?? .monthly
-        let plan = try? ContributionPlanMath.build(
-            targetCents: Double(target),
-            contributedCents: Double(saved),
-            startDate: start,
-            endDate: goal.targetDate,
-            frequency: frequency
-        )
-        let deposits = (plan?.dates ?? []).map { date -> ClimbDeposit in
-            let slots = GoalCalendarMath.resolveSlots(dates: plan?.dates ?? [], today: CivilDate.calendarToday(), contributions: paid)
-            let status = slots.first { $0.dueDate == date }?.status
-            switch status {
-            case .onTime: return ClimbDeposit(status: .paidOnTime, dueDate: date)
-            case .latePayment: return ClimbDeposit(status: .paidLate, dueDate: date)
-            case .missed: return ClimbDeposit(status: .missed, dueDate: date)
-            case .upcoming, nil: return ClimbDeposit(status: .pending, dueDate: date)
+    static func make(goal: PaymentGoal, reservation _: ReservationRow?, contributions: [Contribution]) -> GoalSnapshot {
+        let schedule = GoalLinks.schedule(goal: goal, contributions: contributions)
+        let percent = Double(schedule?.progressPercent ?? 0)
+        let deposits = (schedule?.slots ?? []).map { slot -> ClimbDeposit in
+            switch slot.status {
+            case .onTime: return ClimbDeposit(status: .paidOnTime, dueDate: slot.dueDate)
+            case .latePayment: return ClimbDeposit(status: .paidLate, dueDate: slot.dueDate)
+            case .missed: return ClimbDeposit(status: .missed, dueDate: slot.dueDate)
+            case .upcoming: return ClimbDeposit(status: .pending, dueDate: slot.dueDate)
             }
         }
         let climb = ClimbLogic.deriveStatus(deposits: deposits, percent: percent, today: CivilDate.calendarToday())
@@ -57,24 +66,45 @@ struct GoalSnapshot: Sendable {
         case .late: tone = .danger
         case .done: tone = .accent
         }
-        return GoalSnapshot(status: climb, savedCents: saved, targetCents: target, percent: percent, plan: plan, contributions: paid, tone: tone)
+        return GoalSnapshot(
+            status: climb,
+            savedCents: schedule?.savedCents ?? 0,
+            targetCents: goal.amountCents,
+            percent: percent,
+            plan: schedule?.plan,
+            contributions: schedule?.contributions ?? [],
+            tone: tone,
+            schedule: schedule
+        )
     }
 }
 
 struct SimulatorSheet: View {
-    let products: [Product]
     var locked: SimulatorLock?
-    var onDone: () -> Void
+    var priorPayments: [PlanContribution] = []
+    var onDone: (UUID?) -> Void
     @Environment(SessionStore.self) private var session
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var catalog: [Product]
     @State private var name = ""
     @State private var productId: UUID?
     @State private var startDate = CivilDate.calendarToday()
     @State private var targetDate = ""
     @State private var frequency: ContributionFrequency = .monthly
-    @State private var simulated = false
     @State private var plan: ContributionPlan?
+    @State private var contributedCents = 0
+    @State private var targetCents = 0
     @State private var message: String?
     @State private var busy = false
+    @State private var created: GoalSchedule?
+    @State private var createdReservation: UUID?
+
+    init(products: [Product], locked: SimulatorLock? = nil, priorPayments: [PlanContribution] = [], onDone: @escaping (UUID?) -> Void) {
+        self.locked = locked
+        self.priorPayments = priorPayments
+        self.onDone = onDone
+        _catalog = State(initialValue: products)
+    }
 
     var body: some View {
         NavigationStack {
@@ -84,74 +114,95 @@ struct SimulatorSheet: View {
                         .font(.title.weight(.bold))
                     Text("Escolha o ritmo. O valor de cada aporte aparece para fechar o produto na data combinada.")
                         .foregroundStyle(Brand.inkMuted)
-                    labeled("Nome da meta") {
-                        TextField("Ex.: iPhone até o fim do ano", text: $name)
-                            .textFieldStyle(.plain)
+                    if created == nil {
+                        form
                     }
-                    labeled(locked == nil ? "Selecionar um produto do catálogo" : "Produto") {
-                        if let locked {
-                            Text(locked.productName)
-                        } else {
-                            Picker("Produto", selection: $productId) {
-                                Text("Escolha").tag(Optional<UUID>.none)
-                                ForEach(products) { product in
-                                    Text(product.name).tag(Optional(product.id))
-                                }
-                            }
-                        }
-                    }
-                    labeled("Data de início") {
-                        TextField("aaaa-mm-dd", text: $startDate)
-                            .textFieldStyle(.plain)
-                    }
-                    Text("Os aportes começam neste dia.")
-                        .font(.caption)
-                        .foregroundStyle(Brand.inkMuted)
-                    labeled("Data para concluir") {
-                        TextField("aaaa-mm-dd", text: $targetDate)
-                            .textFieldStyle(.plain)
-                    }
-                    Text("Precisa ser depois da data de início.")
-                        .font(.caption)
-                        .foregroundStyle(Brand.inkMuted)
-                    Text("Frequência").font(.subheadline.weight(.semibold))
-                    HStack {
-                        frequencyButton(.daily, "Diário")
-                        frequencyButton(.weekly, "Semanal")
-                        frequencyButton(.monthly, "Mensal")
-                    }
-                    Button("Simular") { simulate() }
-                        .buttonStyle(PrimaryButtonStyle())
                     if let message {
                         Text(message).foregroundStyle(Brand.danger)
                     }
-                    if let plan {
-                        result(plan)
-                        Button(busy ? "Criando meta..." : "Criar meta") {
+                    if let created {
+                        ContributionCalendarView(data: created.calendar)
+                        if createdReservation != nil {
+                            Button("Ver reserva") {
+                                Haptics.tap()
+                                onDone(createdReservation)
+                            }
+                            .buttonStyle(PrimaryButtonStyle(fill: Brand.accent))
+                        }
+                    } else if let plan {
+                        SimulatorPayoff(
+                            plan: plan,
+                            frequency: frequency,
+                            contributedCents: contributedCents,
+                            targetCents: targetCents,
+                            saving: busy,
+                            reduceMotion: reduceMotion
+                        ) {
                             Task { await create(plan) }
                         }
-                        .buttonStyle(PrimaryButtonStyle())
-                        .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
                 .padding(20)
+                .animation(.spring(response: 0.5, dampingFraction: 0.86), value: revealToken)
             }
             .background(Brand.backgroundSubtle)
             .navigationTitle("Simulador")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Fechar") { onDone() }
+                    Button("Fechar") { onDone(nil) }
                 }
             }
-            .onAppear {
+            .task { await prepare() }
+        }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            labeled("Nome da meta") {
+                TextField("Ex.: iPhone até o fim do ano", text: $name)
+                    .textFieldStyle(.plain)
+            }
+            labeled(locked == nil ? "Selecionar um produto do catálogo" : "Produto") {
                 if let locked {
-                    productId = locked.productId
-                    name = locked.productName
-                } else if productId == nil {
-                    productId = products.first?.id
+                    Text(locked.productName)
+                } else {
+                    Picker("Produto", selection: $productId) {
+                        Text("Escolha").tag(Optional<UUID>.none)
+                        ForEach(catalog) { product in
+                            Text(product.name).tag(Optional(product.id))
+                        }
+                    }
+                    .pickerStyle(.menu)
                 }
             }
+            labeled("Data de início") {
+                TextField("aaaa-mm-dd", text: $startDate)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            Text("Os aportes começam neste dia.")
+                .font(.caption)
+                .foregroundStyle(Brand.inkMuted)
+            labeled("Data para concluir") {
+                TextField("aaaa-mm-dd", text: $targetDate)
+                    .textFieldStyle(.plain)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+            }
+            Text("Precisa ser depois da data de início.")
+                .font(.caption)
+                .foregroundStyle(Brand.inkMuted)
+            Text("Frequência").font(.subheadline.weight(.semibold))
+            HStack {
+                frequencyButton(.daily, "Diário")
+                frequencyButton(.weekly, "Semanal")
+                frequencyButton(.monthly, "Mensal")
+            }
+            Button("Simular") { simulate() }
+                .buttonStyle(PrimaryButtonStyle())
         }
     }
 
@@ -167,36 +218,72 @@ struct SimulatorSheet: View {
     }
 
     private func frequencyButton(_ value: ContributionFrequency, _ title: String) -> some View {
-        Button(title) { frequency = value }
-            .font(.subheadline.weight(.semibold))
-            .frame(maxWidth: .infinity, minHeight: 44)
-            .background(frequency == value ? Brand.accentSoft : Brand.background)
-            .foregroundStyle(Brand.ink)
-            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .stroke(frequency == value ? Brand.accent : Brand.line, lineWidth: 1)
-            )
-            .accessibilityAddTraits(frequency == value ? .isSelected : AccessibilityTraits())
+        Button(title) {
+            frequency = value
+            Haptics.tap()
+        }
+        .font(.subheadline.weight(.semibold))
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .background(frequency == value ? Brand.accentSoft : Brand.background)
+        .foregroundStyle(Brand.ink)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(frequency == value ? Brand.accent : Brand.line, lineWidth: 1)
+        )
+        .accessibilityAddTraits(frequency == value ? .isSelected : AccessibilityTraits())
+    }
+
+    private var revealToken: String {
+        if created != nil { return "created" }
+        return plan?.dates.joined(separator: ",") ?? "form"
+    }
+
+    private func prepare() async {
+        if catalog.isEmpty {
+            catalog = (try? await Repository.products()) ?? []
+        }
+        if let locked {
+            productId = locked.productId
+            if name.isEmpty { name = locked.productName }
+        } else if productId == nil {
+            productId = catalog.first?.id
+        }
     }
 
     private func simulate() {
         message = nil
-        simulated = true
-        let target = locked?.listPriceCents ?? products.first { $0.id == productId }?.listPriceCents ?? 0
+        created = nil
+        Haptics.tap()
+        let start = startDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = targetDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let today = CivilDate.calendarToday()
+        if start < today {
+            plan = nil
+            message = "A data de início precisa ser hoje ou uma data futura."
+            return
+        }
+        let price = locked?.listPriceCents ?? catalog.first { $0.id == productId }?.listPriceCents ?? 0
         let contributed = locked?.contributedCents ?? 0
+        guard price > 0, productId != nil else {
+            plan = nil
+            message = "Escolha um produto do catálogo."
+            return
+        }
         do {
             let built = try ContributionPlanMath.build(
-                targetCents: Double(target),
+                targetCents: Double(price),
                 contributedCents: Double(contributed),
-                startDate: startDate.trimmingCharacters(in: .whitespacesAndNewlines),
-                endDate: targetDate.trimmingCharacters(in: .whitespacesAndNewlines),
+                startDate: start,
+                endDate: end,
                 frequency: frequency
             )
             if built.remainingCents <= 0 {
                 plan = nil
                 message = "Não há valor restante para aportar."
             } else {
+                targetCents = price
+                contributedCents = contributed
                 plan = built
             }
         } catch {
@@ -205,109 +292,193 @@ struct SimulatorSheet: View {
         }
     }
 
-    @ViewBuilder
-    private func result(_ plan: ContributionPlan) -> some View {
-        BrandCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(rhythm(plan))
-                    .font(.headline)
-                Text("\(Money.format(cents: plan.amountPerInstallmentCents)) por aporte")
-                    .font(.title2.weight(.bold))
-                if plan.lastInstallmentCents != plan.amountPerInstallmentCents {
-                    Text("Último aporte \(Money.format(cents: plan.lastInstallmentCents))")
-                        .foregroundStyle(Brand.inkMuted)
-                }
-                Text("De \(plan.dates.first ?? startDate) até \(plan.dates.last ?? targetDate)")
-                    .font(.subheadline)
-                    .foregroundStyle(Brand.inkMuted)
-            }
-        }
-    }
-
-    private func rhythm(_ plan: ContributionPlan) -> String {
-        let count = plan.installmentCount
-        switch frequency {
-        case .daily:
-            return count == 1 ? "1 dia" : "\(count) dias"
-        case .weekly:
-            return count == 1 ? "1 semana" : "\(count) semanas"
-        case .monthly:
-            return count == 1 ? "1 mês" : "\(count) meses"
-        }
-    }
-
     private func create(_ plan: ContributionPlan) async {
         guard let userId = session.profile?.id, let productId else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            message = "Dê um nome para a meta."
+            return
+        }
         busy = true
         defer { busy = false }
+        let start = startDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let end = targetDate.trimmingCharacters(in: .whitespacesAndNewlines)
         let draft = GoalDraft(
             existingId: nil,
             userId: userId,
             productId: productId,
             reservationId: locked?.reservationId,
-            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
-            targetDate: targetDate.trimmingCharacters(in: .whitespacesAndNewlines),
+            name: trimmed,
+            targetDate: end,
             reminderDay: nil,
-            amountCents: locked?.listPriceCents ?? plan.remainingCents,
-            installmentCents: plan.amountPerInstallmentCents,
+            amountCents: plan.remainingCents,
+            installmentCents: plan.amountPerInstallmentCents > 0 ? plan.amountPerInstallmentCents : plan.lastInstallmentCents,
             installmentsCount: plan.installmentCount,
             frequency: frequency.rawValue,
-            planStartDate: startDate.trimmingCharacters(in: .whitespacesAndNewlines),
+            planStartDate: start,
             whatsappPhone: nil
         )
         do {
-            try await Repository.saveGoal(draft)
-            onDone()
+            let saved = try await Repository.saveGoal(draft)
+            let schedule = try GoalScheduleMath.build(
+                name: trimmed,
+                amountCents: plan.remainingCents,
+                startDate: start,
+                targetDate: end,
+                frequency: frequency,
+                contributions: priorPayments,
+                today: CivilDate.calendarToday()
+            )
+            createdReservation = saved.reservationId
+            created = schedule
+            Haptics.success()
         } catch {
             message = describeError(error)
         }
     }
 }
 
-struct ClimbSceneView: View {
-    let percent: Double
-    let health: GoalHealth
-    @State private var phase = false
+private struct SimulatorPayoff: View {
+    let plan: ContributionPlan
+    let frequency: ContributionFrequency
+    let contributedCents: Int
+    let targetCents: Int
+    let saving: Bool
+    let reduceMotion: Bool
+    var onCreate: () -> Void
+    @State private var ring: Double
+    @State private var shownChips = 0
 
-    var body: some View {
-        let weather = ClimbJourney.journeyWeather(health: health, hour: hour, external: nil)
-        let progress = percent
-        let climbHealth = health
-        let accent = Brand.accent
-        let night = weather.phase == .night
-        TimelineView(.animation) { timeline in
-            let wobble = sin(timeline.date.timeIntervalSinceReferenceDate * 1.4)
-            Canvas { context, size in
-                let sky = night ? Color(red: 0.08, green: 0.12, blue: 0.22) : Color(red: 0.78, green: 0.88, blue: 0.98)
-                context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(sky))
-                var ridge = Path()
-                ridge.move(to: CGPoint(x: 0, y: size.height * 0.92))
-                ridge.addLine(to: CGPoint(x: size.width * 0.18, y: size.height * 0.72))
-                ridge.addLine(to: CGPoint(x: size.width * 0.42, y: size.height * 0.8))
-                ridge.addLine(to: CGPoint(x: size.width * 0.7, y: size.height * 0.48))
-                ridge.addLine(to: CGPoint(x: size.width, y: size.height * 0.62))
-                ridge.addLine(to: CGPoint(x: size.width, y: size.height))
-                ridge.addLine(to: CGPoint(x: 0, y: size.height))
-                context.fill(ridge, with: .color(Color(red: 0.55, green: 0.62, blue: 0.7)))
-                let point = ClimbJourney.trailPoint(progress / 100)
-                let x = point.x / 560 * size.width
-                let y = point.y / 360 * size.height + wobble * 3
-                let motion = ClimbJourney.climbMotion(climbHealth)
-                let radius: CGFloat = motion == .celebrate ? 16 : 12
-                let climber = CGRect(x: x - radius, y: y - radius * 2, width: radius * 2, height: radius * 2.4)
-                context.fill(Path(ellipseIn: climber), with: .color(accent))
-            }
-            .animation(.spring(response: 0.6, dampingFraction: 0.8), value: phase)
-        }
-        .frame(height: 280)
-        .clipShape(RoundedRectangle(cornerRadius: Brand.cardRadius, style: .continuous))
-        .accessibilityLabel("Cena da meta, \(Int(percent.rounded())) por cento")
-        .onAppear { phase = true }
+    init(
+        plan: ContributionPlan,
+        frequency: ContributionFrequency,
+        contributedCents: Int,
+        targetCents: Int,
+        saving: Bool,
+        reduceMotion: Bool,
+        onCreate: @escaping () -> Void
+    ) {
+        self.plan = plan
+        self.frequency = frequency
+        self.contributedCents = contributedCents
+        self.targetCents = targetCents
+        self.saving = saving
+        self.reduceMotion = reduceMotion
+        self.onCreate = onCreate
+        let paid = targetCents > 0 ? Double(contributedCents) / Double(targetCents) * 100 : 0
+        _ring = State(initialValue: reduceMotion ? 100 : paid)
+        _shownChips = State(initialValue: reduceMotion ? min(8, plan.dates.count) : 0)
     }
 
-    private var hour: Int {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = CivilDay.zone
-        return calendar.component(.hour, from: Date())
+    var body: some View {
+        let preview = Array(plan.dates.prefix(8))
+        let hidden = plan.dates.count - preview.count
+        let hero = plan.amountPerInstallmentCents > 0 ? plan.amountPerInstallmentCents : plan.lastInstallmentCents
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(alignment: .center, spacing: 16) {
+                ZStack {
+                    Circle().stroke(Color.white, lineWidth: 8)
+                    Circle()
+                        .trim(from: 0, to: max(0, min(1, ring / 100)))
+                        .stroke(Brand.accent, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                    VStack(spacing: 0) {
+                        Text("\(Int(ring.rounded()))%")
+                            .font(.headline.weight(.bold))
+                            .foregroundStyle(Brand.ink)
+                            .contentTransition(.numericText())
+                        Text("projeção")
+                            .font(.caption2.weight(.semibold))
+                            .tracking(1.2)
+                            .textCase(.uppercase)
+                            .foregroundStyle(Brand.inkMuted)
+                    }
+                }
+                .frame(width: 112, height: 112)
+                .animation(reduceMotion ? nil : .spring(response: 1.05, dampingFraction: 0.86), value: ring)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("Valor por aporte · \(PlanCopy.periodLabel(frequency))")
+                        .font(.caption.weight(.semibold))
+                        .tracking(1.1)
+                        .textCase(.uppercase)
+                        .foregroundStyle(Brand.accent)
+                    Text(Money.format(cents: hero))
+                        .font(.largeTitle.weight(.bold))
+                        .contentTransition(.numericText())
+                    Text(PlanCopy.summary(plan, frequency: frequency))
+                        .font(.subheadline)
+                        .foregroundStyle(Brand.inkMuted)
+                    Text("Você chega lá.")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(Brand.accent)
+                    if contributedCents > 0 {
+                        Text("Já aportado \(Money.format(cents: contributedCents)). O plano cobre os \(Money.format(cents: plan.remainingCents)) restantes.")
+                            .font(.subheadline)
+                            .foregroundStyle(Brand.inkMuted)
+                    }
+                    if plan.lastInstallmentCents != plan.amountPerInstallmentCents {
+                        Text("O último aporte fica em \(Money.format(cents: plan.lastInstallmentCents)) para fechar os centavos.")
+                            .font(.subheadline)
+                            .foregroundStyle(Brand.inkMuted)
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Sequência")
+                    .font(.caption.weight(.semibold))
+                    .tracking(1.1)
+                    .textCase(.uppercase)
+                    .foregroundStyle(Brand.inkMuted)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        ForEach(Array(preview.enumerated()), id: \.offset) { index, date in
+                            let chip = PlanCopy.chip(iso: date)
+                            VStack(spacing: 0) {
+                                Text(chip.day).font(.subheadline.weight(.bold))
+                                Text(chip.month).font(.caption2).textCase(.uppercase).foregroundStyle(Brand.inkMuted)
+                            }
+                            .frame(width: 56, height: 56)
+                            .background(Brand.background)
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(Brand.line, lineWidth: 1))
+                            .opacity(index < shownChips ? 1 : 0)
+                            .offset(y: index < shownChips ? 0 : 8)
+                        }
+                        if hidden > 0 {
+                            Text("+\(hidden)")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(Brand.inkMuted)
+                                .frame(width: 56, height: 56)
+                                .background(Brand.background)
+                                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                        }
+                    }
+                }
+            }
+            Button(saving ? "Criando meta..." : "Criar meta") { onCreate() }
+                .buttonStyle(PrimaryButtonStyle(fill: Brand.accent))
+                .disabled(saving)
+        }
+        .padding(20)
+        .background(Brand.backgroundSubtle)
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(RoundedRectangle(cornerRadius: 20, style: .continuous).stroke(Brand.line, lineWidth: 1))
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.spring(response: 1.05, dampingFraction: 0.86)) {
+                ring = 100
+            }
+        }
+        .task {
+            guard !reduceMotion, preview.count > 0 else { return }
+            for index in 1...preview.count {
+                if Task.isCancelled { return }
+                try? await Task.sleep(for: .milliseconds(45))
+                if Task.isCancelled { return }
+                withAnimation(.spring(response: 0.42, dampingFraction: 0.78)) {
+                    shownChips = index
+                }
+            }
+        }
     }
 }

@@ -237,8 +237,8 @@ enum Repository {
         return rows
     }
 
-    static func saveGoal(_ goal: GoalDraft) async throws {
-        _ = try await WebAPI.saveGoal(
+    static func saveGoal(_ goal: GoalDraft) async throws -> (goalId: UUID, reservationId: UUID?) {
+        let saved = try await WebAPI.saveGoal(
             WebAPI.GoalBody(
                 name: goal.name,
                 productId: goal.productId,
@@ -248,6 +248,7 @@ enum Repository {
                 reservationId: goal.reservationId
             )
         )
+        return (saved.goalId, saved.reservationId ?? goal.reservationId)
     }
 
     static func setGoalStatus(id: UUID, userId: UUID, status: String) async throws {

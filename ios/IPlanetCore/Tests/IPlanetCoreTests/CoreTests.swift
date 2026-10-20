@@ -147,6 +147,103 @@ final class CoreTests: XCTestCase {
             "Rua Joaquim Floriano, 466 · São Paulo/SP · CEP 04534-002"
         )
         XCTAssertEqual(MoneyFormat.centsBRL(10_000).contains("100"), true)
+        XCTAssertFalse(MoneyFormat.reais(10_000).contains(","))
+        XCTAssertTrue(MoneyFormat.reais(79990).contains("799,90") || MoneyFormat.reais(79990).contains("799.90"))
+    }
+
+    func testSimulatorCopyAndCentRemainder() throws {
+        let plan = try ContributionPlanMath.build(
+            targetCents: 799_900,
+            contributedCents: 0,
+            startDate: "2026-11-19",
+            endDate: "2027-02-19",
+            frequency: .monthly
+        )
+        XCTAssertEqual(plan.installmentCount, 4)
+        let three = try ContributionPlanMath.build(
+            targetCents: 799_900,
+            contributedCents: 0,
+            startDate: "2026-01-01",
+            endDate: "2026-01-03",
+            frequency: .daily
+        )
+        XCTAssertEqual(three.amountPerInstallmentCents, 266_633)
+        XCTAssertEqual(three.lastInstallmentCents, 266_634)
+        XCTAssertEqual(PlanCopy.longDate("2027-02-19"), "19 de fev. de 2027")
+        XCTAssertEqual(PlanCopy.rhythmLabel(.monthly, count: 5), "mensais")
+        XCTAssertEqual(PlanCopy.periodLabel(.monthly), "por mês")
+        XCTAssertEqual(PlanCopy.summary(plan, frequency: .monthly), "4 aportes mensais até 19 de fev. de 2027")
+        XCTAssertEqual(PlanCopy.chip(iso: "2027-02-19").month, "fev")
+        XCTAssertEqual(PlanCopy.dayMonth("2026-11-19"), "19 de nov")
+        XCTAssertEqual(
+            PlanCopy.calendarPayoff(health: .late, dues: []),
+            "Tem aporte em atraso. Os dias ficam marcados."
+        )
+        XCTAssertEqual(PlanCopy.calendarPayoff(health: .onTrack, dues: []), "Você chega lá.")
+        XCTAssertEqual(PlanCopy.depositPhrase(.pending), "a vencer")
+    }
+
+    func testGoalScheduleIgnoresPaymentsBeforeTheStart() throws {
+        let schedule = try GoalScheduleMath.build(
+            name: "iPhone",
+            amountCents: 30_000,
+            startDate: "2026-11-01",
+            targetDate: "2027-01-01",
+            frequency: .monthly,
+            contributions: [
+                PlanContribution(paidOn: "2026-10-01", amountCents: 50_000),
+                PlanContribution(paidOn: "2026-11-01", amountCents: 15_000),
+            ],
+            today: "2026-11-15"
+        )
+        XCTAssertEqual(schedule.savedCents, 15_000)
+        XCTAssertEqual(schedule.applied[0].paid, true)
+        XCTAssertEqual(schedule.applied[1].dueCents, 5_000)
+        XCTAssertEqual(schedule.applied[1].antecipado, true)
+        XCTAssertEqual(schedule.applied[2].dueCents, 10_000)
+        XCTAssertEqual(schedule.calendar.dues[1].note, "Antecipado")
+        XCTAssertEqual(schedule.calendar.heroLabel, "Próximo aporte")
+        let cells = GoalScheduleMath.monthCells(year: 2026, month: 11)
+        XCTAssertEqual(cells[6], "2026-11-01")
+        XCTAssertNil(cells[0])
+    }
+
+    func testWeatherAdjustsWithGoalHealthAndTheSkyFollowsTheClock() {
+        XCTAssertEqual(WeatherAdjust.wmoKind(0), .clear)
+        XCTAssertEqual(WeatherAdjust.wmoKind(61), .rain)
+        XCTAssertEqual(WeatherAdjust.wmoKind(95), .storm)
+        XCTAssertEqual(WeatherAdjust.wmoKind(86), .blizzard)
+        let pleasant = WeatherAdjust.effective(
+            Forecast(kind: .rain, temperatureC: 22, windKmh: 10, localHour: 15, sunrise: 6, sunset: 18),
+            status: .onTrack
+        )
+        XCTAssertEqual(pleasant.kind, .partlyCloudy)
+        let worse = WeatherAdjust.effective(
+            Forecast(kind: .clear, temperatureC: 22, windKmh: 8, localHour: 15, sunrise: 6, sunset: 18),
+            status: .nearLate
+        )
+        XCTAssertEqual(worse.kind, .partlyCloudy)
+        XCTAssertGreaterThanOrEqual(worse.wind, 0.45)
+        let storm = WeatherAdjust.effective(
+            Forecast(kind: .clear, temperatureC: 20, windKmh: 4, localHour: 15, sunrise: 6, sunset: 18),
+            status: .late
+        )
+        XCTAssertEqual(storm.kind, .storm)
+        XCTAssertEqual(storm.temperatureC, 6)
+        let blizzard = WeatherAdjust.effective(
+            Forecast(kind: .rain, temperatureC: 8, windKmh: 4, localHour: 15, sunrise: 6, sunset: 18),
+            status: .late
+        )
+        XCTAssertEqual(blizzard.kind, .blizzard)
+        let day = SkyMath.compute(hour: 14, sunrise: 6, sunset: 18, kind: .clear)
+        let night = SkyMath.compute(hour: 22, sunrise: 6, sunset: 18, kind: .clear)
+        XCTAssertFalse(day.isNight)
+        XCTAssertGreaterThan(day.sunOpacity, 0.5)
+        XCTAssertTrue(night.isNight)
+        XCTAssertGreaterThan(night.starsOpacity, 0.4)
+        let trail = ClimbSceneMath.portraitTrail()
+        XCTAssertGreaterThan(trail.point(at: 0).y, trail.point(at: 1).y)
+        XCTAssertFalse(ClimbSceneMath.portraitOutline().isEmpty)
     }
 }
 

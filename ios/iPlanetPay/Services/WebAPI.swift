@@ -293,10 +293,15 @@ enum WebAPI {
         )
     }
 
-    static func saveGoal(_ body: GoalBody) async throws -> UUID {
+    struct SavedGoal: Sendable {
+        var goalId: UUID
+        var reservationId: UUID?
+    }
+
+    static func saveGoal(_ body: GoalBody) async throws -> SavedGoal {
         let response: StatusResponse = try await post(path: "/api/goals", body: body, authorize: true)
         guard let id = response.goalId else { throw Failure(message: "A meta não foi criada.") }
-        return id
+        return SavedGoal(goalId: id, reservationId: response.reservationId)
     }
 
     static func requestWithdrawal(_ body: WithdrawalBody) async throws {

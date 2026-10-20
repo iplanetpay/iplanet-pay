@@ -212,6 +212,7 @@ private func jsonText(_ value: AnyJSON?) -> String? {
 final class AppRouter {
     var reservationID: UUID?
     var goalID: UUID?
+    var requestPixReservationID: UUID?
     var selectedTab: AppTab = .home
     var authMessage: String?
     var overlay: AppOverlay?

@@ -116,6 +116,29 @@ struct StatusPill: View {
     }
 }
 
+struct LoadingSkeleton: View {
+    var lines: Int = 3
+    @State private var pulse = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            ForEach(0..<lines, id: \.self) { index in
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Brand.line.opacity(pulse ? 0.35 : 0.8))
+                    .frame(height: index == 0 ? 22 : 14)
+                    .frame(maxWidth: index == lines - 1 ? 160 : .infinity, alignment: .leading)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Brand.background)
+        .clipShape(RoundedRectangle(cornerRadius: Brand.cardRadius, style: .continuous))
+        .accessibilityLabel("Carregando")
+        .onAppear { pulse = true }
+        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+    }
+}
+
 struct EmptyPane: View {
     let title: String
     let message: String

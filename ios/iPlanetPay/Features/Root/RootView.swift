@@ -96,6 +96,8 @@ struct ClientShell: View {
                 .tabItem { Label("Conta", systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
+        .toolbarBackground(.visible, for: .tabBar)
+        .toolbarBackground(.ultraThinMaterial, for: .tabBar)
         .safeAreaInset(edge: .top, spacing: 0) {
             ClientHeader()
         }

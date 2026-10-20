@@ -21,25 +21,32 @@ struct ProgressRing: View {
     var caption: String
     var tint: Color = Brand.accent
     var size: CGFloat = 112
+    var numberColor: Color = Brand.ink
+
+    private var line: CGFloat { max(3, size * 0.08) }
 
     var body: some View {
         ZStack {
             Circle()
-                .stroke(Brand.line, lineWidth: 8)
+                .stroke(Brand.line, lineWidth: line)
             Circle()
                 .trim(from: 0, to: max(0, min(1, percent / 100)))
-                .stroke(tint, style: StrokeStyle(lineWidth: 8, lineCap: .round))
+                .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
                 Text("\(Int(percent.rounded()))%")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Brand.ink)
-                Text(caption)
-                    .font(.caption)
-                    .foregroundStyle(Brand.inkMuted)
+                    .font(size < 48.0 ? .caption2.weight(.bold) : .title3.weight(.bold))
+                    .foregroundStyle(numberColor)
+                    .contentTransition(.numericText())
+                if !caption.isEmpty {
+                    Text(caption)
+                        .font(.caption)
+                        .foregroundStyle(Brand.inkMuted)
+                }
             }
         }
         .frame(width: size, height: size)
+        .animation(.spring(response: 0.7, dampingFraction: 0.85), value: percent)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(caption), \(Int(percent.rounded())) por cento")
     }
@@ -109,22 +116,19 @@ struct ReservationGoalCard: View {
 
     var body: some View {
         let snapshot = GoalSnapshot.make(goal: goal, reservation: reservation, contributions: contributions)
-        BrandCard {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Meta").font(.title3.weight(.bold))
-                Text(goal.name).font(.headline)
-                StatusPill(text: snapshot.status.label, tone: snapshot.tone)
-                Text(snapshot.status.message)
-                    .font(.subheadline)
-                    .foregroundStyle(Brand.inkMuted)
-                Text("\(Money.format(cents: snapshot.savedCents)) de \(Money.format(cents: snapshot.targetCents))")
-                Button("Ver meta") {
-                    router.goalID = goal.id
-                    router.selectedTab = .goals
-                }
-                .frame(minHeight: 44)
+        VStack(alignment: .leading, spacing: 12) {
+            if let schedule = snapshot.schedule {
+                ContributionCalendarView(data: schedule.calendar)
             }
+            Button("Ver meta") {
+                router.goalID = goal.id
+                router.selectedTab = .goals
+                router.reservationID = nil
+            }
+            .buttonStyle(SecondaryButtonStyle())
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityHint(reservation.product?.name ?? goal.name)
     }
 }
 

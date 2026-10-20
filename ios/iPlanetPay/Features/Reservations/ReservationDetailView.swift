@@ -8,6 +8,7 @@ import UniformTypeIdentifiers
 struct ReservationDetailView: View {
     let reservationID: UUID
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @State private var reservation: ReservationRow?
     @State private var contributions: [Contribution] = []
     @State private var offers: [UsedDeviceOffer] = []
@@ -28,7 +29,7 @@ struct ReservationDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if loading && reservation == nil {
-                    ProgressView()
+                    LoadingSkeleton(lines: 5)
                 }
                 if let reservation {
                     content(reservation)
@@ -48,6 +49,10 @@ struct ReservationDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .refreshable { await load() }
         .task { await load() }
+        .onChange(of: router.requestPixReservationID) { _, id in
+            openPixIfRequested(id)
+        }
+        .onAppear { openPixIfRequested(router.requestPixReservationID) }
         .sheet(isPresented: $showAporte) {
             if let reservation {
                 AporteSheet(reservation: reservation) {
@@ -85,8 +90,9 @@ struct ReservationDetailView: View {
                         productName: reservation.product?.name ?? "Produto da reserva",
                         listPriceCents: reservation.listPriceCents,
                         contributedCents: reservation.amountPaidCents
-                    )
-                ) {
+                    ),
+                    priorPayments: GoalLinks.paid(contributions)
+                ) { _ in
                     showSimulator = false
                     Task { await load() }
                 }
@@ -119,8 +125,10 @@ struct ReservationDetailView: View {
         Text("Total: \(Money.format(cents: reservation.listPriceCents))")
         Text("Pago: \(Money.format(cents: reservation.amountPaidCents))")
             .font(.headline)
+            .contentTransition(.numericText())
         Text("Restante: \(Money.format(cents: reservation.remainingCents))")
             .foregroundStyle(Brand.inkMuted)
+            .contentTransition(.numericText())
         if let created = reservation.createdAt {
             Text("Criada em \(DatesPT.medium(created))")
                 .font(.subheadline)
@@ -128,7 +136,8 @@ struct ReservationDetailView: View {
         }
         aporteBlock(reservation)
         if reservation.status == "ativa" {
-            Button("Simulador de aportes") { showSimulator = true }
+            let goalName = goals.first { $0.reservationId == reservation.id }?.name
+            Button(goalName ?? "Simulador de aportes") { showSimulator = true }
                 .buttonStyle(SecondaryButtonStyle())
             Button("Trocar aparelho") { showSwitch = true }
                 .buttonStyle(SecondaryButtonStyle())
@@ -325,6 +334,12 @@ struct ReservationDetailView: View {
                 return
             }
         }
+    }
+
+    private func openPixIfRequested(_ id: UUID?) {
+        guard id == reservationID else { return }
+        showAporte = true
+        router.requestPixReservationID = nil
     }
 
     private func load() async {
