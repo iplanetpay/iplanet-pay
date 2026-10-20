@@ -227,9 +227,12 @@ struct SimulatorSheet: View {
     private func rhythm(_ plan: ContributionPlan) -> String {
         let count = plan.installmentCount
         switch frequency {
-        case .daily: count == 1 ? "1 dia" : "\(count) dias"
-        case .weekly: count == 1 ? "1 semana" : "\(count) semanas"
-        case .monthly: count == 1 ? "1 mês" : "\(count) meses"
+        case .daily:
+            return count == 1 ? "1 dia" : "\(count) dias"
+        case .weekly:
+            return count == 1 ? "1 semana" : "\(count) semanas"
+        case .monthly:
+            return count == 1 ? "1 mês" : "\(count) meses"
         }
     }
 
@@ -268,10 +271,14 @@ struct ClimbSceneView: View {
 
     var body: some View {
         let weather = ClimbJourney.journeyWeather(health: health, hour: hour, external: nil)
+        let progress = percent
+        let climbHealth = health
+        let accent = Brand.accent
+        let night = weather.phase == .night
         TimelineView(.animation) { timeline in
             let wobble = sin(timeline.date.timeIntervalSinceReferenceDate * 1.4)
             Canvas { context, size in
-                let sky = weather.phase == .night ? Color(red: 0.08, green: 0.12, blue: 0.22) : Color(red: 0.78, green: 0.88, blue: 0.98)
+                let sky = night ? Color(red: 0.08, green: 0.12, blue: 0.22) : Color(red: 0.78, green: 0.88, blue: 0.98)
                 context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(sky))
                 var ridge = Path()
                 ridge.move(to: CGPoint(x: 0, y: size.height * 0.92))
@@ -282,13 +289,13 @@ struct ClimbSceneView: View {
                 ridge.addLine(to: CGPoint(x: size.width, y: size.height))
                 ridge.addLine(to: CGPoint(x: 0, y: size.height))
                 context.fill(ridge, with: .color(Color(red: 0.55, green: 0.62, blue: 0.7)))
-                let point = ClimbJourney.trailPoint(percent / 100)
+                let point = ClimbJourney.trailPoint(progress / 100)
                 let x = point.x / 560 * size.width
                 let y = point.y / 360 * size.height + wobble * 3
-                let motion = ClimbJourney.climbMotion(health)
+                let motion = ClimbJourney.climbMotion(climbHealth)
                 let radius: CGFloat = motion == .celebrate ? 16 : 12
-                let body = CGRect(x: x - radius, y: y - radius * 2, width: radius * 2, height: radius * 2.4)
-                context.fill(Path(ellipseIn: body), with: .color(Brand.accent))
+                let climber = CGRect(x: x - radius, y: y - radius * 2, width: radius * 2, height: radius * 2.4)
+                context.fill(Path(ellipseIn: climber), with: .color(accent))
             }
             .animation(.spring(response: 0.6, dampingFraction: 0.8), value: phase)
         }

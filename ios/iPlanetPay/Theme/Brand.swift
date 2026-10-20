@@ -81,7 +81,7 @@ struct StatusPill: View {
     let text: String
     var tone: PillTone = .accent
 
-    enum PillTone {
+    enum PillTone: Sendable {
         case accent, success, danger, lavender, neutral
     }
 
