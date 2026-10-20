@@ -15,6 +15,10 @@ struct RootView: View {
             case .signedIn:
                 if session.profile == nil {
                     profileFailure
+                } else if session.needsIdentityOnboarding {
+                    NavigationStack {
+                        ProfileView(onboarding: true)
+                    }
                 } else if session.isAdmin && !session.prefersClientShell {
                     AdminView()
                 } else {

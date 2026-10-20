@@ -21,6 +21,7 @@ ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = Accent
 CODE_SIGN_STYLE = Automatic
 CODE_SIGNING_REQUIRED = YES
 CODE_SIGNING_ALLOWED = YES
+CODE_SIGN_ENTITLEMENTS = iPlanetPay/iPlanetPay.entitlements
 // Simulator signs locally with an empty Team. A physical device still needs a Team in Xcode.
 CODE_SIGN_IDENTITY[sdk=iphonesimulator*] = -
 

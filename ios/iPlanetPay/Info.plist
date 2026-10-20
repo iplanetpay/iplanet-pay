@@ -58,7 +58,23 @@
 				<string>iplanetpay</string>
 			</array>
 		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>google-signin</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
+			</array>
+		</dict>
 	</array>
+	<key>GIDClientID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>GOOGLE_IOS_CLIENT_ID</key>
+	<string>$(GOOGLE_IOS_CLIENT_ID)</string>
+	<key>GOOGLE_IOS_REVERSED_CLIENT_ID</key>
+	<string>$(GOOGLE_IOS_REVERSED_CLIENT_ID)</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>A iPlanet Pay usa suas fotos para o avatar e para a avaliação de aparelhos usados.</string>
 	<key>SUPABASE_URL</key>

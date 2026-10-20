@@ -1,6 +1,8 @@
 import AuthenticationServices
+import GoogleSignIn
 import Supabase
 import SwiftUI
+import UIKit
 
 struct AuthView: View {
     @Environment(SessionStore.self) private var session
@@ -21,13 +23,21 @@ struct AuthView: View {
     @State private var acceptWithdrawal = false
     @State private var acceptRaffle = false
     @State private var message: String?
+    @State private var noticeTone: NoticeTone = .error
     @State private var busy = false
     @State private var showTerms = false
+    @State private var appleRawNonce = ""
+    @Environment(\.colorScheme) private var colorScheme
 
     private enum Mode: String, CaseIterable, Identifiable {
         case login = "Entrar"
         case signup = "Criar conta"
         var id: String { rawValue }
+    }
+
+    private enum NoticeTone {
+        case error
+        case info
     }
 
     var body: some View {
@@ -55,7 +65,7 @@ struct AuthView: View {
                     if let text = message ?? router.authMessage {
                         Text(text)
                             .font(.callout)
-                            .foregroundStyle(Brand.danger)
+                            .foregroundStyle(message != nil && noticeTone == .info ? Brand.success : Brand.danger)
                     }
                     if mode == .signup {
                         signupFields
@@ -82,6 +92,19 @@ struct AuthView: View {
                         Task { await google() }
                     }
                     .buttonStyle(SecondaryButtonStyle())
+                    .disabled(busy)
+                    SignInWithAppleButton(.continue) { request in
+                        let raw = AppleNonce.make()
+                        appleRawNonce = raw
+                        request.requestedScopes = [.fullName, .email]
+                        request.nonce = AppleNonce.sha256(raw)
+                    } onCompletion: { result in
+                        Task { await finishApple(result) }
+                    }
+                    .signInWithAppleButtonStyle(colorScheme == .dark ? .white : .black)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 50)
+                    .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .disabled(busy)
                     if mode == .login {
                         Button("Esqueci minha senha") {
@@ -148,7 +171,7 @@ struct AuthView: View {
         defer { busy = false }
         let cleaned = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard cleaned.contains("@"), password.count >= 6 else {
-            message = "Informe e-mail e senha com pelo menos 6 caracteres."
+            show("Informe e-mail e senha com pelo menos 6 caracteres.")
             return
         }
         do {
@@ -158,13 +181,13 @@ struct AuthView: View {
                 try await signUp(email: cleaned)
             }
         } catch {
-            message = describeError(error)
+            show(describeError(error))
         }
     }
 
     private func signUp(email: String) async throws {
         guard acceptTerms, acceptWithdrawal, acceptRaffle else {
-            message = "Marque todos os aceites dos Termos de Uso para criar a conta."
+            show("Marque todos os aceites dos Termos de Uso para criar a conta.")
             return
         }
         let phoneValue = BrazilPhone.normalize(phone)
@@ -178,9 +201,10 @@ struct AuthView: View {
             birth: DatesPT.isoDay(birthDate)
         )
         if let missing {
-            message = missing
+            show(missing)
             return
         }
+        let acceptedAt = ISO8601DateFormatter().string(from: Date())
         let response = try await SupabaseService.client.auth.signUp(
             email: email,
             password: password,
@@ -190,31 +214,35 @@ struct AuthView: View {
             ],
             redirectTo: AppConfig.authRedirectURL
         )
+        let pending = PendingEmailSignup(
+            email: email,
+            fullName: fullName.trimmingCharacters(in: .whitespacesAndNewlines),
+            phone: phoneValue ?? "",
+            cpf: BrazilID.normalizeCPF(cpf) ?? "",
+            city: city.trimmingCharacters(in: .whitespacesAndNewlines),
+            state: state,
+            address: address.trimmingCharacters(in: .whitespacesAndNewlines),
+            addressNumber: addressNumber.trimmingCharacters(in: .whitespacesAndNewlines),
+            birthDate: DatesPT.isoDay(birthDate),
+            referralCode: referralCode.trimmingCharacters(in: .whitespacesAndNewlines),
+            termsAcceptedAt: acceptedAt,
+            termsVersion: LegalCopy.termsVersion
+        )
         guard response.session != nil else {
-            message = "Conta criada. Confirme o e-mail para entrar. O link abre este app se o redirect iplanetpay://auth-callback estiver liberado no Supabase."
+            PendingEmailSignupStore.save(pending)
+            show(
+                "Conta criada. Enviamos um e-mail de confirmação. Abra o link nesse e-mail para entrar — ele abre o app em iplanetpay://auth-callback. CPF, endereço e termos ficam salvos neste aparelho e entram no perfil quando você confirmar.",
+                tone: .info
+            )
             mode = .login
             return
         }
         let userId = response.user.id
-        try await Repository.updateProfile(
-            id: userId,
-            fields: [
-                "full_name": fullName.trimmingCharacters(in: .whitespacesAndNewlines),
-                "phone": phoneValue,
-                "cpf": BrazilID.normalizeCPF(cpf),
-                "city": city.trimmingCharacters(in: .whitespacesAndNewlines),
-                "state": state,
-                "address": address.trimmingCharacters(in: .whitespacesAndNewlines),
-                "address_number": addressNumber.trimmingCharacters(in: .whitespacesAndNewlines),
-                "birth_date": DatesPT.isoDay(birthDate),
-                "terms_version": LegalCopy.termsVersion,
-                "terms_accepted_at": ISO8601DateFormatter().string(from: Date()),
-            ]
-        )
-        let code = referralCode.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !code.isEmpty {
-            try? await Repository.applyReferral(code: code)
+        try await Repository.updateProfile(id: userId, fields: pending.profileFields)
+        if !pending.referralCode.isEmpty {
+            try? await Repository.applyReferral(code: pending.referralCode)
         }
+        PendingEmailSignupStore.clear()
         await session.refreshProfile()
     }
 
@@ -222,21 +250,110 @@ struct AuthView: View {
         busy = true
         defer { busy = false }
         do {
-            try await SupabaseService.client.auth.signInWithOAuth(
-                provider: .google,
-                redirectTo: AppConfig.authRedirectURL
-            )
+            if let clientID = AppConfig.googleIOSClientID {
+                try await googleNative(clientID: clientID)
+            } else {
+                try await SupabaseService.client.auth.signInWithOAuth(
+                    provider: .google,
+                    redirectTo: AppConfig.authRedirectURL,
+                    scopes: "openid email profile",
+                    queryParams: [(name: "prompt", value: "consent select_account")]
+                )
+            }
         } catch {
-            let text = describeError(error)
-            if text.localizedCaseInsensitiveContains("cancel") { return }
-            message = text
+            if isCancellation(error) { return }
+            show(describeError(error))
         }
+    }
+
+    private func googleNative(clientID: String) async throws {
+        guard let presenter = topViewController() else {
+            show("Não foi possível abrir o login do Google.")
+            return
+        }
+        GIDSignIn.sharedInstance.configuration = GIDConfiguration(clientID: clientID)
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            GIDSignIn.sharedInstance.configure { _ in
+                continuation.resume()
+            }
+        }
+        let rawNonce = AppleNonce.make()
+        let result = try await GIDSignIn.sharedInstance.signIn(
+            withPresenting: presenter,
+            hint: nil,
+            additionalScopes: nil,
+            nonce: AppleNonce.sha256(rawNonce)
+        )
+        guard let idToken = result.user.idToken?.tokenString else {
+            show("O Google não devolveu um token de identidade.")
+            return
+        }
+        session.pendingProviderName = result.user.profile?.name ?? ""
+        _ = try await SupabaseService.client.auth.signInWithIdToken(
+            credentials: OpenIDConnectCredentials(
+                provider: .google,
+                idToken: idToken,
+                accessToken: result.user.accessToken.tokenString,
+                nonce: rawNonce
+            )
+        )
+    }
+
+    private func finishApple(_ result: Result<ASAuthorization, Error>) async {
+        busy = true
+        defer { busy = false }
+        switch result {
+        case .failure(let error):
+            if isCancellation(error) { return }
+            show(appleSignInMessage(error))
+        case .success(let authorization):
+            guard let credential = authorization.credential as? ASAuthorizationAppleIDCredential,
+                  let tokenData = credential.identityToken,
+                  let idToken = String(data: tokenData, encoding: .utf8) else {
+                show("A Apple não devolveu um token de identidade.")
+                return
+            }
+            let rawNonce = appleRawNonce
+            guard !rawNonce.isEmpty else {
+                show("Não foi possível validar o login com a Apple. Tente de novo.")
+                return
+            }
+            session.pendingProviderName = appleDisplayName(credential.fullName)
+            do {
+                _ = try await SupabaseService.client.auth.signInWithIdToken(
+                    credentials: OpenIDConnectCredentials(
+                        provider: .apple,
+                        idToken: idToken,
+                        nonce: rawNonce
+                    )
+                )
+            } catch {
+                if isCancellation(error) { return }
+                show(appleSignInMessage(error))
+            }
+        }
+    }
+
+    private func appleDisplayName(_ name: PersonNameComponents?) -> String {
+        guard let name else { return "" }
+        return PersonNameComponentsFormatter().string(from: name)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func topViewController() -> UIViewController? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let window = scenes.flatMap(\.windows).first { $0.isKeyWindow } ?? scenes.first?.windows.first
+        var controller = window?.rootViewController
+        while let presented = controller?.presentedViewController {
+            controller = presented
+        }
+        return controller
     }
 
     private func reset() async {
         let cleaned = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard cleaned.contains("@") else {
-            message = "Informe o e-mail para recuperar a senha."
+            show("Informe o e-mail para recuperar a senha.")
             return
         }
         do {
@@ -244,11 +361,45 @@ struct AuthView: View {
                 cleaned,
                 redirectTo: AppConfig.authRedirectURL
             )
-            message = "Enviamos o link de recuperação. Ele abre o app se o redirect estiver liberado no Supabase."
+            show(
+                "Enviamos o link de recuperação. Ele abre o app em iplanetpay://auth-callback.",
+                tone: .info
+            )
         } catch {
-            message = describeError(error)
+            show(describeError(error))
         }
     }
+
+    private func show(_ text: String, tone: NoticeTone = .error) {
+        message = text
+        noticeTone = tone
+    }
+}
+
+private func appleSignInMessage(_ error: Error) -> String {
+    let described = describeError(error)
+    let blob = (described + "\n" + String(describing: error)).lowercased()
+    let providerDisabled = blob.contains("not enabled")
+        || blob.contains("provider is disabled")
+        || blob.contains("unsupported provider")
+        || blob.contains("appleid.apple.com")
+    if providerDisabled {
+        return "O login com a Apple ainda não está disponível. Use e-mail ou Google por enquanto. Quando a conta Apple Developer estiver pronta, ative o provedor Apple no Supabase e tente de novo."
+    }
+    return described
+}
+
+private func isCancellation(_ error: Error) -> Bool {
+    if let auth = error as? ASAuthorizationError, auth.code == .canceled { return true }
+    let nsError = error as NSError
+    if nsError.domain == kGIDSignInErrorDomain, nsError.code == GIDSignInError.canceled.rawValue {
+        return true
+    }
+    if nsError.domain == ASWebAuthenticationSessionError.errorDomain,
+       nsError.code == ASWebAuthenticationSessionError.canceledLogin.rawValue {
+        return true
+    }
+    return nsError.localizedDescription.localizedCaseInsensitiveContains("cancel")
 }
 
 func identityMessage(

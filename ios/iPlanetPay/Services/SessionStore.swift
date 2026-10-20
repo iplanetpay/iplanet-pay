@@ -1,4 +1,5 @@
 import Foundation
+import GoogleSignIn
 import Supabase
 
 @MainActor
@@ -14,7 +15,9 @@ final class SessionStore {
     private(set) var profile: Profile?
     private(set) var email: String = ""
     private(set) var signedInWithGoogle = false
+    private(set) var signedInWithApple = false
     private(set) var profileError: String?
+    var pendingProviderName = ""
     var needsPasswordUpdate = false
     var prefersClientShell = false
     private var started = false
@@ -22,6 +25,11 @@ final class SessionStore {
     var userId: UUID? { profile?.id }
     var role: UserRole { profile?.userRole ?? .cliente }
     var isAdmin: Bool { role == .admin }
+    var signedInWithSocial: Bool { signedInWithGoogle || signedInWithApple }
+    var needsIdentityOnboarding: Bool {
+        guard let profile, role == .cliente, signedInWithSocial else { return false }
+        return !profile.identityComplete
+    }
 
     init() {
         Task { await observe() }
@@ -36,8 +44,9 @@ final class SessionStore {
     }
 
     func refreshProfile() async {
-        guard let id = profile?.id ?? currentSessionUserId else { return }
-        await loadProfile(userId: id, fallbackName: profile?.fullName ?? "")
+        guard let user = SupabaseService.client.auth.currentUser else { return }
+        let fallback = profile?.fullName ?? Self.metadataName(user)
+        await loadProfile(userId: user.id, fallbackName: fallback, accountEmail: user.email ?? email)
     }
 
     func signOut() async {
@@ -46,16 +55,15 @@ final class SessionStore {
         } catch {
             profileError = describeError(error)
         }
+        GIDSignIn.sharedInstance.signOut()
         profile = nil
         email = ""
         signedInWithGoogle = false
+        signedInWithApple = false
+        pendingProviderName = ""
         needsPasswordUpdate = false
         prefersClientShell = false
         phase = .signedOut
-    }
-
-    private var currentSessionUserId: UUID? {
-        profile?.id
     }
 
     private func apply(event: AuthChangeEvent, session: Session?) async {
@@ -67,20 +75,34 @@ final class SessionStore {
                 return
             }
             email = session.user.email ?? ""
-            signedInWithGoogle = Self.usesGoogle(session.user)
-            let name = Self.metadataName(session.user)
-            await loadProfile(userId: session.user.id, fallbackName: name)
+            signedInWithGoogle = Self.usesProvider(session.user, "google")
+            signedInWithApple = Self.usesProvider(session.user, "apple")
+            let metadataName = Self.metadataName(session.user)
+            let name = metadataName.isEmpty ? pendingProviderName : metadataName
+            await loadProfile(
+                userId: session.user.id,
+                fallbackName: name,
+                accountEmail: session.user.email ?? ""
+            )
             await syncAvatarIfNeeded(user: session.user)
         case .passwordRecovery:
             needsPasswordUpdate = true
             if let session {
                 email = session.user.email ?? ""
-                await loadProfile(userId: session.user.id, fallbackName: Self.metadataName(session.user))
+                signedInWithGoogle = Self.usesProvider(session.user, "google")
+                signedInWithApple = Self.usesProvider(session.user, "apple")
+                await loadProfile(
+                    userId: session.user.id,
+                    fallbackName: Self.metadataName(session.user),
+                    accountEmail: session.user.email ?? ""
+                )
             }
         case .signedOut, .userDeleted:
             profile = nil
             email = ""
             signedInWithGoogle = false
+            signedInWithApple = false
+            pendingProviderName = ""
             needsPasswordUpdate = false
             phase = .signedOut
         @unknown default:
@@ -88,9 +110,20 @@ final class SessionStore {
         }
     }
 
-    private func loadProfile(userId: UUID, fallbackName: String) async {
+    private func loadProfile(userId: UUID, fallbackName: String, accountEmail: String) async {
         do {
-            let loaded = try await Repository.ensureProfile(id: userId, fullName: fallbackName)
+            var loaded = try await Repository.ensureProfile(id: userId, fullName: fallbackName)
+            let stored = loaded.fullName.trimmingCharacters(in: .whitespacesAndNewlines)
+            let incoming = fallbackName.trimmingCharacters(in: .whitespacesAndNewlines)
+            if stored.isEmpty, !incoming.isEmpty {
+                try await Repository.updateProfile(id: userId, fields: ["full_name": incoming])
+                try? await SupabaseService.client.auth.update(
+                    user: UserAttributes(data: ["full_name": .string(incoming)])
+                )
+                loaded.fullName = incoming
+                pendingProviderName = ""
+            }
+            loaded = try await applyPendingEmailSignup(userId: userId, accountEmail: accountEmail, profile: loaded)
             profile = loaded
             profileError = nil
             phase = .signedIn
@@ -98,6 +131,45 @@ final class SessionStore {
             profileError = describeError(error)
             phase = .signedIn
         }
+    }
+
+    /// Writes the signup form after the confirmation link creates a session.
+    private func applyPendingEmailSignup(userId: UUID, accountEmail: String, profile: Profile) async throws -> Profile {
+        guard let pending = PendingEmailSignupStore.load() else { return profile }
+        guard pending.email.caseInsensitiveCompare(accountEmail) == .orderedSame else { return profile }
+        var current = profile
+        let needsIdentity = !current.identityComplete
+        let needsTerms = current.termsAcceptedAt == nil
+        if needsIdentity || needsTerms {
+            var fields: [String: String?] = [:]
+            if needsIdentity {
+                fields["full_name"] = pending.fullName
+                fields["phone"] = pending.phone
+                fields["cpf"] = pending.cpf
+                fields["city"] = pending.city
+                fields["state"] = pending.state
+                fields["address"] = pending.address
+                fields["address_number"] = pending.addressNumber
+                fields["birth_date"] = pending.birthDate
+            }
+            if needsTerms {
+                fields["terms_version"] = pending.termsVersion
+                fields["terms_accepted_at"] = pending.termsAcceptedAt
+            }
+            try await Repository.updateProfile(id: userId, fields: fields)
+            if let refreshed = try await Repository.profile(id: userId) {
+                current = refreshed
+            }
+        }
+        let code = pending.referralCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !code.isEmpty, current.referredBy == nil {
+            try? await Repository.applyReferral(code: code)
+            if let refreshed = try await Repository.profile(id: userId) {
+                current = refreshed
+            }
+        }
+        PendingEmailSignupStore.clear()
+        return current
     }
 
     private func syncAvatarIfNeeded(user: User) async {
@@ -116,9 +188,9 @@ final class SessionStore {
         }
     }
 
-    private static func usesGoogle(_ user: User) -> Bool {
-        if jsonText(user.appMetadata["provider"]) == "google" { return true }
-        return (user.identities ?? []).contains { $0.provider == "google" }
+    private static func usesProvider(_ user: User, _ provider: String) -> Bool {
+        if jsonText(user.appMetadata["provider"]) == provider { return true }
+        return (user.identities ?? []).contains { $0.provider == provider }
     }
 
     private static func metadataName(_ user: User) -> String {
@@ -143,6 +215,9 @@ final class AppRouter {
 
     func open(_ url: URL) {
         guard let scheme = url.scheme?.lowercased() else { return }
+        if GIDSignIn.sharedInstance.handle(url) {
+            return
+        }
         if scheme == "iplanetpay" {
             let host = url.host?.lowercased() ?? ""
             if host == "auth-callback" || host == "login-callback" {

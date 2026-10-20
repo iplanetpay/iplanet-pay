@@ -5,16 +5,29 @@ enum AppConfig {
     static let bundleID = "com.iplanetpay.app"
 
     static let supabaseURL: URL = {
-        url(info("SUPABASE_URL"), fallback: "https://zjnikfrledckmjahwnsb.supabase.co")
+        url(info("SUPABASE_URL"), fallback: "https://xeeogfmmasvgbpmodqym.supabase.co")
     }()
 
     static let supabaseAnonKey: String = {
         let value = info("SUPABASE_ANON_KEY") ?? ""
-        if value.isEmpty {
-            return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpqbmlrZnJsZWRja21qYWh3bnNiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTAxNjg5MjAsImV4cCI6MjEwNTc0NDkyMH0.6teIFzZMLo0CNl9fqmO5KcdHfac05yAx9hF5rVvIfAw"
+        if value.isEmpty || value.contains("$(") {
+            return "sb_publishable_LfK2s9fW5x1JDOQZ05khBg_BjT2wDhq"
         }
         return value
     }()
+
+    /// Real iOS OAuth client (`….apps.googleusercontent.com`). Placeholders keep the OAuth web fallback.
+    static var googleIOSClientID: String? {
+        configuredGoogleID(info("GOOGLE_IOS_CLIENT_ID"), suffix: ".apps.googleusercontent.com")
+    }
+
+    static var googleReversedClientID: String? {
+        configuredGoogleID(info("GOOGLE_IOS_REVERSED_CLIENT_ID"), prefix: "com.googleusercontent.apps.")
+    }
+
+    static var usesNativeGoogle: Bool {
+        googleIOSClientID != nil && googleReversedClientID != nil
+    }
 
     static let webAppURL: URL = {
         url(info("WEB_APP_URL"), fallback: "https://iplanet-pay.vercel.app")
@@ -34,6 +47,15 @@ enum AppConfig {
             return url
         }
         return web(trimmed)
+    }
+
+    private static func configuredGoogleID(_ raw: String?, suffix: String? = nil, prefix: String? = nil) -> String? {
+        guard let raw else { return nil }
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.contains("placeholder"), !value.contains("$(") else { return nil }
+        if let suffix, !value.hasSuffix(suffix) { return nil }
+        if let prefix, !value.hasPrefix(prefix) { return nil }
+        return value
     }
 
     private static func info(_ key: String) -> String? {

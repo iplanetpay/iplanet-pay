@@ -19,6 +19,9 @@ packages:
   supabase-swift:
     url: https://github.com/supabase/supabase-swift
     exactVersion: 2.55.4
+  GoogleSignIn-iOS:
+    url: https://github.com/google/GoogleSignIn-iOS
+    exactVersion: 9.2.0
 targets:
   iPlanetPay:
     type: application
@@ -40,8 +43,11 @@ targets:
         CURRENT_PROJECT_VERSION: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: Accent
+        CODE_SIGN_ENTITLEMENTS: iPlanetPay/iPlanetPay.entitlements
     dependencies:
       - package: supabase-swift
         product: Supabase
+      - package: GoogleSignIn-iOS
+        product: GoogleSignIn
     scheme:
       gatherCoverageData: false

@@ -371,7 +371,7 @@ struct AporteSheet: View {
 
     private func submit() async {
         guard let userId = session.profile?.id else { return }
-        if session.signedInWithGoogle && session.profile?.identityComplete != true {
+        if session.signedInWithSocial && session.profile?.identityComplete != true {
             message = "Complete seu cadastro antes de fazer um aporte."
             return
         }

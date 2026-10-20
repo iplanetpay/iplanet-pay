@@ -20,6 +20,7 @@
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
+				iPlanetPay.entitlements,
 			);
 			target = A10000000000000000000002 /* iPlanetPay */;
 		};
@@ -42,6 +43,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000000000000000000000E /* Supabase in Frameworks */,
+				A1000000000000000000001C /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -98,6 +100,7 @@
 			name = iPlanetPay;
 			packageProductDependencies = (
 				A1000000000000000000000D /* Supabase */,
+				A1000000000000000000001B /* GoogleSignIn */,
 			);
 			productName = iPlanetPay;
 			productReference = A10000000000000000000008 /* iPlanet Pay.app */;
@@ -130,6 +133,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				A1000000000000000000000C /* XCRemoteSwiftPackageReference "supabase-swift" */,
+				A1000000000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = A10000000000000000000006 /* Products */;
@@ -250,6 +254,14 @@
 				version = 2.55.4;
 			};
 		};
+		A1000000000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = exactVersion;
+				version = 9.2.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -258,10 +270,16 @@
 			package = A1000000000000000000000C /* XCRemoteSwiftPackageReference "supabase-swift" */;
 			productName = Supabase;
 		};
+		A1000000000000000000001B /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000000000000000000001A /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
 /* End XCSwiftPackageProductDependency section */
 
 /* Begin PBXBuildFile section */
 		A1000000000000000000000E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000000D /* Supabase */; };
+		A1000000000000000000001C /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1000000000000000000001B /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 	};
 	rootObject = A10000000000000000000001 /* Project object */;

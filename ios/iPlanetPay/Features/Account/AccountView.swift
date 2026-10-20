@@ -47,6 +47,7 @@ struct AccountView: View {
 }
 
 struct ProfileView: View {
+    var onboarding = false
     @Environment(SessionStore.self) private var session
     @State private var fullName = ""
     @State private var phone = ""
@@ -65,6 +66,14 @@ struct ProfileView: View {
 
     var body: some View {
         Form {
+            if onboarding {
+                Section {
+                    Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão platform-v2.")
+                        .font(.footnote)
+                        .foregroundStyle(Brand.inkMuted)
+                    NavigationLink("Ler termos de uso", destination: TermsView())
+                }
+            }
             Section("Conta") {
                 TextField("Nome", text: $fullName)
                 TextField("Telefone", text: $phone)
@@ -77,11 +86,13 @@ struct ProfileView: View {
                 TextField("Número", text: $number)
                 DatePicker("Nascimento", selection: $birth, displayedComponents: .date)
             }
-            Section("Pix") {
-                Picker("Tipo", selection: $pixType) {
-                    ForEach(pixTypes, id: \.self) { Text($0).tag($0) }
+            if !onboarding {
+                Section("Pix") {
+                    Picker("Tipo", selection: $pixType) {
+                        ForEach(pixTypes, id: \.self) { Text($0).tag($0) }
+                    }
+                    TextField("Chave", text: $pixKey)
                 }
-                TextField("Chave", text: $pixKey)
             }
             if let message {
                 Text(message).foregroundStyle(message == "Salvo." ? Brand.success : Brand.danger)
@@ -90,8 +101,13 @@ struct ProfileView: View {
                 Task { await save() }
             }
             .disabled(busy)
+            if onboarding {
+                Button("Sair", role: .destructive) {
+                    Task { await session.signOut() }
+                }
+            }
         }
-        .navigationTitle("Perfil")
+        .navigationTitle(onboarding ? "Complete seu cadastro" : "Perfil")
         .onAppear(perform: fill)
     }
 
