@@ -113,7 +113,7 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
         <div className="space-y-6">
           <EmptyState
             title="Nenhuma meta ainda"
-            description="Simule os aportes e crie uma meta para acompanhar a subida."
+            description="Simule os aportes e crie uma meta para acompanhar a viagem até o planeta."
             action={
               <Link
                 href="/app/simulador"

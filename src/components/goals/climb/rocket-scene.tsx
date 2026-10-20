@@ -106,7 +106,9 @@ export function RocketScene({ size, ppu, percent, status, condition, deposits, v
     if (labelsRef.current) labelsRef.current.style.opacity = String(clamp(1 - z * 2.5, 0, 1));
   }, [route, zoom, W, H, R, ppu, done, profile]);
 
-  useMotionValueEvent(zoom, "change", render);
+  const renderRef = useRef(render);
+  renderRef.current = render;
+  useMotionValueEvent(zoom, "change", () => renderRef.current());
   useLayoutEffect(render, [render]);
 
   // viagem até o percentual (rAF): cruzeiro constante + parada suave
@@ -114,7 +116,7 @@ export function RocketScene({ size, ppu, percent, status, condition, deposits, v
     const target = clamp(percent / 100, 0, 1);
     if (reduce()) {
       state.current = { progress: target, flame: 0, t0: 0, time: 0 };
-      render();
+      renderRef.current();
       setLanded(true);
       onLanded?.();
       return;
@@ -129,7 +131,7 @@ export function RocketScene({ size, ppu, percent, status, condition, deposits, v
       state.current.progress = smp.progress;
       state.current.flame = Math.max(smp.flame, 0.12);
       state.current.time = elapsed;
-      render();
+      renderRef.current();
       if (!fired && smp.progress >= target && smp.speed === 0) {
         fired = true;
         setLanded(true);

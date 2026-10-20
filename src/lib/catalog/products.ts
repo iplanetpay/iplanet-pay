@@ -1,3 +1,4 @@
+import type { VariantRow } from "./variants";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import type { ProductWithStock } from "@/types/database";
 import { normalizeStoreEmbed } from "./stores-for-product";
@@ -168,6 +169,34 @@ export async function listProductSwatches(): Promise<Record<string, string[]>> {
       const list = map[row.product_id] ?? [];
       if (!list.includes(color)) list.push(color);
       map[row.product_id] = list;
+    }
+    return map;
+  } catch {
+    return {};
+  }
+}
+
+/** Variantes ativas (RLS: leitura pública só de active = true). */
+export async function listProductVariants(): Promise<Record<string, VariantRow[]>> {
+  if (USE_MOCK_AUTH) {
+    return {
+      "mock-iphone-17": [
+        { id: "mock-v-512-lavanda", product_id: "mock-iphone-17", color: "Lavanda", storage: "512 GB", price_cents: 949900 },
+        { id: "mock-v-256-preto", product_id: "mock-iphone-17", color: "Preto", storage: "256 GB", price_cents: 799900 },
+      ],
+    };
+  }
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("product_variants")
+      .select("id, product_id, color, storage, price_cents")
+      .eq("active", true);
+    if (error || !data) return {};
+    const map: Record<string, VariantRow[]> = {};
+    for (const row of data as VariantRow[]) {
+      (map[row.product_id] ??= []).push(row);
     }
     return map;
   } catch {

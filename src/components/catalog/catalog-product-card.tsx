@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCentsBRL } from "@/lib/utils";
 
@@ -37,6 +37,8 @@ export function CatalogProductCard({
   images,
   colors,
   onDetails,
+  picker,
+  exactPrice = false,
 }: {
   name: string;
   meta: string;
@@ -45,10 +47,17 @@ export function CatalogProductCard({
   images: string[];
   colors: string[];
   onDetails: () => void;
+  /** Seletor de Cor/Armazenamento; substitui as bolinhas de cor. */
+  picker?: ReactNode;
+  /** Preço da variante escolhida (sem "A partir de"). */
+  exactPrice?: boolean;
 }) {
   const shots = images.length > 0 ? images : [];
   const [index, setIndex] = useState(0);
   const safeIndex = shots.length ? index % shots.length : 0;
+  const firstShot = shots[0];
+  // nova cor escolhida → volta para a primeira foto (a da cor)
+  useEffect(() => setIndex(0), [firstShot]);
   const installment = Math.round(priceCents / 12);
   const dots = colors.length > 0 ? colors : ["Padrão"];
 
@@ -83,9 +92,10 @@ export function CatalogProductCard({
         {shots[safeIndex] ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
+            key={shots[safeIndex]}
             src={shots[safeIndex]}
             alt={name}
-            className="h-[78%] w-auto object-contain"
+            className="h-[78%] w-auto object-contain animate-[catalog-fade_.35s_ease]"
             draggable={false}
           />
         ) : (
@@ -119,23 +129,25 @@ export function CatalogProductCard({
         >
           {condition}
         </span>
-        <p className="mt-4 text-sm text-[#6e6e73]">A partir de</p>
-        <p className="text-[1.65rem] font-bold leading-none tracking-tight text-[var(--ink)]">
+        <p className="mt-4 text-sm text-[#6e6e73]">{exactPrice ? "Preço" : "A partir de"}</p>
+        <p key={priceCents} className="text-[1.65rem] font-bold leading-none tracking-tight text-[var(--ink)] tabular-nums animate-[catalog-fade_.35s_ease]" data-testid="catalog-price">
           {formatCentsBRL(priceCents)}
         </p>
         <p className="mt-1 text-sm text-[#6e6e73]">
           ou 12x de {formatCentsBRL(installment)}
         </p>
-        <div className="mt-3 flex items-center gap-2">
-          {dots.slice(0, 6).map((color) => (
-            <span
-              key={color}
-              title={color}
-              className="h-4 w-4 rounded-full border border-black/10"
-              style={{ backgroundColor: colorHex(color) }}
-            />
-          ))}
-        </div>
+        {picker ?? (
+          <div className="mt-3 flex items-center gap-2">
+            {dots.slice(0, 6).map((color) => (
+              <span
+                key={color}
+                title={color}
+                className="h-4 w-4 rounded-full border border-black/10"
+                style={{ backgroundColor: colorHex(color) }}
+              />
+            ))}
+          </div>
+        )}
         <button
           type="button"
           onClick={onDetails}

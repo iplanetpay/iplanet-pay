@@ -43,7 +43,7 @@ export default function suite(test) {
     const b = sampleRocket(p, 0.6, 1.5);
     assert.ok(Math.abs(a.speed - b.speed) < 1e-9, "constant cruise speed");
     assert.ok(Math.abs(b.progress - 3 * a.progress) < 1e-9);
-    const easing = sampleRocket(p, 0.6, 2.4 + 0.6);
+    const easing = sampleRocket(p, 0.6, 2.4 + 0.8);
     assert.ok(easing.speed < a.speed && easing.flame < a.flame);
     assert.ok(easing.progress > 0.6 * 0.82 && easing.progress < 0.6);
     const end = sampleRocket(p, 0.6, rocketDuration(p) + 0.01);

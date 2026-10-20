@@ -1,4 +1,4 @@
-/* Escalada da tela Metas. Escopo em .metas-climb para não vazar no app. */
+/* Viagem até o planeta (tela Metas). Escopo em .metas-climb para não vazar no app. */
 
 .metas-climb {
   --blue: var(--accent, #0071e3);
@@ -959,4 +959,10 @@
     animation: none !important;
     opacity: 0.6;
   }
+}
+.metas-climb .scene.space .status-pill .sp-label {
+  color: #fff;
+}
+.metas-climb .scene.space .status-pill .sp-pct {
+  color: rgba(255, 255, 255, 0.72);
 }

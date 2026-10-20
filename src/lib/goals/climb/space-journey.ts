@@ -56,8 +56,12 @@ export function rocketProfile(status: GoalStatus): RocketMotionProfile {
 }
 
 /** Duração total (s) da viagem até o percentual: cruzeiro + parada suave. */
+const CRUISE_S = 2.4;
+/** Parada cúbica que começa na mesma velocidade do cruzeiro (sem tranco). */
+const EASE_S = (CRUISE_S * 0.18 * 3) / 0.82;
+
 export function rocketDuration(profile: RocketMotionProfile): number {
-  return (2.4 + 0.85) / profile.pace;
+  return (CRUISE_S + EASE_S) / profile.pace;
 }
 
 export interface RocketSample {
@@ -74,8 +78,8 @@ export interface RocketSample {
 export function sampleRocket(profile: RocketMotionProfile, target: number, elapsed: number): RocketSample {
   const t = Math.max(0, Math.min(1, target));
   if (t <= 0 || elapsed <= 0) return { progress: elapsed > 0 ? t : 0, speed: 0, flame: 0 };
-  const cruise = 2.4 / profile.pace;
-  const ease = 0.85 / profile.pace;
+  const cruise = CRUISE_S / profile.pace;
+  const ease = EASE_S / profile.pace;
   if (elapsed >= cruise + ease) return { progress: t, speed: 0, flame: 0 };
   const maxSpeed = 0.82 / cruise;
   if (elapsed < cruise) {
