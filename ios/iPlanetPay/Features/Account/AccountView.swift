@@ -24,9 +24,11 @@ struct AccountView: View {
                 }
                 Section("Você") {
                     NavigationLink("Perfil e cadastro", destination: ProfileView())
-                    NavigationLink("Indicações", destination: ReferralsView())
                     NavigationLink("Ranking e fichas", destination: RankingView())
                     NavigationLink("Avisos", destination: NoticesView())
+                    if session.isAdmin {
+                        Link("Admin", destination: AppConfig.web("/admin"))
+                    }
                 }
                 Section("Ajuda") {
                     NavigationLink("Perguntas frequentes", destination: HelpView())
@@ -127,7 +129,7 @@ struct ProfileView: View {
 
     private func save() async {
         guard let id = session.profile?.id else { return }
-        let birthDay = DatesPT.isoDay(birth)
+        let birthDay = CivilDay.string(from: birth)
         if let missing = identityMessage(
             cpf: cpf,
             phone: BrazilPhone.normalize(phone),
@@ -143,20 +145,24 @@ struct ProfileView: View {
         busy = true
         defer { busy = false }
         do {
-            try await Repository.updateProfile(
-                id: id,
-                fields: [
-                    "full_name": fullName.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "phone": BrazilPhone.normalize(phone),
-                    "cpf": BrazilID.normalizeCPF(cpf),
-                    "city": city.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "state": state,
-                    "address": address.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "address_number": number.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "birth_date": birthDay,
-                    "pix_key": pixKey.trimmingCharacters(in: .whitespacesAndNewlines),
-                    "pix_key_type": pixType,
-                ]
+            try await WebAPI.saveIdentity(
+                WebAPI.IdentityBody(
+                    phone: BrazilPhone.normalize(phone) ?? phone,
+                    cpf: BrazilID.normalizeCPF(cpf) ?? cpf,
+                    city: city.trimmingCharacters(in: .whitespacesAndNewlines),
+                    state: state,
+                    address: address.trimmingCharacters(in: .whitespacesAndNewlines),
+                    addressNumber: number.trimmingCharacters(in: .whitespacesAndNewlines),
+                    birthDate: birthDay
+                )
+            )
+            try await WebAPI.patchProfile(
+                WebAPI.ProfilePatch(
+                    fullName: fullName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    phone: BrazilPhone.normalize(phone),
+                    pixKey: onboarding ? nil : pixKey.trimmingCharacters(in: .whitespacesAndNewlines),
+                    pixKeyType: onboarding ? nil : pixType
+                )
             )
             await session.refreshProfile()
             message = "Salvo."
@@ -174,8 +180,17 @@ struct ReferralsView: View {
     @State private var message: String?
 
     var body: some View {
+        NavigationStack {
+            referralsList
+        }
+    }
+
+    private var referralsList: some View {
         List {
             Section("Seu código") {
+                Text("O bônus é ativado quando o indicado confirma R$ 100,00 em aportes.")
+                    .font(.footnote)
+                    .foregroundStyle(Brand.inkMuted)
                 Text(session.profile?.referralCode ?? "—")
                     .font(.title2.weight(.bold))
                     .textSelection(.enabled)

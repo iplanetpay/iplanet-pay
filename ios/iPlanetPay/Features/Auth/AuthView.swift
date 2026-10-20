@@ -88,7 +88,7 @@ struct AuthView: View {
                     }
                     .buttonStyle(PrimaryButtonStyle())
                     .disabled(busy)
-                    Button("Continuar com Google") {
+                    Button(mode == .login ? "Entrar com Google" : "Continuar com Google") {
                         Task { await google() }
                     }
                     .buttonStyle(SecondaryButtonStyle())
@@ -107,11 +107,17 @@ struct AuthView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                     .disabled(busy)
                     if mode == .login {
+                        Button("Enviar magic link") {
+                            Task { await magicLink() }
+                        }
+                        .buttonStyle(SecondaryButtonStyle())
+                        .disabled(busy)
                         Button("Esqueci minha senha") {
                             Task { await reset() }
                         }
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(Brand.accent)
+                        .frame(minHeight: 44)
                     }
                 }
                 .padding(20)
@@ -176,10 +182,35 @@ struct AuthView: View {
         }
         do {
             if mode == .login {
-                try await SupabaseService.client.auth.signIn(email: cleaned, password: password)
+                let response = try await WebAPI.login(email: cleaned, password: password)
+                try await WebAPI.adopt(response)
+                if let warning = response.warning, !warning.isEmpty {
+                    show(warning, tone: .info)
+                }
             } else {
                 try await signUp(email: cleaned)
             }
+        } catch {
+            show(describeError(error))
+        }
+    }
+
+    private func magicLink() async {
+        message = nil
+        let cleaned = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard cleaned.contains("@") else {
+            show("Informe o e-mail para enviar o link mágico.")
+            return
+        }
+        busy = true
+        defer { busy = false }
+        do {
+            try await SupabaseService.client.auth.signInWithOTP(
+                email: cleaned,
+                redirectTo: AppConfig.authRedirectURL,
+                shouldCreateUser: true
+            )
+            show("Link mágico enviado. Verifique seu e-mail.", tone: .info)
         } catch {
             show(describeError(error))
         }
@@ -198,22 +229,13 @@ struct AuthView: View {
             state: state,
             address: address,
             number: addressNumber,
-            birth: DatesPT.isoDay(birthDate)
+            birth: CivilDay.string(from: birthDate)
         )
         if let missing {
             show(missing)
             return
         }
         let acceptedAt = ISO8601DateFormatter().string(from: Date())
-        let response = try await SupabaseService.client.auth.signUp(
-            email: email,
-            password: password,
-            data: [
-                "full_name": .string(fullName.trimmingCharacters(in: .whitespacesAndNewlines)),
-                "phone": .string(phoneValue ?? ""),
-            ],
-            redirectTo: AppConfig.authRedirectURL
-        )
         let pending = PendingEmailSignup(
             email: email,
             fullName: fullName.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -223,12 +245,30 @@ struct AuthView: View {
             state: state,
             address: address.trimmingCharacters(in: .whitespacesAndNewlines),
             addressNumber: addressNumber.trimmingCharacters(in: .whitespacesAndNewlines),
-            birthDate: DatesPT.isoDay(birthDate),
+            birthDate: CivilDay.string(from: birthDate),
             referralCode: referralCode.trimmingCharacters(in: .whitespacesAndNewlines),
             termsAcceptedAt: acceptedAt,
             termsVersion: LegalCopy.termsVersion
         )
-        guard response.session != nil else {
+        let response = try await WebAPI.signup(
+            WebAPI.SignupBody(
+                fullName: pending.fullName,
+                email: email,
+                password: password,
+                phone: pending.phone,
+                cpf: pending.cpf,
+                city: pending.city,
+                state: pending.state,
+                address: pending.address,
+                addressNumber: pending.addressNumber,
+                birthDate: pending.birthDate,
+                termsAccepted: true,
+                termsVersion: pending.termsVersion,
+                referralCode: pending.referralCode.isEmpty ? nil : pending.referralCode,
+                client: "native"
+            )
+        )
+        guard response.accessToken != nil, response.refreshToken != nil else {
             PendingEmailSignupStore.save(pending)
             show(
                 "Conta criada. Enviamos um e-mail de confirmação. Abra o link nesse e-mail para entrar — ele abre o app em iplanetpay://auth-callback. CPF, endereço e termos ficam salvos neste aparelho e entram no perfil quando você confirmar.",
@@ -237,11 +277,7 @@ struct AuthView: View {
             mode = .login
             return
         }
-        let userId = response.user.id
-        try await Repository.updateProfile(id: userId, fields: pending.profileFields)
-        if !pending.referralCode.isEmpty {
-            try? await Repository.applyReferral(code: pending.referralCode)
-        }
+        try await WebAPI.adopt(response)
         PendingEmailSignupStore.clear()
         await session.refreshProfile()
     }

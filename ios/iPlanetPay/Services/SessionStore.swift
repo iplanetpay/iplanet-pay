@@ -27,7 +27,7 @@ final class SessionStore {
     var isAdmin: Bool { role == .admin }
     var signedInWithSocial: Bool { signedInWithGoogle || signedInWithApple }
     var needsIdentityOnboarding: Bool {
-        guard let profile, role == .cliente, signedInWithSocial else { return false }
+        guard let profile, role == .cliente else { return false }
         return !profile.identityComplete
     }
 
@@ -51,6 +51,7 @@ final class SessionStore {
 
     func signOut() async {
         do {
+            try? await WebAPI.logout()
             try await SupabaseService.client.auth.signOut()
         } catch {
             profileError = describeError(error)
@@ -210,8 +211,10 @@ private func jsonText(_ value: AnyJSON?) -> String? {
 @Observable
 final class AppRouter {
     var reservationID: UUID?
+    var goalID: UUID?
     var selectedTab: AppTab = .home
     var authMessage: String?
+    var overlay: AppOverlay?
 
     func open(_ url: URL) {
         guard let scheme = url.scheme?.lowercased() else { return }
@@ -246,5 +249,16 @@ enum AppTab: Hashable {
     case catalog
     case wallet
     case goals
+    case referrals
     case account
+}
+
+enum AppOverlay: String, Identifiable {
+    case ranking
+    case notices
+    case settings
+    case terms
+    case admin
+
+    var id: String { rawValue }
 }

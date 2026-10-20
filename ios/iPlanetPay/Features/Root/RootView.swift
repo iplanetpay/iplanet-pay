@@ -1,4 +1,3 @@
-import Supabase
 import SwiftUI
 
 struct RootView: View {
@@ -19,13 +18,12 @@ struct RootView: View {
                     NavigationStack {
                         ProfileView(onboarding: true)
                     }
-                } else if session.isAdmin && !session.prefersClientShell {
-                    AdminView()
                 } else {
                     ClientShell()
                 }
             }
         }
+        .preferredColorScheme(.light)
         .background(Brand.backgroundSubtle)
         .sheet(isPresented: passwordBinding) {
             PasswordUpdateView()
@@ -91,19 +89,36 @@ struct ClientShell: View {
             GoalsView()
                 .tabItem { Label("Metas", systemImage: "flag") }
                 .tag(AppTab.goals)
+            ReferralsView()
+                .tabItem { Label("Indicações", systemImage: "person.2") }
+                .tag(AppTab.referrals)
             AccountView()
                 .tabItem { Label("Conta", systemImage: "person.crop.circle") }
                 .tag(AppTab.account)
         }
-        .safeAreaInset(edge: .top) {
-            if session.isAdmin {
-                Button("Voltar ao admin") { session.prefersClientShell = false }
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 8)
-                    .background(Brand.accentSoft)
+        .safeAreaInset(edge: .top, spacing: 0) {
+            ClientHeader()
+        }
+        .sheet(item: overlayBinding) { overlay in
+            NavigationStack {
+                switch overlay {
+                case .ranking:
+                    RankingView()
+                case .notices:
+                    NoticesView()
+                case .settings:
+                    ProfileView()
+                case .terms:
+                    TermsView()
+                case .admin:
+                    AdminLinkView()
+                }
             }
         }
+    }
+
+    private var overlayBinding: Binding<AppOverlay?> {
+        Binding(get: { router.overlay }, set: { router.overlay = $0 })
     }
 }
 
@@ -124,7 +139,7 @@ struct PasswordUpdateView: View {
                 Button(busy ? "Salvando…" : "Salvar senha") {
                     Task { await save() }
                 }
-                .disabled(busy || password.count < 6)
+                .disabled(busy || password.count < 8)
             }
             .navigationTitle("Nova senha")
             .navigationBarTitleDisplayMode(.inline)
@@ -140,7 +155,7 @@ struct PasswordUpdateView: View {
         busy = true
         defer { busy = false }
         do {
-            try await SupabaseService.client.auth.update(user: UserAttributes(password: password))
+            try await WebAPI.updatePassword(password)
             session.needsPasswordUpdate = false
             dismiss()
         } catch {

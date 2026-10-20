@@ -27,6 +27,17 @@ enum Money {
     }
 }
 
+enum CivilDay {
+    static var zone: TimeZone { TimeZone(identifier: "America/Sao_Paulo") ?? .gmt }
+
+    static func string(from date: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+}
+
 enum DatesPT {
     static func medium(_ date: Date) -> String {
         let formatter = DateFormatter()
