@@ -644,14 +644,14 @@ struct TradeInSheet: View {
 }
 
 private struct ContractFrameKey: PreferenceKey {
-    static var defaultValue: CGRect = .zero
+    static var defaultValue: CGRect { .zero }
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
         value = nextValue()
     }
 }
 
 private struct ContractViewportKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
+    static var defaultValue: CGFloat { 0 }
     static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
         value = max(value, nextValue())
     }
