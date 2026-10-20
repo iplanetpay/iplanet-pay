@@ -102,7 +102,7 @@ export function SupportAiSettingsForm({ initial }: { initial: SupportAiInitial }
 
       {!initial.available ? (
         <p className="mt-3 rounded-2xl bg-[var(--bg-subtle)] p-3 text-sm text-[var(--danger)]">
-          Tabela de configuração não encontrada. Aplique a migração 035_support_ai.sql.
+          Tabela de configuração não encontrada. Aplique a migração 036_support_ai.sql.
         </p>
       ) : null}
 

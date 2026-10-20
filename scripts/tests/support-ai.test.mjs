@@ -85,7 +85,7 @@ export default function suite(test) {
     const admin = source("src/app/api/admin/support-ai/route.ts");
     const form = source("src/components/admin/support-ai-form.tsx");
     const widget = source("src/components/support/support-chat.tsx");
-    const migration = source("supabase/migrations/035_support_ai.sql");
+    const migration = source("supabase/migrations/036_support_ai.sql");
     const guide = source("docs/support-ai.md");
     assert.match(chat, /getCurrentUser/);
     assert.match(chat, /consumeSupportQuota/);
