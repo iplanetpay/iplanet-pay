@@ -216,7 +216,7 @@ public enum ClimbLogic {
     public static func isoDayDelta(_ from: String, _ to: String) -> Int {
         guard let start = CivilDate.parse(from), let end = CivilDate.parse(to) else { return 0 }
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.timeZone = TimeZone(identifier: "UTC")!
         func date(_ parts: (year: Int, month: Int, day: Int)) -> Date? {
             var comps = DateComponents()
             comps.calendar = calendar

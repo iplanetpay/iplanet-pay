@@ -3,6 +3,10 @@ import PackageDescription
 
 let package = Package(
     name: "IPlanetCore",
+    platforms: [
+        .iOS(.v18),
+        .macOS(.v14),
+    ],
     products: [
         .library(name: "IPlanetCore", targets: ["IPlanetCore"]),
     ],

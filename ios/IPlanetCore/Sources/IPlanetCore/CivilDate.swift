@@ -32,7 +32,7 @@ public enum CivilDate {
 
     public static func calendarToday(_ now: Date = Date()) -> String {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo") ?? .gmt
+        calendar.timeZone = TimeZone(identifier: "America/Sao_Paulo") ?? TimeZone(identifier: "UTC")!
         let parts = calendar.dateComponents([.year, .month, .day], from: now)
         return format(year: parts.year ?? 1970, month: parts.month ?? 1, day: parts.day ?? 1)
     }
@@ -87,7 +87,7 @@ public enum CivilDate {
 
     private static var utc: Calendar {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.timeZone = TimeZone(identifier: "UTC")!
         return calendar
     }
 }

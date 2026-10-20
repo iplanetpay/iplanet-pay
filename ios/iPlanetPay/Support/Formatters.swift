@@ -28,7 +28,7 @@ enum Money {
 }
 
 enum CivilDay {
-    static var zone: TimeZone { TimeZone(identifier: "America/Sao_Paulo") ?? .gmt }
+    static var zone: TimeZone { TimeZone(identifier: "America/Sao_Paulo") ?? TimeZone(identifier: "UTC")! }
 
     static func string(from date: Date) -> String {
         var calendar = Calendar(identifier: .gregorian)

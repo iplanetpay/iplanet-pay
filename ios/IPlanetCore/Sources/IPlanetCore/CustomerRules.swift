@@ -131,7 +131,7 @@ public enum IdentityRules {
         guard let parsed = CivilDate.parse(trimmed) else { return false }
         if parsed.year < 1900 { return false }
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .gmt
+        calendar.timeZone = TimeZone(identifier: "UTC")!
         let today = calendar.dateComponents([.year, .month, .day], from: now)
         guard let year = today.year, let month = today.month, let day = today.day else { return false }
         let birth = parsed.year * 10_000 + parsed.month * 100 + parsed.day
