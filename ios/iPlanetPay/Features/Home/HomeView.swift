@@ -12,6 +12,14 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
+                    Text("Olá, \(session.profile?.displayName ?? "Cliente")")
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(Brand.inkMuted)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                        .padding(.top, -14)
+                        .contentTransition(.opacity)
+                        .modifier(StaggerIn(delay: 0))
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Sua reserva")
                             .font(.subheadline.weight(.semibold))
@@ -21,7 +29,7 @@ struct HomeView: View {
                         Text("Acompanhe o aporte, pague com Pix e explore o catálogo.")
                             .foregroundStyle(Brand.inkMuted)
                     }
-                    .modifier(StaggerIn(delay: 0))
+                    .modifier(StaggerIn(delay: 0.06))
                     if let error {
                         Text(error).foregroundStyle(Brand.danger)
                     }

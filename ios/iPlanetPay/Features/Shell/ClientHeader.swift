@@ -10,10 +10,6 @@ struct ClientHeader: View {
         HStack(spacing: 8) {
             Wordmark(height: 22)
                 .accessibilityHidden(true)
-            Text("Olá, \(firstName)")
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .accessibilityLabel("Olá, \(firstName)")
             Spacer(minLength: 8)
             Button {
                 router.overlay = .settings
@@ -64,11 +60,6 @@ struct ClientHeader: View {
             Rectangle().fill(Brand.line).frame(height: 1)
         }
         .task { await refresh() }
-    }
-
-    private var firstName: String {
-        let name = session.profile?.displayName ?? "Cliente"
-        return name.split(separator: " ").first.map(String.init) ?? name
     }
 
     @ViewBuilder
