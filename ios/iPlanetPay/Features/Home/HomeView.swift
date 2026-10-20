@@ -21,6 +21,7 @@ struct HomeView: View {
                         Text("Acompanhe o aporte, pague com Pix e explore o catálogo.")
                             .foregroundStyle(Brand.inkMuted)
                     }
+                    .modifier(StaggerIn(delay: 0))
                     if let error {
                         Text(error).foregroundStyle(Brand.danger)
                     }
@@ -53,9 +54,11 @@ struct HomeView: View {
                         }
                     }
                     shortcutGrid
+                        .modifier(StaggerIn(delay: 0.12))
                 }
                 .padding(20)
             }
+            .animation(.spring(response: 0.5, dampingFraction: 0.86), value: loading)
             .background(Brand.backgroundSubtle)
             .navigationTitle("Início")
             .navigationDestination(item: reservationBinding) { id in
@@ -137,6 +140,10 @@ private struct ActiveReservationCarousel: View {
     let items: [ReservationRow]
     var open: (UUID) -> Void
     @State private var index = 0
+    @State private var forward = true
+    @State private var dragX: CGFloat = 0
+    @Namespace private var dots
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         let count = items.count
@@ -167,12 +174,28 @@ private struct ActiveReservationCarousel: View {
                         }
                     }
                 }
+                .id(item.id)
+                .transition(cardTransition)
+                .offset(x: dragX)
+                .rotation3DEffect(.degrees(Double(dragX) / -25), axis: (x: 0, y: 1, z: 0), perspective: 0.6)
+                .gesture(
+                    DragGesture(minimumDistance: 20)
+                        .onChanged { value in
+                            guard count > 1, abs(value.translation.width) > abs(value.translation.height) else { return }
+                            dragX = value.translation.width * 0.6
+                        }
+                        .onEnded { value in
+                            guard count > 1 else { return }
+                            if value.translation.width < -60 { go(1) } else if value.translation.width > 60 { go(-1) }
+                            withAnimation(.spring(response: 0.45, dampingFraction: 0.8)) { dragX = 0 }
+                        }
+                )
                 .accessibilityElement(children: .contain)
             }
             if count > 1 {
                 HStack(spacing: 12) {
                     Button {
-                        index = step(safe, -1, count)
+                        go(-1)
                     } label: {
                         Image(systemName: "chevron.left")
                             .frame(width: 44, height: 44)
@@ -182,14 +205,20 @@ private struct ActiveReservationCarousel: View {
                     .accessibilityLabel("Reserva anterior")
                     HStack(spacing: 8) {
                         ForEach(items.indices, id: \.self) { position in
-                            Circle()
-                                .fill(position == safe ? Brand.accent : Brand.line)
-                                .frame(width: position == safe ? 10 : 8, height: 8)
+                            ZStack {
+                                Capsule().fill(Brand.line).frame(width: 8, height: 8)
+                                if position == safe {
+                                    Capsule().fill(Brand.accent)
+                                        .frame(width: 22, height: 8)
+                                        .matchedGeometryEffect(id: "dot", in: dots)
+                                }
+                            }
+                            .frame(width: position == safe ? 22 : 8, height: 8)
                                 .accessibilityLabel("Reserva \(position + 1) de \(count)")
                         }
                     }
                     Button {
-                        index = step(safe, 1, count)
+                        go(1)
                     } label: {
                         Image(systemName: "chevron.right")
                             .foregroundStyle(.white)
@@ -207,8 +236,25 @@ private struct ActiveReservationCarousel: View {
             guard count > 1 else { return }
             try? await Task.sleep(for: .seconds(10))
             guard !Task.isCancelled else { return }
-            index = step(index, 1, count)
+            go(1)
         }
+    }
+
+    private var cardTransition: AnyTransition {
+        if reduceMotion { return .opacity }
+        let edgeIn: Edge = forward ? .trailing : .leading
+        let edgeOut: Edge = forward ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: edgeIn).combined(with: .opacity).combined(with: .scale(scale: 0.94)),
+            removal: .move(edge: edgeOut).combined(with: .opacity).combined(with: .scale(scale: 0.94))
+        )
+    }
+
+    private func go(_ delta: Int) {
+        forward = delta > 0
+        Haptics.tap()
+        let animation: Animation? = reduceMotion ? .easeInOut(duration: 0.2) : .spring(response: 0.55, dampingFraction: 0.82)
+        withAnimation(animation) { index = step(min(index, items.count - 1), delta, items.count) }
     }
 
     private func step(_ current: Int, _ delta: Int, _ count: Int) -> Int {
@@ -217,5 +263,22 @@ private struct ActiveReservationCarousel: View {
         if next < 0 { return count - 1 }
         if next >= count { return 0 }
         return next
+    }
+}
+
+/// Entrada suave (sobe + aparece) ao abrir a tela; respeita "Reduzir movimento".
+struct StaggerIn: ViewModifier {
+    var delay: Double
+    @State private var shown = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(shown || reduceMotion ? 1 : 0)
+            .offset(y: shown || reduceMotion ? 0 : 18)
+            .onAppear {
+                guard !shown else { return }
+                withAnimation(.spring(response: 0.6, dampingFraction: 0.85).delay(delay)) { shown = true }
+            }
     }
 }

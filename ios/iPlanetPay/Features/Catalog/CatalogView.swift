@@ -78,6 +78,9 @@ struct CatalogView: View {
             .navigationTitle("Catálogo")
             .refreshable { await load() }
             .task { await load() }
+            .onChange(of: selected) { _, value in
+                if value != nil { router.guideViewedProduct = true }
+            }
             .sheet(item: $selected) { product in
                 ProductReserveSheet(product: product, stores: stores) { reservationID in
                     selected = nil

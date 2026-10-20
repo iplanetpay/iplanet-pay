@@ -124,7 +124,7 @@ private struct GoalDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let schedule = snapshot.schedule {
-                    ClimbSceneView(
+                    RocketSceneView(
                         schedule: schedule,
                         productName: reservation?.product?.name ?? "Produto"
                     ) {
