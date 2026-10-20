@@ -48,3 +48,9 @@ public/workbox-*.js.map
 public/swe-worker-*.js
 public/swe-worker-*.js.map
 public/fallback-*.js
+
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+ios/**/*.xcuserstate

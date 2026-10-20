@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
+import { magicLinkRedirect } from "@/lib/auth/native-client";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { email?: string };
+  const body = (await request.json()) as { email?: string; redirectTo?: string };
 
   if (USE_MOCK_AUTH) {
     return NextResponse.json({
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   const { error } = await supabase.auth.signInWithOtp({
     email: body.email ?? "",
     options: {
-      emailRedirectTo: `${origin}/app`,
+      emailRedirectTo: magicLinkRedirect(origin, body.redirectTo),
     },
   });
 

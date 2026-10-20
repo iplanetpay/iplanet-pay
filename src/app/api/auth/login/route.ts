@@ -6,6 +6,7 @@ import {
   serializeMockSession,
 } from "@/lib/auth/mock";
 import type { UserRole } from "@/types/auth";
+import { nativeAuthFields } from "@/lib/auth/native-client";
 import { homeForRole, roleAllowedForPath } from "@/lib/auth/roles";
 
 export async function POST(request: Request) {
@@ -14,6 +15,7 @@ export async function POST(request: Request) {
     password?: string;
     role?: UserRole;
     next?: string;
+    client?: string;
   };
 
   if (USE_MOCK_AUTH) {
@@ -101,5 +103,6 @@ export async function POST(request: Request) {
     redirectTo,
     warning,
     mode: "supabase",
+    ...nativeAuthFields(body.client, data.session),
   });
 }

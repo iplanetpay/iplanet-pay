@@ -29,11 +29,14 @@ export const getCurrentUser = cache(async (): Promise<AuthUser | null> => {
     return parseMockSession(cookieStore.get(MOCK_COOKIE)?.value);
   }
 
-  const { createClient } = await import("@/lib/supabase/server");
+  const { createClient, requestAccessToken } = await import("@/lib/supabase/server");
+  const accessToken = await requestAccessToken();
   const supabase = await createClient();
   const {
     data: { user },
-  } = await supabase.auth.getUser();
+  } = accessToken
+    ? await supabase.auth.getUser(accessToken)
+    : await supabase.auth.getUser();
 
   if (!user) return null;
 
