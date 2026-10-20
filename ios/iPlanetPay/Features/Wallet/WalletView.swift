@@ -24,6 +24,7 @@ struct WalletView: View {
                             Text("Confirmado").font(.subheadline).foregroundStyle(Brand.inkMuted)
                             Text(Money.format(cents: confirmed))
                                 .font(.title.weight(.bold))
+                                .contentTransition(.numericText())
                             Text("Bônus \(Money.format(cents: session.profile?.bonusCents ?? 0))")
                                 .foregroundStyle(Brand.accent)
                             Text("Mínimo R$ 1.000,00 para saque. Ao solicitar, 30% fica com a plataforma e 70% segue para o Pix.")
@@ -36,7 +37,7 @@ struct WalletView: View {
                         }
                     }
                     if let error { Text(error).foregroundStyle(Brand.danger) }
-                    if loading { ProgressView() }
+                    if loading { LoadingSkeleton(lines: 3) }
                     Text("Aportes").font(.title3.weight(.bold))
                     if contributions.isEmpty {
                         Text("Nenhum aporte ainda.").foregroundStyle(Brand.inkMuted)

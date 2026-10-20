@@ -6,6 +6,7 @@ struct HomeView: View {
     @State private var reservations: [ReservationRow] = []
     @State private var error: String?
     @State private var loading = true
+    @State private var showSimulator = false
 
     var body: some View {
         NavigationStack {
@@ -24,7 +25,7 @@ struct HomeView: View {
                         Text(error).foregroundStyle(Brand.danger)
                     }
                     if loading {
-                        ProgressView()
+                        LoadingSkeleton(lines: 4)
                     } else if active.isEmpty {
                         EmptyPane(
                             title: "Nenhuma reserva ativa",
@@ -62,6 +63,15 @@ struct HomeView: View {
             }
             .refreshable { await load() }
             .task { await load() }
+            .fullScreenCover(isPresented: $showSimulator) {
+                SimulatorSheet(products: []) { reservationId in
+                    showSimulator = false
+                    if let reservationId {
+                        router.reservationID = reservationId
+                    }
+                    Task { await load() }
+                }
+            }
         }
     }
 
@@ -78,7 +88,7 @@ struct HomeView: View {
             shortcut("Atalho", "Catálogo", "Veja modelos disponíveis para nova reserva.", "Abrir catálogo", tab: .catalog)
             shortcut("Ranking", "Fichas & posição", "Acompanhe o ranking de aportes e suas fichas para o sorteio.", "Ver ranking →", tab: nil, overlay: .ranking)
             shortcut("Carteira", "Saldo & Pix", "Veja aportes Pix confirmados e o extrato da carteira.", "Ir para carteira →", tab: .wallet)
-            shortcut("Simulador", "Simulador de aportes", "Calcule o valor de cada aporte e crie a meta do produto.", "Abrir simulador", tab: .goals)
+            shortcut("Simulador", "Simulador de aportes", "Calcule o valor de cada aporte e crie a meta do produto.", "Abrir simulador", tab: nil, openSimulator: true)
         }
     }
 
@@ -88,9 +98,11 @@ struct HomeView: View {
         _ message: String,
         _ action: String,
         tab: AppTab?,
-        overlay: AppOverlay? = nil
+        overlay: AppOverlay? = nil,
+        openSimulator: Bool = false
     ) -> some View {
         Button {
+            if openSimulator { showSimulator = true }
             if let overlay { router.overlay = overlay }
             if let tab { router.selectedTab = tab }
         } label: {
@@ -141,6 +153,7 @@ private struct ActiveReservationCarousel: View {
                             .foregroundStyle(Brand.inkMuted)
                         Text("\(Money.format(cents: item.remainingCents)) restantes")
                             .font(.subheadline.weight(.semibold))
+                            .contentTransition(.numericText())
                         RemoteImage(url: AppConfig.media(item.product?.imageUrl))
                         HStack(alignment: .center) {
                             ProgressRing(percent: item.progress * 100, caption: "quitado", size: 96)

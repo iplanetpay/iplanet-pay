@@ -38,7 +38,7 @@ struct CatalogView: View {
                         Text(error).foregroundStyle(Brand.danger)
                     }
                     if loading {
-                        ProgressView()
+                        LoadingSkeleton(lines: 5)
                     }
                     ForEach(filtered) { product in
                         Button {
@@ -61,6 +61,7 @@ struct CatalogView: View {
                                             .foregroundStyle(Brand.inkMuted)
                                         Text(Money.format(cents: product.listPriceCents))
                                             .font(.headline)
+                                            .contentTransition(.numericText())
                                         Text("Escolher produto")
                                             .font(.subheadline.weight(.semibold))
                                             .foregroundStyle(Brand.accent)
