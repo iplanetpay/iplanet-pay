@@ -69,7 +69,7 @@ struct ClimbSceneView: View {
         let outline = ClimbSceneMath.portraitOutline()
         let dots = milestoneDots(trail: trail, deposits: deposits)
         let nextIndex = deposits.firstIndex { $0.status == .pending || $0.status == .missed }
-        TimelineView(.animation(minimumInterval: reduceMotion ? 60 : 1.0 / 30.0, paused: false)) { timeline in
+        return TimelineView(.animation(minimumInterval: reduceMotion ? 60 : 1.0 / 30.0, paused: false)) { timeline in
             let motion = motionSample(at: timeline.date, status: status)
             let climber = trail.point(at: motion.progress)
             GeometryReader { geo in
