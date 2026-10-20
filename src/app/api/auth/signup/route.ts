@@ -7,6 +7,7 @@ import {
 } from "@/lib/auth/mock";
 import { homeForRole } from "@/lib/auth/roles";
 import { normalizeBrazilPhone } from "@/lib/phone";
+import { nativeAuthFields } from "@/lib/auth/native-client";
 import { resolveSignupAccess } from "@/lib/auth/signup-access";
 import {
   identityMissingMessage,
@@ -29,6 +30,7 @@ export async function POST(request: Request) {
     birth_date?: string;
     terms_accepted?: boolean;
     terms_version?: string;
+    client?: string;
   };
 
   const phone = normalizeBrazilPhone(body.phone);
@@ -97,6 +99,8 @@ export async function POST(request: Request) {
   let userId: string | null = null;
   let hasSession = false;
   let autoConfirmed = false;
+  let session: { access_token: string; refresh_token: string; expires_at?: number | null } | null =
+    null;
 
   // Prefer admin create with email already confirmed so signup is not blocked
   // by Supabase "Confirm email" / confirmation-email rate limits.
@@ -131,6 +135,7 @@ export async function POST(request: Request) {
       );
     }
     hasSession = true;
+    session = signedIn.data.session;
   } else {
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -150,6 +155,7 @@ export async function POST(request: Request) {
     }
     userId = data.user.id;
     hasSession = Boolean(data.session);
+    session = data.session;
   }
 
   try {
@@ -248,5 +254,6 @@ export async function POST(request: Request) {
     redirectTo: homeForRole("cliente"),
     mode: "supabase",
     needs_email_confirmation: access.needsEmailConfirmation,
+    ...nativeAuthFields(body.client, session),
   });
 }
