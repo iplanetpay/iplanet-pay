@@ -193,11 +193,15 @@ struct ReferralsView: View {
 
     private var referralsList: some View {
         List {
+            if (session.profile?.bonusCents ?? 0) > 0 {
+                Section {
+                    ReferralBonusCard(bonusCents: session.profile?.bonusCents ?? 0, hasActiveReservation: true)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
             Section("Seu código") {
                 Text("O bônus é ativado quando o indicado confirma R$ 100,00 em aportes.")
-                    .font(.footnote)
-                    .foregroundStyle(Brand.inkMuted)
-                Text(LegalCopy.referralBonusWithdrawalNote)
                     .font(.footnote)
                     .foregroundStyle(Brand.inkMuted)
                 Text(session.profile?.referralCode ?? "—")
@@ -412,7 +416,7 @@ struct TermsView: View {
                     Label("Abrir os Termos de Uso no site", systemImage: "safari")
                 }
                 .buttonStyle(PrimaryButtonStyle())
-                Text(LegalCopy.terms)
+                Text(LegalCopy.termsAttributed)
                     .font(.body)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }

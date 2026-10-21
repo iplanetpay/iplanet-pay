@@ -1,3 +1,4 @@
+import IPlanetCore
 import Foundation
 import Supabase
 
@@ -307,6 +308,44 @@ enum WebAPI {
 
     static func requestWithdrawal(_ body: WithdrawalBody) async throws {
         let _: StatusResponse = try await post(path: "/api/withdrawals/request", body: body, authorize: true)
+    }
+
+    struct PreviewResponse: Decodable, Sendable, APIReply {
+        var ok: Bool
+        var error: String?
+        var split: WithdrawalBreakdown?
+    }
+
+    static func withdrawalPreview(reservationId: UUID) async throws -> WithdrawalBreakdown {
+        let id = reservationId.uuidString.lowercased()
+        let reply: PreviewResponse = try await sendRaw(method: "GET", path: "/api/withdrawals/preview?reservation_id=\(id)", body: nil, contentType: "application/json", authorize: true)
+        guard let split = reply.split else { throw Failure(message: "Não foi possível calcular o saque.") }
+        return split
+    }
+
+    struct BonusWithdrawBody: Encodable, Sendable {
+        var pixKey: String
+        var pixKeyType: String
+        var holderFullName: String
+        var holderCpf: String
+    }
+
+    struct RequestIDResponse: Decodable, Sendable, APIReply {
+        var ok: Bool
+        var error: String?
+        var requestId: UUID?
+    }
+
+    /// `POST /api/referrals/withdraw-bonus` → RPC `request_bonus_withdrawal` (sem taxa, aprovação do admin).
+    static func withdrawBonus(_ body: BonusWithdrawBody) async throws -> UUID? {
+        let reply: RequestIDResponse = try await post(path: "/api/referrals/withdraw-bonus", body: body, authorize: true)
+        return reply.requestId
+    }
+
+    @discardableResult
+    static func requestWithdrawalReturningID(_ body: WithdrawalBody) async throws -> UUID? {
+        let reply: RequestIDResponse = try await post(path: "/api/withdrawals/request", body: body, authorize: true)
+        return reply.requestId
     }
 
     static func withdrawWallet(_ body: WalletWithdrawBody) async throws {

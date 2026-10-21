@@ -48,18 +48,10 @@ struct HomeView: View {
                         }
                     }
                     if (session.profile?.bonusCents ?? 0) > 0 {
-                        BrandCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text("Bônus de indicação")
-                                    .font(.headline)
-                                Text(Money.format(cents: session.profile?.bonusCents ?? 0))
-                                    .font(.title2.weight(.bold))
-                                    .foregroundStyle(Brand.accent)
-                                Text("Abra uma reserva ativa para aplicar o bônus.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(Brand.inkMuted)
-                            }
-                        }
+                        ReferralBonusCard(
+                            bonusCents: session.profile?.bonusCents ?? 0,
+                            hasActiveReservation: reservations.contains { $0.status == "ativa" }
+                        )
                     }
                     shortcutGrid
                         .modifier(StaggerIn(delay: 0.12))

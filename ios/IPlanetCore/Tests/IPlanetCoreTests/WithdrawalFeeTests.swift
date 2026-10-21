@@ -16,30 +16,37 @@ final class WithdrawalFeeTests: XCTestCase {
         XCTAssertEqual(b.fullRefundCents, 20_000)
         XCTAssertEqual(b.feeCents, 45_000)
         XCTAssertEqual(b.netCents, 125_000)
+        XCTAssertEqual(b.windowDays, 7)
     }
 
-    func testExactlySevenDaysIsStillFullRefund() {
-        let b = WithdrawalFee.breakdown(aportes: [.init(amountCents: 10_000, confirmedAt: daysAgo(7))], requestedAt: now)
-        XCTAssertEqual(b.feeCents, 0)
-        XCTAssertEqual(b.netCents, 10_000)
-        let older = WithdrawalFee.breakdown(aportes: [.init(amountCents: 10_000, confirmedAt: daysAgo(7.001))], requestedAt: now)
-        XCTAssertEqual(older.feeCents, 3_000)
+    func testBoundaryAndMissingDateFavorTheClient() {
+        XCTAssertEqual(WithdrawalFee.breakdown(aportes: [.init(amountCents: 10_000, confirmedAt: daysAgo(7))], requestedAt: now).feeCents, 0)
+        XCTAssertEqual(WithdrawalFee.breakdown(aportes: [.init(amountCents: 10_000, confirmedAt: daysAgo(7.001))], requestedAt: now).feeCents, 3_000)
+        XCTAssertEqual(WithdrawalFee.breakdown(aportes: [.init(amountCents: 10_000, confirmedAt: nil)], requestedAt: now).fullRefundCents, 10_000)
     }
 
-    func testAllRecentMeansNoFee() {
-        let b = WithdrawalFee.breakdown(aportes: [.init(amountCents: 99_999, confirmedAt: daysAgo(1))], requestedAt: now)
-        XCTAssertEqual(b.feeCents, 0)
-        XCTAssertEqual(b.netCents, 99_999)
+    func testCustomWindowRateAndAmountCap() {
+        let b = WithdrawalFee.breakdown(aportes: [
+            .init(amountCents: 30_000, confirmedAt: daysAgo(2)),
+            .init(amountCents: 70_000, confirmedAt: daysAgo(20)),
+        ], requestedAt: now, feePercent: 25, windowDays: 3, amountCents: 50_000)
+        XCTAssertEqual(b.totalCents, 50_000)
+        XCTAssertEqual(b.fullRefundCents, 30_000)
+        XCTAssertEqual(b.discountedCents, 20_000)
+        XCTAssertEqual(b.feeCents, 5_000)
     }
 
-    func testCustomRateAndRounding() {
-        let b = WithdrawalFee.breakdown(aportes: [.init(amountCents: 333, confirmedAt: daysAgo(10))], requestedAt: now, feePercent: 25)
-        XCTAssertEqual(b.feeCents, 83) // 83,25 → 83
-        let half = WithdrawalFee.breakdown(aportes: [.init(amountCents: 50, confirmedAt: daysAgo(10))], requestedAt: now, feePercent: 33)
-        XCTAssertEqual(half.feeCents, 17) // 16,5 → 17 (Math.round)
-        XCTAssertEqual(WithdrawalFee.percent(fromSetting: "25"), 25)
-        XCTAssertEqual(WithdrawalFee.percent(fromSetting: "abc"), 30)
-        XCTAssertEqual(WithdrawalFee.percentLabel(12.5), "12,5")
-        XCTAssertEqual(WithdrawalFee.percentLabel(30), "30")
+    func testRoundingConfigAndServerRows() {
+        XCTAssertEqual(WithdrawalFee.breakdown(aportes: [.init(amountCents: 50, confirmedAt: daysAgo(10))], requestedAt: now, feePercent: 33).feeCents, 17)
+        let cfg = WithdrawalFee.config(feeSetting: "25", windowSetting: "10")
+        XCTAssertEqual(cfg.feePct, 25)
+        XCTAssertEqual(cfg.windowDays, 10)
+        let bad = WithdrawalFee.config(feeSetting: "abc", windowSetting: nil)
+        XCTAssertEqual(bad.feePct, 30)
+        XCTAssertEqual(bad.windowDays, 7)
+        XCTAssertEqual(WithdrawalFee.percentLabel(12.5), "12.5")
+        let legacy = WithdrawalBreakdown.fromServer(totalPaidCents: 100_000, feePct: 30, feeAmountCents: 30_000, refundAmountCents: 70_000, fullRefundCents: nil, discountedCents: nil)
+        XCTAssertEqual(legacy.discountedCents, 100_000)
+        XCTAssertEqual(legacy.fullRefundCents, 0)
     }
 }

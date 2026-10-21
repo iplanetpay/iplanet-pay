@@ -334,17 +334,40 @@ enum Repository {
         try await WebAPI.applyReferral(code: code)
     }
 
-    /// Taxa de saque configurada no admin (`app_settings.withdrawal_fee_pct`); sem leitura, 30%.
-    static func withdrawalFeePercent() async -> Double {
-        struct Row: Decodable { var value: String }
-        let rows: [Row]? = try? await client
+    /// Taxa e janela do saque no admin (`withdrawal_fee_pct`, `withdrawal_full_refund_days`); sem leitura, 30% / 7 dias.
+    static func withdrawalFeeConfig() async -> (feePct: Double, windowDays: Int) {
+        struct Row: Decodable { var key: String; var value: String }
+        let rows: [Row] = (try? await client
             .from("app_settings")
-            .select("value")
-            .eq("key", value: "withdrawal_fee_pct")
-            .limit(1)
+            .select("key, value")
+            .in("key", values: ["withdrawal_fee_pct", "withdrawal_full_refund_days"])
             .execute()
-            .value
-        return WithdrawalFee.percent(fromSetting: rows?.first?.value)
+            .value) ?? []
+        return WithdrawalFee.config(
+            feeSetting: rows.first { $0.key == "withdrawal_fee_pct" }?.value,
+            windowSetting: rows.first { $0.key == "withdrawal_full_refund_days" }?.value
+        )
+    }
+
+    /// Prévia do servidor (`GET /api/withdrawals/preview`); sem ela, mesmo cálculo local do site
+    /// (todos os aportes confirmados, data = confirmed_at senão created_at).
+    static func withdrawalPreview(reservationId: UUID) async throws -> WithdrawalBreakdown {
+        if let split = try? await WebAPI.withdrawalPreview(reservationId: reservationId) { return split }
+        async let config = withdrawalFeeConfig()
+        let rows = try await contributions(reservationId: reservationId)
+        let items = rows.filter { $0.status == "confirmed" }
+            .map { WithdrawalFee.Aporte(amountCents: $0.amountCents, confirmedAt: $0.confirmedAt ?? $0.createdAt) }
+        let cfg = await config
+        return WithdrawalFee.breakdown(aportes: items, requestedAt: Date(), feePercent: cfg.feePct, windowDays: cfg.windowDays)
+    }
+
+    static func requestBonusWithdrawal(pixKey: String, pixKeyType: String, holderFullName: String, holderCpf: String) async throws -> UUID? {
+        try await WebAPI.withdrawBonus(.init(pixKey: pixKey, pixKeyType: pixKeyType, holderFullName: holderFullName, holderCpf: holderCpf))
+    }
+
+    static func requestBonusWithdrawalRow(pixKey: String, pixKeyType: String, holderFullName: String, holderCpf: String) async throws -> WithdrawalRequest? {
+        guard let id = try await requestBonusWithdrawal(pixKey: pixKey, pixKeyType: pixKeyType, holderFullName: holderFullName, holderCpf: holderCpf) else { return nil }
+        return try? await withdrawal(id: id)
     }
 
     static func applyBonus(reservationId: UUID) async throws {
@@ -391,9 +414,22 @@ enum Repository {
     }
 
     static func withdrawals(userId: UUID) async throws -> [WithdrawalRequest] {
+        do { return try await withdrawalsV037(userId: userId) } catch {
+            // Banco ainda sem a migration 037: colunas antigas.
+            return try await client
+                .from("withdrawal_requests")
+                .select(withdrawalColumns)
+                .eq("user_id", value: userId)
+                .order("created_at", ascending: false)
+                .execute()
+                .value
+        }
+    }
+
+    private static func withdrawalsV037(userId: UUID) async throws -> [WithdrawalRequest] {
         let rows: [WithdrawalRequest] = try await client
             .from("withdrawal_requests")
-            .select("id, user_id, reservation_id, total_paid_cents, fee_amount_cents, refund_amount_cents, pix_key, pix_key_type, holder_full_name, status, payout_status, created_at")
+            .select(withdrawalColumns + ", source, full_refund_cents, discounted_cents")
             .eq("user_id", value: userId)
             .order("created_at", ascending: false)
             .execute()
@@ -401,8 +437,23 @@ enum Repository {
         return rows
     }
 
-    static func requestWithdrawal(_ params: RPC.Withdrawal) async throws {
-        try await WebAPI.requestWithdrawal(
+    private static let withdrawalColumns = "id, user_id, reservation_id, total_paid_cents, fee_percentage, fee_amount_cents, refund_amount_cents, pix_key, pix_key_type, holder_full_name, status, payout_status, created_at"
+
+    static func withdrawal(id: UUID) async throws -> WithdrawalRequest? {
+        let rows: [WithdrawalRequest] = try await client
+            .from("withdrawal_requests")
+            .select(withdrawalColumns + ", source, full_refund_cents, discounted_cents")
+            .eq("id", value: id)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Cria o pedido e devolve a linha gravada (valores do servidor), quando legível.
+    @discardableResult
+    static func requestWithdrawal(_ params: RPC.Withdrawal) async throws -> WithdrawalRequest? {
+        let id = try await WebAPI.requestWithdrawalReturningID(
             WebAPI.WithdrawalBody(
                 reservationId: params.pReservationId,
                 pixKey: params.pPixKey,
@@ -411,6 +462,8 @@ enum Repository {
                 holderCpf: params.pHolderCpf
             )
         )
+        guard let id else { return nil }
+        return try? await withdrawal(id: id)
     }
 
     static func offers(reservationId: UUID) async throws -> [UsedDeviceOffer] {

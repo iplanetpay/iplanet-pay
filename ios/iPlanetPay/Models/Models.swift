@@ -290,6 +290,15 @@ struct WithdrawalRequest: Codable, Identifiable, Hashable, Sendable {
     var status: String
     var payoutStatus: String?
     var createdAt: Date?
+    /// Migration 037: 'reserva' ou 'bonus' e a quebra integral/desconto gravada pelo servidor.
+    var source: String?
+    var fullRefundCents: Int?
+    var discountedCents: Int?
+
+    var breakdown: WithdrawalBreakdown {
+        .fromServer(totalPaidCents: totalPaidCents, feePct: feePercentage, feeAmountCents: feeAmountCents,
+                    refundAmountCents: refundAmountCents, fullRefundCents: fullRefundCents, discountedCents: discountedCents)
+    }
 
     var statusLabel: String {
         switch status {

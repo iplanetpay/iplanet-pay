@@ -573,8 +573,11 @@ struct SwitchSheet: View {
     }
 }
 
+/// Espelha request-saque-button.tsx do site: saque da reserva (com quebra) ou do bônus de indicação.
 struct WithdrawalSheet: View {
-    let reservation: ReservationRow
+    enum Mode { case reserva(ReservationRow), bonus(Int) }
+
+    let mode: Mode
     var onDone: () -> Void
     @Environment(SessionStore.self) private var session
     @State private var pixKey = ""
@@ -583,49 +586,76 @@ struct WithdrawalSheet: View {
     @State private var cpf = ""
     @State private var message: String?
     @State private var busy = false
-    @State private var feePercent = WithdrawalFee.defaultPercent
-    @State private var aportes: [WithdrawalFee.Aporte] = []
-    @State private var loadingBreakdown = true
+    @State private var split: WithdrawalBreakdown?
+    @State private var splitError: String?
+    @State private var created: WithdrawalRequest?
+    @State private var sent = false
+
+    init(reservation: ReservationRow, onDone: @escaping () -> Void) {
+        self.mode = .reserva(reservation)
+        self.onDone = onDone
+    }
+
+    init(bonusCents: Int, onDone: @escaping () -> Void) {
+        self.mode = .bonus(bonusCents)
+        self.onDone = onDone
+    }
 
     private let types = ["cpf", "cnpj", "email", "phone", "random"]
-
-    private var breakdown: WithdrawalBreakdown {
-        WithdrawalFee.breakdown(aportes: aportes, requestedAt: Date(), feePercent: feePercent)
+    private var isBonus: Bool { if case .bonus = mode { true } else { false } }
+    private var cpfDigits: String { cpf.filter(\.isNumber) }
+    private var canSubmit: Bool {
+        !busy && !pixKey.trimmingCharacters(in: .whitespaces).isEmpty
+            && !holder.trimmingCharacters(in: .whitespaces).isEmpty && cpfDigits.count == 11
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    Text(LegalCopy.withdrawalRule(feePercent: feePercent))
-                        .font(.footnote)
-                    if loadingBreakdown {
-                        LoadingSkeleton(lines: 4)
-                    } else {
-                        breakdownRows
+                if sent {
+                    sentSection
+                } else {
+                    Section {
+                        switch mode {
+                        case .bonus(let cents):
+                            Text(LegalCopy.bonusWithdrawalNote(cents: cents)).font(.footnote)
+                        case .reserva:
+                            if let split {
+                                breakdownRows(split, settled: false)
+                            } else if let splitError {
+                                Text(splitError).foregroundStyle(Brand.danger)
+                            } else {
+                                Text("Calculando o valor do saque…").foregroundStyle(Brand.inkMuted)
+                                LoadingSkeleton(lines: 4)
+                            }
+                        }
+                        Text(LegalCopy.pixPayoutNote).font(.caption).foregroundStyle(Brand.inkMuted)
                     }
+                    Section {
+                        Picker("Tipo da chave Pix", selection: $pixType) {
+                            ForEach(types, id: \.self) { Text($0).tag($0) }
+                        }
+                        TextField("Chave Pix", text: $pixKey)
+                        TextField("Nome completo do titular", text: $holder, prompt: Text("Nome como no banco"))
+                        TextField("CPF do titular", text: $cpf).keyboardType(.numberPad)
+                    }
+                    if let message {
+                        Text(message).foregroundStyle(Brand.danger)
+                    }
+                    Button(busy ? "Enviando..." : "Confirmar saque") {
+                        Task { await submit() }
+                    }
+                    .disabled(!canSubmit)
                 }
-                TextField("Nome do titular", text: $holder)
-                TextField("CPF do titular", text: $cpf)
-                Picker("Tipo da chave", selection: $pixType) {
-                    ForEach(types, id: \.self) { Text($0).tag($0) }
-                }
-                TextField("Chave Pix", text: $pixKey)
-                if let message {
-                    Text(message).foregroundStyle(Brand.danger)
-                }
-                Button(busy ? "Enviando…" : "Solicitar saque") {
-                    Task { await submit() }
-                }
-                .disabled(busy)
             }
-            .navigationTitle("Saque")
+            .navigationTitle(isBonus ? "Sacar bônus de indicação" : "Solicitar saque")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Fechar") { onDone() }
                 }
             }
-            .task { await loadBreakdown() }
+            .task { await loadSplit() }
             .onAppear {
                 holder = session.profile?.fullName ?? ""
                 cpf = session.profile?.cpf ?? ""
@@ -636,21 +666,39 @@ struct WithdrawalSheet: View {
     }
 
     @ViewBuilder
-    private var breakdownRows: some View {
-        let b = breakdown
-        let pct = WithdrawalFee.percentLabel(b.feePercent)
+    private var sentSection: some View {
+        Section {
+            Text("Pedido de saque enviado. Status: \(created?.statusLabel ?? "Pendente").")
+                .fontWeight(.semibold)
+            if let created {
+                if created.source == "bonus" || isBonus {
+                    row("Você receberá", Money.format(cents: created.refundAmountCents))
+                } else {
+                    breakdownRows(created.breakdown, settled: false)
+                }
+            }
+            Text(isBonus ? "O saque do bônus só sai com aprovação do admin na tela Saques." : LegalCopy.pixPayoutNote)
+                .font(.caption).foregroundStyle(Brand.inkMuted)
+        }
+        Button("Fechar") { onDone() }
+    }
+
+    /// withdrawal-fee-breakdown.tsx
+    @ViewBuilder
+    private func breakdownRows(_ b: WithdrawalBreakdown, settled: Bool) -> some View {
+        let pct = WithdrawalFee.percentLabel(b.feePct)
+        Text((try? AttributedString(markdown: LegalCopy.withdrawalRule(feePercent: b.feePct, windowDays: b.windowDays, settled: settled)))
+             ?? AttributedString(LegalCopy.withdrawalRule(feePercent: b.feePct, windowDays: b.windowDays, settled: settled)))
+            .font(.footnote)
         row("Aportes confirmados", Money.format(cents: b.totalCents))
-        row("Reembolso integral (últimos 7 dias)", Money.format(cents: b.fullRefundCents))
-        row("Com taxa (há mais de 7 dias)", Money.format(cents: b.discountedCents))
-        row("Taxa administrativa (\(pct)%)", "− \(Money.format(cents: b.feeCents))", tint: Brand.danger)
+        row("Reembolso integral (até \(b.windowDays) dias)", Money.format(cents: b.fullRefundCents))
+        row("Com desconto (há mais de \(b.windowDays) dias)", Money.format(cents: b.discountedCents))
+        row("Taxa administrativa (\(pct)% da parte com desconto)", "− \(Money.format(cents: b.feeCents))", tint: Brand.danger)
         HStack {
-            Text("Você receberá").fontWeight(.semibold)
+            Text(settled ? "Você recebeu" : "Você receberá").fontWeight(.semibold)
             Spacer()
             Text(Money.format(cents: b.netCents)).font(.headline).foregroundStyle(Brand.accent)
         }
-        Text("Estimativa. O valor final é calculado pelo servidor na data do pedido.")
-            .font(.caption)
-            .foregroundStyle(Brand.inkMuted)
     }
 
     private func row(_ title: String, _ value: String, tint: Color = Brand.ink) -> some View {
@@ -662,35 +710,71 @@ struct WithdrawalSheet: View {
         .font(.subheadline)
     }
 
-    private func loadBreakdown() async {
-        defer { loadingBreakdown = false }
-        async let pct = Repository.withdrawalFeePercent()
-        let rows = (try? await Repository.contributions(reservationId: reservation.id)) ?? []
-        aportes = rows
-            .filter { $0.status == "confirmed" && $0.paymentMethod.lowercased().contains("pix") }
-            .compactMap { c in
-                guard let at = c.confirmedAt ?? c.createdAt else { return nil }
-                return WithdrawalFee.Aporte(amountCents: c.amountCents, confirmedAt: at)
-            }
-        feePercent = await pct
+    private func loadSplit() async {
+        guard case .reserva(let reservation) = mode else { return }
+        do {
+            split = try await Repository.withdrawalPreview(reservationId: reservation.id)
+        } catch {
+            splitError = "Não foi possível calcular o saque."
+        }
     }
 
     private func submit() async {
+        let key = pixKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = holder.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, !name.isEmpty, cpfDigits.count == 11 else {
+            message = "Preencha a chave Pix, o tipo, o titular e o CPF."
+            return
+        }
         busy = true
+        message = nil
         defer { busy = false }
         do {
-            try await Repository.requestWithdrawal(
-                RPC.Withdrawal(
-                    pReservationId: reservation.id,
-                    pPixKey: pixKey.trimmingCharacters(in: .whitespacesAndNewlines),
-                    pPixKeyType: pixType,
-                    pHolderFullName: holder.trimmingCharacters(in: .whitespacesAndNewlines),
-                    pHolderCpf: BrazilID.normalizeCPF(cpf) ?? cpf
+            switch mode {
+            case .reserva(let reservation):
+                created = try await Repository.requestWithdrawal(
+                    RPC.Withdrawal(pReservationId: reservation.id, pPixKey: key, pPixKeyType: pixType,
+                                   pHolderFullName: name, pHolderCpf: cpfDigits)
                 )
-            )
-            onDone()
+            case .bonus:
+                created = try await Repository.requestBonusWithdrawalRow(
+                    pixKey: key, pixKeyType: pixType, holderFullName: name, holderCpf: cpfDigits)
+                await session.refreshProfile()
+            }
+            sent = true
+        } catch is URLError {
+            message = "Erro de rede. Tente novamente."
         } catch {
-            message = describeError(error)
+            let text = describeError(error)
+            message = text.isEmpty ? "Não foi possível solicitar o saque." : text
+        }
+    }
+}
+
+/// Card "Bônus de indicação" do site (referral-bonus-card.tsx) com a ação "Sacar bônus".
+struct ReferralBonusCard: View {
+    let bonusCents: Int
+    var hasActiveReservation: Bool
+    @State private var showWithdraw = false
+
+    var body: some View {
+        BrandCard {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Bônus de indicação").font(.headline)
+                Text("Você tem \(Money.format(cents: bonusCents)) para direcionar a um aporte ativo.")
+                    .font(.subheadline)
+                if !hasActiveReservation {
+                    Text("Crie uma reserva ativa para usar o bônus.")
+                        .font(.footnote).foregroundStyle(Brand.inkMuted)
+                }
+                Text(LegalCopy.referralBonusWithdrawalNote)
+                    .font(.footnote).foregroundStyle(Brand.inkMuted)
+                Button("Sacar bônus") { showWithdraw = true }
+                    .buttonStyle(SecondaryButtonStyle())
+            }
+        }
+        .sheet(isPresented: $showWithdraw) {
+            WithdrawalSheet(bonusCents: bonusCents) { showWithdraw = false }
         }
     }
 }
