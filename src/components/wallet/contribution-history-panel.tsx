@@ -25,6 +25,8 @@ export function ContributionHistoryPanel({
     feePct: number;
     feeAmountCents: number;
     refundAmountCents: number;
+    fullRefundCents?: number;
+    discountedCents?: number;
   } | null;
   emptyLabel?: string;
 }) {
@@ -45,6 +47,8 @@ export function ContributionHistoryPanel({
           feePct={paidWithdrawal.feePct}
           feeAmountCents={paidWithdrawal.feeAmountCents}
           refundAmountCents={paidWithdrawal.refundAmountCents}
+          fullRefundCents={paidWithdrawal.fullRefundCents}
+          discountedCents={paidWithdrawal.discountedCents}
           settled
         />
       </div>

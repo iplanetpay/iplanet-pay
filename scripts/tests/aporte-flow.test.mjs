@@ -77,10 +77,10 @@ export default function suite(test) {
   });
 
   test("the aporte contract lives in the Termos de Uso accepted at signup", () => {
-    assert.equal(TERMS_VERSION, "platform-v3");
-    assert.match(TERMS_OF_USE_PT, /7\. Contrato de aporte/);
-    assert.match(TERMS_OF_USE_PT, /não é preciso aceitá-lo de novo a cada Pix/);
-    assert.match(source("src/app/termos/page.tsx"), /id="contrato-de-aporte"/);
+    assert.equal(TERMS_VERSION, "platform-v4");
+    assert.match(TERMS_OF_USE_PT, /8\. Contrato de Aporte/);
+    assert.match(TERMS_OF_USE_PT, /Não é preciso aceitá-lo de novo a cada Pix/);
+    assert.match(source("src/app/termos/page.tsx"), /CONTRATO_DE_APORTE_ANCHOR/);
     assert.match(source("src/components/auth/signup-form.tsx"), /terms_version: TERMS_VERSION/);
   });
 

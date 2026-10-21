@@ -185,6 +185,8 @@ export type WithdrawalPayoutStatus =
 
 export type PixKeyType = "cpf" | "cnpj" | "email" | "phone" | "random";
 
+export type WithdrawalSource = "reserva" | "carteira" | "bonus";
+
 export interface WithdrawalRequest {
   id: string;
   user_id: string;
@@ -193,6 +195,12 @@ export interface WithdrawalRequest {
   fee_percentage: number;
   fee_amount_cents: number;
   refund_amount_cents: number;
+  /** 037: origem do saque. Ausente em bancos sem a migration 037. */
+  source?: WithdrawalSource;
+  /** 037: parte devolvida integralmente (aportes de até 7 dias). */
+  full_refund_cents?: number;
+  /** 037: parte sobre a qual incide a taxa. */
+  discounted_cents?: number;
   pix_key: string;
   pix_key_type: PixKeyType;
   holder_full_name: string;

@@ -2,9 +2,24 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { tryCreateServiceClient } from "@/lib/supabase/admin";
 import { debitWallet, getWalletBalanceCents } from "@/lib/wallet/balance";
-import { calcWithdrawalAmounts, WITHDRAWAL_FEE_PCT_DEFAULT } from "@/lib/withdrawals/types";
+import { isMissingColumnError } from "@/lib/withdrawals/types";
+import { previewWalletWithdrawal } from "@/lib/withdrawals/preview";
 
 const MIN_CENTS = 100_000;
+
+/** Prévia: GET /api/wallet/withdraw?amount_cents=… */
+export async function GET(request: Request) {
+  const user = await getCurrentUser();
+  if (!user) {
+    return NextResponse.json({ ok: false, error: "Entre para continuar." }, { status: 401 });
+  }
+  const amount = Math.round(Number(new URL(request.url).searchParams.get("amount_cents") ?? 0));
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return NextResponse.json({ ok: false, error: "Valor inválido." }, { status: 400 });
+  }
+  const split = await previewWalletWithdrawal(user.id, amount);
+  return NextResponse.json({ ok: true, split });
+}
 
 export async function POST(request: Request) {
   const user = await getCurrentUser();
@@ -62,7 +77,8 @@ export async function POST(request: Request) {
     );
   }
 
-  const amounts = calcWithdrawalAmounts(amount, WITHDRAWAL_FEE_PCT_DEFAULT);
+  // Mesma fonte de taxa e janela de 7 dias do saque de reserva.
+  const split = await previewWalletWithdrawal(user.id, amount);
   const debit = await debitWallet({
     userId: user.id,
     amountCents: amount,
@@ -73,25 +89,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: debit.error }, { status: 400 });
   }
 
-  const { data: created, error } = await admin
-    .from("withdrawal_requests")
-    .insert({
-      user_id: user.id,
-      reservation_id: anchor.id,
-      total_paid_cents: amount,
-      fee_percentage: WITHDRAWAL_FEE_PCT_DEFAULT,
-      fee_amount_cents: amounts.fee_amount_cents,
-      refund_amount_cents: amounts.refund_amount_cents,
-      pix_key: pix,
-      pix_key_type: pixType,
-      holder_full_name: holder,
-      holder_cpf: cpf,
-      status: "pending",
-      payout_status: "pending_admin",
-      admin_notes: "carteira",
-    })
-    .select("id")
-    .single();
+  const base = {
+    user_id: user.id,
+    reservation_id: anchor.id,
+    total_paid_cents: amount,
+    fee_percentage: split.feePct,
+    fee_amount_cents: split.feeCents,
+    refund_amount_cents: split.netCents,
+    pix_key: pix,
+    pix_key_type: pixType,
+    holder_full_name: holder,
+    holder_cpf: cpf,
+    status: "pending",
+    payout_status: "pending_admin",
+    admin_notes: "carteira",
+  };
+  const insert = (row: Record<string, unknown>) =>
+    admin.from("withdrawal_requests").insert(row).select("id").single();
+  let { data: created, error } = await insert({
+    ...base,
+    source: "carteira",
+    full_refund_cents: split.fullRefundCents,
+    discounted_cents: split.discountedCents,
+  });
+  if (error && isMissingColumnError(error.message)) {
+    // Banco sem a 037: grava sem as colunas novas (a taxa já segue a janela).
+    ({ data: created, error } = await insert(base));
+  }
 
   if (error || !created) {
     await admin.from("wallet_ledger").insert({
@@ -116,7 +140,8 @@ export async function POST(request: Request) {
   return NextResponse.json({
     ok: true,
     id: created.id,
-    fee_amount_cents: amounts.fee_amount_cents,
-    refund_amount_cents: amounts.refund_amount_cents,
+    fee_amount_cents: split.feeCents,
+    refund_amount_cents: split.netCents,
+    split,
   });
 }
