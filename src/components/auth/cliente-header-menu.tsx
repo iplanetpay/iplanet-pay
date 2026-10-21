@@ -3,7 +3,8 @@
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Menu, Settings, X } from "lucide-react";
+import { LifeBuoy, Menu, Settings, X } from "lucide-react";
+import { openSupportChat } from "@/components/support/support-chat";
 import { LEGAL_FOOTER_LINKS } from "@/lib/navigation/legal-footer";
 
 export function ClienteHeaderMenu() {
@@ -71,6 +72,18 @@ export function ClienteHeaderMenu() {
             onClick={() => void logout()}
           >
             Sair
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex h-11 w-full items-center gap-2 rounded-2xl px-3 text-left text-sm font-semibold text-[var(--ink)] hover:bg-[var(--bg-subtle)]"
+            onClick={() => {
+              setOpen(false);
+              openSupportChat();
+            }}
+          >
+            <LifeBuoy className="h-4 w-4" aria-hidden />
+            Suporte
           </button>
           <div className="mt-1 flex items-center gap-1 border-t border-[var(--line)] px-1 pt-2 text-xs text-[var(--ink-muted)]">
             {LEGAL_FOOTER_LINKS.map((link, index) => (

@@ -14,6 +14,9 @@ import { ProfileCompletionGate } from "@/components/auth/profile-completion-gate
 import { loadProfileIdentity } from "@/lib/profile/identity-server";
 import { ClienteHeaderMenu } from "@/components/auth/cliente-header-menu";
 import { NoticeBell } from "@/components/notices/notice-bell";
+import { SupportButton } from "@/components/support/support-button";
+import { SupportChat } from "@/components/support/support-chat";
+import { getAppSettings } from "@/lib/settings/queries";
 
 export default async function ClienteLayout({
   children,
@@ -28,6 +31,8 @@ export default async function ClienteLayout({
     const identity = await loadProfileIdentity(user.id);
     pendingProfile = identity.readable && !identity.complete;
   }
+
+  const { settings } = await getAppSettings(["whatsapp_support"]);
 
   return (
     <AppShell
@@ -60,6 +65,7 @@ export default async function ClienteLayout({
                 </Button>
               </Link>
               <LogoutButton />
+              <SupportButton />
             </div>
             <ClienteHeaderMenu />
           </div>
@@ -75,6 +81,7 @@ export default async function ClienteLayout({
         </div>
         {children}
       </ProfileCompletionGate>
+      <SupportChat whatsappDigits={settings.whatsapp_support ?? null} />
     </AppShell>
   );
 }

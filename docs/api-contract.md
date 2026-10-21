@@ -60,6 +60,7 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/trade-in/respond` | sim | `offerId`, `action` `accept`\|`reject`\|`resubmit`\|`discard`, `expectedCents?` | resposta à contra-proposta |
 | `GET /api/notices` | sim | — | `notices[]` com `id`, `kind`, `title`, `body`, `couponCode`, `createdAt`, `read` |
 | `POST /api/notices/read` | sim | `notice_id` | marca como lido |
+| `POST /api/support/chat` | sim | `messages[]` `{ role: "user"\|"assistant", content }`, `stream?` (padrão `true`) | stream SSE ou `{ ok, reply, whatsapp }` — ver "Suporte com IA" |
 
 `401` quando falta sessão nas rotas marcadas. `400` para regra de negócio. Corpo inválido: `{ ok: false, error: "JSON inválido." }` onde a rota distingue o parse.
 
@@ -101,3 +102,42 @@ Não há aceite de contrato por aporte. O contrato de aporte faz parte dos Termo
 
 
 O app chama `POST /api/pix/generate`. Não fala com o Mercado Pago. O QR mostrado no aparelho é gerado do copia-e-cola (`CIQRCodeGenerator`). A confirmação chega pelo webhook `POST /api/webhooks/pix` (só o servidor). O app observa `contributions` via Realtime ou consulta de novo enquanto a tela está aberta.
+
+## Suporte com IA
+
+`POST /api/support/chat`, cookie ou `Authorization: Bearer <access_token>`. A chave do provedor de IA nunca sai do servidor; o app não fala com o provedor.
+
+Corpo:
+
+```json
+{ "messages": [{ "role": "user", "content": "Como gero o Pix?" }], "stream": true }
+```
+
+- O cliente guarda o histórico da sessão e manda a conversa inteira a cada pergunta. Só `user` e `assistant` são aceitos (qualquer `system` é descartado). Cada mensagem é cortada em 2.000 caracteres; ficam as 20 últimas. A última precisa ser `user`.
+- O servidor acrescenta o arquivo de comportamento (admin → Config → Suporte com IA) e um resumo da conta lido sob a RLS do usuário (primeiro nome, até 5 reservas com status e progresso, até 5 metas).
+
+`stream: true` (padrão): `200`, `Content-Type: text/event-stream`. Cada evento é uma linha `data: <json>` seguida de linha em branco:
+
+```
+data: {"type":"delta","text":"Na reserva, "}
+
+data: {"type":"delta","text":"toque em Gerar Pix."}
+
+data: {"type":"done"}
+```
+
+`{"type":"error","error":"mensagem"}` pode chegar no lugar de `done` se o provedor cair no meio. Concatene os `text` dos `delta`. A resposta é Markdown simples (`**negrito**`, listas `-`, títulos `#`).
+
+`stream: false`: `{ "ok": true, "reply": "texto", "whatsapp": "5511999999999" | null }`.
+
+Erros (JSON `{ ok: false, error }`):
+
+| Status | Quando |
+| --- | --- |
+| `400` | JSON inválido ou histórico sem mensagem final do cliente |
+| `401` | sem sessão |
+| `429` | mais de 20 perguntas em 10 minutos para o mesmo usuário |
+| `503` | IA desligada ou sem chave; traz `handoff: true` e `whatsapp` (dígitos) para mostrar "Falar no WhatsApp" |
+| `502` | falha do provedor de IA |
+
+Configuração (só admin, site): `POST /api/admin/support-ai` com `enabled`, `provider` (`openai`\|`xai`\|`openrouter`\|`groq`\|`custom`), `base_url` (https), `model`, `behavior_md`, `api_key?` (somente escrita), `clear_api_key?`. Responde `api_key_set` e `api_key_last4`; a chave nunca volta.
