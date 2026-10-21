@@ -1,5 +1,6 @@
 import type { Deposit } from '@/lib/goals/climb/types';
-import type { Trail } from '@/lib/goals/climb/geometry';
+/** Qualquer rota com pointAt (foguete ou trilha). */
+type Trail = { pointAt(t: number): { x: number; y: number } };
 
 /**
  * Marcos de pagamento (pequenos e discretos):
@@ -34,6 +35,12 @@ export function Milestones({ deposits, trail, r, selected, onSelect }: Props) {
             key={d.id}
             transform={`translate(${p.x},${p.y})`}
             className="milestone"
+            onPointerEnter={(e) => {
+              if (e.pointerType === 'mouse') onSelect(d.id);
+            }}
+            onPointerLeave={(e) => {
+              if (e.pointerType === 'mouse' && sel) onSelect(null);
+            }}
             onClick={(e) => {
               e.stopPropagation();
               onSelect(sel ? null : d.id);

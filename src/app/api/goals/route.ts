@@ -26,6 +26,7 @@ export async function POST(request: Request) {
     const planned = await saveContributionMeta({
       name: String(body.name ?? ""),
       product_id: String(body.product_id ?? ""),
+      variant_id: typeof body.variant_id === "string" && body.variant_id ? body.variant_id : null,
       target_date: String(body.target_date ?? ""),
       start_date: String(body.start_date ?? ""),
       frequency,

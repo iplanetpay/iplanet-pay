@@ -1,4 +1,10 @@
-import { WITHDRAWAL_SELECT, type WithdrawalRequest } from "./types";
+import {
+  WITHDRAWAL_SELECT,
+  WITHDRAWAL_SELECT_V037,
+  isMissingColumnError,
+  withdrawalSource,
+  type WithdrawalRequest,
+} from "./types";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { mockListWithdrawals } from "@/lib/withdrawals/mock";
 import type { ReservationStatus } from "@/lib/reservations/types";
@@ -33,14 +39,22 @@ export async function listWithdrawalRequests(limit = 80): Promise<{
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("withdrawal_requests")
-      .select(WITHDRAWAL_SELECT)
-      .order("created_at", { ascending: false })
-      .limit(limit);
+    const list = (select: string) =>
+      supabase
+        .from("withdrawal_requests")
+        .select(select)
+        .order("created_at", { ascending: false })
+        .limit(limit);
+    let { data, error } = await list(WITHDRAWAL_SELECT_V037);
+    if (error && isMissingColumnError(error.message)) {
+      ({ data, error } = await list(WITHDRAWAL_SELECT));
+    }
     if (error) return { ...empty, error: error.message };
 
-    const rows = (data ?? []) as WithdrawalRequest[];
+    const rows = ((data ?? []) as unknown as WithdrawalRequest[]).map((r) => ({
+      ...r,
+      source: withdrawalSource(r),
+    }));
     const userIds = [...new Set(rows.map((r) => r.user_id))];
     const reservationIds = [...new Set(rows.map((r) => r.reservation_id))];
 
@@ -109,17 +123,23 @@ export async function getPaidWithdrawalForReservation(
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("withdrawal_requests")
-      .select(WITHDRAWAL_SELECT)
-      .eq("reservation_id", reservationId)
-      .eq("status", "approved")
-      .eq("payout_status", "sent")
-      .order("processed_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    const paid = (select: string) =>
+      supabase
+        .from("withdrawal_requests")
+        .select(select)
+        .eq("reservation_id", reservationId)
+        .eq("status", "approved")
+        .eq("payout_status", "sent")
+        .order("processed_at", { ascending: false })
+        .limit(10);
+    let { data, error } = await paid(WITHDRAWAL_SELECT_V037);
+    if (error && isMissingColumnError(error.message)) {
+      ({ data, error } = await paid(WITHDRAWAL_SELECT));
+    }
     if (error || !data) return null;
-    return data as WithdrawalRequest;
+    // Saques de carteira/bônus usam a reserva só como âncora: não contam aqui.
+    const rows = data as unknown as WithdrawalRequest[];
+    return rows.find((r) => withdrawalSource(r) === "reserva") ?? null;
   } catch {
     return null;
   }

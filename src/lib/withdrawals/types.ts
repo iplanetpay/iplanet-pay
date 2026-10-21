@@ -1,5 +1,7 @@
+import { termsPlainText } from "../terms/parse.ts";
 import type {
   PixKeyType,
+  WithdrawalSource,
   WithdrawalPayoutStatus,
   WithdrawalRequest,
   WithdrawalStatus,
@@ -7,6 +9,7 @@ import type {
 
 export type {
   PixKeyType,
+  WithdrawalSource,
   WithdrawalPayoutStatus,
   WithdrawalRequest,
   WithdrawalStatus,
@@ -59,6 +62,35 @@ export const WITHDRAWAL_SELECT = `
   updated_at
 `;
 
+/** Colunas da migration 037 (origem e quebra integral/desconto). */
+export const WITHDRAWAL_SELECT_V037 = `${WITHDRAWAL_SELECT},
+  source,
+  full_refund_cents,
+  discounted_cents
+`;
+
+/** Erro de coluna inexistente (banco ainda sem a 037). */
+export function isMissingColumnError(message: string | null | undefined): boolean {
+  if (!message) return false;
+  return /column .* does not exist|could not find the .* column|42703|PGRST204/i.test(message);
+}
+
+export const WITHDRAWAL_SOURCE_LABEL: Record<WithdrawalSource, string> = {
+  reserva: "Reserva",
+  carteira: "Carteira",
+  bonus: "Bônus de indicação",
+};
+
+/** Origem do saque, inclusive para linhas anteriores à 037. */
+export function withdrawalSource(w: {
+  source?: WithdrawalSource | null;
+  admin_notes?: string | null;
+}): WithdrawalSource {
+  if (w.source) return w.source;
+  if (w.admin_notes === "carteira") return "carteira";
+  return "reserva";
+}
+
 export function calcWithdrawalAmounts(
   totalPaidCents: number,
   feePct = WITHDRAWAL_FEE_PCT_DEFAULT,
@@ -68,34 +100,7 @@ export function calcWithdrawalAmounts(
   return { fee_amount_cents: fee, refund_amount_cents: refund, fee_percentage: feePct };
 }
 
-export const TERMS_VERSION = "platform-v2";
+/** Versão dos Termos publicada em /termos (docs/termos-de-uso.md). */
+export const TERMS_VERSION = "platform-v4";
 
-export const TERMS_OF_USE_PT = `
-TERMOS DE USO — iPlanet Pay (versão platform-v2)
-
-1. Aportes e reserva
-Ao reservar um produto e realizar aportes via Pix, você concorda com as regras da plataforma iPlanet Pay.
-
-2. Política de saque (reembolso de aportes)
-Saques liberados após 15 dias de conta ativa e apenas quando os aportes confirmados na reserva superarem R$ 1.000,00.
-Sobre o valor total dos aportes confirmados elegíveis:
-• Você recebe 70% (reembolso líquido).
-• A plataforma retém 30% a título de taxa administrativa.
-Bônus de indicação não aplicados e valores não confirmados não entram na base de saque.
-
-3. Retirada do aparelho
-Com 100% quitado, você pode solicitar retirada na loja ou envio (frete + seguro via Pix).
-Com 70% ou mais, a entrega antecipada exige assinatura de contrato de empréstimo do aparelho até quitação total.
-
-4. Indicações
-O indicado deve aportar no mínimo R$ 100,00 confirmados para liberar o bônus ao indicador, que poderá direcionar o valor a uma reserva ativa.
-
-5. Fichas e sorteio
-A cada R$ 100,00 em aportes confirmados você recebe 1 ficha para o sorteio mensal (dia 1). Mais fichas aumentam suas chances de liberação antecipada do aparelho.
-
-6. Prazo de reembolso Pix
-Após aprovação do saque pelo Financeiro, o Pix é efetuado em até 24 horas úteis (estimativa).
-
-7. Aceite
-Ao criar conta e marcar os aceites, você declara ter lido estes termos, política de saque, regras de retirada, indicação e sorteio.
-`.trim();
+export const TERMS_OF_USE_PT = termsPlainText();

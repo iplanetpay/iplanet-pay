@@ -15,58 +15,35 @@ const GATEWAY_MISSING_PT =
  * Cria contribution pending + tenta Mercado Pago.
  * Sem token: retorna ok com gateway_configured=false (não inventa QR).
  */
-async function assertAporteContract(params: {
-  contractId: string;
-  reservationId: string;
-  userId: string;
-}) {
-  if (params.contractId === "mock-contract") return { ok: true as const };
-
-  const { createClient } = await import("@/lib/supabase/server");
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("aporte_contracts")
-    .select("id, reservation_id, scrolled_to_end, contribution_id, user_id")
-    .eq("id", params.contractId)
-    .maybeSingle();
-
-  if (error || !data) {
-    return { ok: false as const, error: "Contrato do aporte não encontrado." };
-  }
-  if (
-    data.user_id !== params.userId ||
-    data.reservation_id !== params.reservationId ||
-    data.scrolled_to_end !== true ||
-    data.contribution_id
-  ) {
-    return {
-      ok: false as const,
-      error: "Aceite o contrato do aporte para continuar.",
-    };
-  }
-  return { ok: true as const };
-}
-
+/**
+ * Compatibilidade: apps antigos ainda mandam contract_id (aceite por aporte, removido).
+ * Se vier e for do usuário, liga ao lançamento; se não, ignora. Nunca bloqueia o Pix.
+ */
 async function linkAporteContract(params: {
   contractId: string;
   contributionId: string;
   userId: string;
 }) {
   if (params.contractId === "mock-contract") return;
-  const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
-  const { createClient } = await import("@/lib/supabase/server");
-  const db = tryCreateServiceClient() ?? (await createClient());
-  await db
-    .from("aporte_contracts")
-    .update({ contribution_id: params.contributionId })
-    .eq("id", params.contractId)
-    .eq("user_id", params.userId)
-    .is("contribution_id", null);
+  try {
+    const { tryCreateServiceClient } = await import("@/lib/supabase/admin");
+    const { createClient } = await import("@/lib/supabase/server");
+    const db = tryCreateServiceClient() ?? (await createClient());
+    await db
+      .from("aporte_contracts")
+      .update({ contribution_id: params.contributionId })
+      .eq("id", params.contractId)
+      .eq("user_id", params.userId)
+      .is("contribution_id", null);
+  } catch {
+    // aceite antigo opcional: falha aqui não impede o aporte
+  }
 }
 
 export async function generatePixForReservation(params: {
   reservationId: string;
   amountCents: number;
+  /** Obsoleto (aceite por aporte removido); tolerado. */
   contractId?: string;
 }): Promise<GeneratePixOutcome> {
   const { reservationId, amountCents, contractId } = params;
@@ -74,32 +51,24 @@ export async function generatePixForReservation(params: {
   if (!Number.isFinite(amountCents) || amountCents < MIN_CONTRIBUTION_CENTS) {
     return { ok: false, error: "Valor mínimo de R$ 5,00 por aporte." };
   }
-  if (!contractId) {
-    return { ok: false, error: "Aceite o contrato do aporte para continuar." };
-  }
 
   const user = await getCurrentUser();
   if (!user) return { ok: false, error: "Entre para continuar." };
 
-  const { aporteBlockedForUser } = await import("@/lib/profile/identity-server");
+  const { aporteBlockedForUser } =
+    await import("@/lib/profile/identity-server");
   const blocked = await aporteBlockedForUser(user);
   if (blocked) return { ok: false, error: blocked };
-
-  const contract = await assertAporteContract({
-    contractId,
-    reservationId,
-    userId: user.id,
-  });
-  if (!contract.ok) return contract;
 
   const created = await createContribution(reservationId, amountCents);
   if (!created.ok) return { ok: false, error: created.error };
 
-  await linkAporteContract({
-    contractId,
-    contributionId: created.contribution_id,
-    userId: user.id,
-  });
+  if (contractId)
+    await linkAporteContract({
+      contractId,
+      contributionId: created.contribution_id,
+      userId: user.id,
+    });
 
   if (!isPixGatewayConfigured()) {
     return {

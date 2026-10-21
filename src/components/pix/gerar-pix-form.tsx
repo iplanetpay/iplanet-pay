@@ -2,7 +2,6 @@
 
 import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { AporteContractModal } from "@/components/pix/aporte-contract-modal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCentsBRL } from "@/lib/utils";
@@ -38,7 +37,6 @@ export function GerarPixForm({
   const [advancing, setAdvancing] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [contractOpen, setContractOpen] = useState(false);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -48,11 +46,10 @@ export function GerarPixForm({
     setPayment(null);
     setConfirmed(false);
     setCopied(false);
-    setContractOpen(true);
+    void generate();
   }
 
-  async function generateAfterAccept(contractId: string) {
-    setContractOpen(false);
+  async function generate() {
     setLoading(true);
     setMessage(null);
     try {
@@ -62,7 +59,6 @@ export function GerarPixForm({
         body: JSON.stringify({
           reservation_id: reservationId,
           amount_brl: amountBrl,
-          contract_id: contractId,
         }),
       });
       const data = (await res.json()) as {
@@ -134,14 +130,6 @@ export function GerarPixForm({
 
   return (
     <div className="space-y-4">
-      <AporteContractModal
-        open={contractOpen}
-        reservationId={reservationId}
-        onClose={() => setContractOpen(false)}
-        onAccepted={(contractId) => {
-          void generateAfterAccept(contractId);
-        }}
-      />
       <form onSubmit={submit} className="space-y-3">
         <Input
           label="Valor do aporte (R$)"

@@ -1,7 +1,7 @@
 import { PageHeader } from "@/components/ui/page-header";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Smartphone } from "lucide-react";
-import { listCatalogProducts, listProductSwatches } from "@/lib/catalog/products";
+import { listCatalogProducts, listProductSwatches, listProductVariants } from "@/lib/catalog/products";
 import { CatalogBrowser } from "@/components/catalog/catalog-browser";
 import { FaqChat } from "@/components/chat/faq-chat";
 import { getAppSettings } from "@/lib/settings/queries";
@@ -14,10 +14,11 @@ export default async function CatalogoPage({
   searchParams?: Promise<{ product?: string }>;
 }) {
   const sp = searchParams ? await searchParams : {};
-  const [{ products, error }, { settings }, swatches] = await Promise.all([
+  const [{ products, error }, { settings }, swatches, variants] = await Promise.all([
     listCatalogProducts(),
     getAppSettings(["whatsapp_support"]),
     listProductSwatches(),
+    listProductVariants(),
   ]);
 
   const highlight = sp.product
@@ -53,6 +54,7 @@ export default async function CatalogoPage({
         <CatalogBrowser
           products={ordered}
           swatches={swatches}
+          variants={variants}
           highlightId={highlight?.id}
         />
       )}

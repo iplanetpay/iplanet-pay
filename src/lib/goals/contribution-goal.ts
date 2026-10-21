@@ -1,5 +1,5 @@
 import { getCurrentUser } from "@/lib/auth/session";
-import { listCatalogProducts } from "@/lib/catalog/products";
+import { listCatalogProducts, listProductVariants } from "@/lib/catalog/products";
 import { storesForProduct } from "@/lib/catalog/stores-for-product";
 import { getActiveGoalForReservation } from "@/lib/goals/queries";
 import { createPaymentGoal } from "@/lib/goals/mutations";
@@ -18,6 +18,8 @@ export type SaveContributionMetaResult =
 export async function saveContributionMeta(input: {
   name: string;
   product_id: string;
+  /** Variante do catálogo (cor/armazenamento); usa o preço dela. */
+  variant_id?: string | null;
   target_date: string;
   start_date: string;
   frequency: ContributionFrequency;
@@ -39,6 +41,7 @@ export async function saveContributionMeta(input: {
   if (!startDate) return { ok: false, error: "Informe a data de início." };
   let reservationId = input.reservation_id?.trim() || null;
   let productId = input.product_id.trim();
+  const variantId = input.reservation_id?.trim() ? null : input.variant_id?.trim() || null;
   let targetCents = 0;
   let contributedCents = 0;
   let storeId: string | null = null;
@@ -70,6 +73,12 @@ export async function saveContributionMeta(input: {
       return { ok: false, error: "Nenhuma loja com estoque para este produto." };
     }
     targetCents = product.list_price_cents;
+    if (variantId) {
+      const variants = (await listProductVariants())[productId] ?? [];
+      const variant = variants.find((row) => row.id === variantId);
+      if (!variant) return { ok: false, error: "Essa combinação de cor e armazenamento não está disponível." };
+      targetCents = variant.price_cents;
+    }
     contributedCents = 0;
   }
 
@@ -99,7 +108,7 @@ export async function saveContributionMeta(input: {
     if (!storeId) {
       return { ok: false, error: "Nenhuma loja com estoque para este produto." };
     }
-    const created = await createReservation(productId, storeId);
+    const created = await createReservation(productId, storeId, variantId);
     if (!created.ok) return { ok: false, error: created.error };
     reservationId = created.id;
   }

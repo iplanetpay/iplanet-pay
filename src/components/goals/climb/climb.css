@@ -1,4 +1,4 @@
-/* Escalada da tela Metas. Escopo em .metas-climb para não vazar no app. */
+/* Viagem até o planeta (tela Metas). Escopo em .metas-climb para não vazar no app. */
 
 .metas-climb {
   --blue: var(--accent, #0071e3);
@@ -839,4 +839,82 @@
     padding-top: 0;
     width: auto;
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Viagem até o planeta iPlanet                                         */
+/* ------------------------------------------------------------------ */
+.metas-climb .scene.space {
+  background: #050816;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 1px 2px rgba(5, 8, 22, 0.2),
+    0 24px 60px rgba(17, 32, 90, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: background 1.2s ease;
+}
+.metas-climb .scene.space .svg-label {
+  stroke: rgba(5, 8, 22, 0.6);
+  letter-spacing: 0.04em;
+}
+.metas-climb .scene.space .glass {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+}
+.metas-climb .scene.space .pill,
+.metas-climb .scene.space .status-pill,
+.metas-climb .scene.space .seg-label {
+  color: #fff;
+}
+.metas-climb .scene.space .segmented button.active .seg-label {
+  color: #0b1440;
+}
+.metas-climb .scene.space .seg-thumb {
+  background: #fff;
+}
+.metas-climb .scene.space .trophy-banner {
+  color: #fff;
+  background: linear-gradient(135deg, rgba(59, 139, 255, 0.55), rgba(139, 92, 246, 0.55));
+}
+.metas-climb .stars circle {
+  animation: metas-twinkle 4s ease-in-out infinite;
+}
+.metas-climb .stars-2 circle {
+  animation-duration: 2.6s;
+}
+.metas-climb .planet-glow {
+  animation: metas-glow 3.6s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.metas-climb .prize-in {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: space-prize 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+@keyframes space-prize {
+  from {
+    transform: translateY(24px) scale(0.3);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .metas-climb .stars circle,
+  .metas-climb .planet-glow,
+  .metas-climb .prize-in {
+    animation: none !important;
+  }
+  }
+.metas-climb .scene.space .status-pill .sp-label {
+  color: #fff;
+}
+.metas-climb .scene.space .status-pill .sp-pct {
+  color: rgba(255, 255, 255, 0.72);
 }

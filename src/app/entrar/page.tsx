@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { TERMS_VERSION } from "@/lib/withdrawals/types";
 import { LoginForm } from "@/components/auth/login-form";
 import { PageHeader } from "@/components/ui/page-header";
 import { Card } from "@/components/ui/card";
@@ -60,7 +61,7 @@ export default async function EntrarPage({
           <Link href="/termos" className="underline">
             Termos de uso
           </Link>{" "}
-          · saque, retirada, indicação e sorteio (platform-v2)
+          · saque, retirada, indicação e sorteio ({TERMS_VERSION})
         </p>
       </div>
     </div>

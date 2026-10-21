@@ -9,10 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { MotionModal } from "@/components/ui/motion";
 import { EmptyState } from "@/components/ui/empty-state";
 import { formatCentsBRL } from "@/lib/utils";
+import { ClientDetailView } from "@/components/clients/client-detail-view";
+import { WithdrawalFeeBreakdown } from "@/components/withdrawals/withdrawal-fee-breakdown";
 import {
   PAYOUT_STATUS_LABEL,
+  WITHDRAWAL_SOURCE_LABEL,
   WITHDRAWAL_STATUS_LABEL,
+  withdrawalSource,
   type WithdrawalPayoutStatus,
+  type WithdrawalSource,
   type WithdrawalStatus,
 } from "@/lib/withdrawals/types";
 import type { WithdrawalWithDetails } from "@/lib/withdrawals/queries";
@@ -43,6 +48,9 @@ export function AdminSaquesPanel({
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [clientId, setClientId] = useState<string | null>(null);
+  const [clientName, setClientName] = useState<string | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   function openModal(item: WithdrawalWithDetails, act: "approve" | "reject") {
     setActive(item);
@@ -118,9 +126,24 @@ export function AdminSaquesPanel({
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-semibold">
-                      {w.client_name ?? "Cliente"} ·{" "}
-                      {w.product_name ?? "Produto"}
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold">
+                      <button
+                        type="button"
+                        className="text-left text-[var(--accent)] underline-offset-2 hover:underline"
+                        data-testid="saque-client-name"
+                        onClick={() => {
+                          setClientId(w.user_id);
+                          setClientName(w.client_name);
+                        }}
+                      >
+                        {w.client_name ?? w.holder_full_name ?? "Cliente"}
+                      </button>
+                      <SourceBadge source={withdrawalSource(w)} />
+                      {withdrawalSource(w) === "reserva" ? (
+                        <span className="font-normal text-[var(--ink-muted)]">
+                          {w.product_name ?? "Produto"}
+                        </span>
+                      ) : null}
                     </p>
                     <p className="text-sm text-[var(--ink-muted)]">
                       {new Date(w.created_at).toLocaleString("pt-BR")} ·{" "}
@@ -133,15 +156,41 @@ export function AdminSaquesPanel({
                     </p>
                   </div>
                   <div className="text-sm sm:text-right">
-                    <p>
-                      Total {formatCentsBRL(w.total_paid_cents)} · taxa{" "}
-                      {formatCentsBRL(w.fee_amount_cents)}
-                    </p>
+                    {withdrawalSource(w) === "bonus" ? (
+                      <p>Bônus {formatCentsBRL(w.total_paid_cents)} · sem taxa</p>
+                    ) : (
+                      <p>
+                        Total {formatCentsBRL(w.total_paid_cents)} · integral{" "}
+                        {formatCentsBRL(w.full_refund_cents ?? 0)} · taxa{" "}
+                        {formatCentsBRL(w.fee_amount_cents)}
+                      </p>
+                    )}
                     <p className="font-bold text-[var(--accent)]">
                       Receber {formatCentsBRL(w.refund_amount_cents)}
                     </p>
+                    {withdrawalSource(w) !== "bonus" ? (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-[var(--ink-muted)] underline-offset-2 hover:underline"
+                        onClick={() => setExpandedId(expandedId === w.id ? null : w.id)}
+                      >
+                        {expandedId === w.id ? "Ocultar cálculo" : "Ver cálculo"}
+                      </button>
+                    ) : null}
                   </div>
                 </div>
+                {expandedId === w.id ? (
+                  <WithdrawalFeeBreakdown
+                    compact
+                    totalPaidCents={w.total_paid_cents}
+                    feePct={Number(w.fee_percentage)}
+                    feeAmountCents={w.fee_amount_cents}
+                    refundAmountCents={w.refund_amount_cents}
+                    fullRefundCents={w.full_refund_cents}
+                    discountedCents={w.discounted_cents}
+                    totalLabel={withdrawalSource(w) === "carteira" ? "Saldo da carteira" : "Aportes confirmados"}
+                  />
+                ) : null}
                 <p className="text-sm text-[var(--ink-muted)] [overflow-wrap:anywhere]">
                   <span className="uppercase">{w.pix_key_type}</span>:{" "}
                   <span className="font-mono text-[var(--ink)]">{w.pix_key}</span>
@@ -189,7 +238,8 @@ export function AdminSaquesPanel({
         <div className="space-y-4 px-5 py-4">
           {active ? (
             <p className="text-sm text-[var(--ink-muted)]">
-              {active.client_name} · reembolso{" "}
+              {active.client_name} ·{" "}
+              {WITHDRAWAL_SOURCE_LABEL[withdrawalSource(active)].toLowerCase()} · reembolso{" "}
               <strong className="text-[var(--ink)]">
                 {formatCentsBRL(active.refund_amount_cents)}
               </strong>
@@ -234,6 +284,55 @@ export function AdminSaquesPanel({
           </Button>
         </div>
       </MotionModal>
+      <MotionModal
+        open={!!clientId}
+        onClose={() => setClientId(null)}
+        labelledBy="saque-client-title"
+        className="max-w-2xl"
+      >
+        <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
+          <h2 id="saque-client-title" className="text-lg font-bold">
+            Cliente
+          </h2>
+          <button
+            type="button"
+            className="text-sm font-semibold text-[var(--ink-muted)]"
+            onClick={() => setClientId(null)}
+          >
+            Fechar
+          </button>
+        </div>
+        <div className="max-h-[75dvh] overflow-y-auto px-5 py-4">
+          {clientId ? (
+            <ClientDetailView
+              clientId={clientId}
+              area="admin"
+              fallbackName={clientName}
+              onSelectClient={(id) => {
+                setClientId(id);
+                setClientName(null);
+              }}
+            />
+          ) : null}
+        </div>
+      </MotionModal>
     </section>
+  );
+}
+
+function SourceBadge({ source }: { source: WithdrawalSource }) {
+  const tone =
+    source === "bonus"
+      ? "bg-amber-100 text-amber-800"
+      : source === "carteira"
+        ? "bg-sky-100 text-sky-800"
+        : "bg-[var(--bg-subtle)] text-[var(--ink-muted)]";
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-semibold ${tone}`}
+      data-testid="saque-source"
+    >
+      {WITHDRAWAL_SOURCE_LABEL[source]}
+    </span>
   );
 }

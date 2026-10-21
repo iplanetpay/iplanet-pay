@@ -9,14 +9,26 @@ import {
   conditionFromName,
 } from "@/components/catalog/catalog-product-card";
 import type { ProductWithStock } from "@/types/database";
+import Link from "next/link";
+import { CatalogVariantPicker } from "@/components/catalog/catalog-variant-picker";
+import {
+  buildVariantOptions,
+  imagesForColor,
+  minPriceCents,
+  variantLabel,
+  type CatalogVariant,
+  type VariantRow,
+} from "@/lib/catalog/variants";
 
 export function CatalogBrowser({
   products,
   swatches,
+  variants = {},
   highlightId,
 }: {
   products: ProductWithStock[];
   swatches: Record<string, string[]>;
+  variants?: Record<string, VariantRow[]>;
   highlightId?: string | null;
 }) {
   const [category, setCategory] = useState("Todos");
@@ -85,45 +97,74 @@ export function CatalogBrowser({
         <p className="text-sm text-[var(--ink-muted)]">Nenhum produto com esse nome.</p>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2">
-          {visible.map((product) => {
-            const colors = [
-              ...(product.color ? [product.color] : []),
-              ...((swatches[product.id] ?? []).filter((color) => color !== product.color)),
-            ];
-            return (
-              <Card
-                key={product.id}
-                id={product.slug}
-                className={highlightId === product.id ? "ring-2 ring-[var(--accent)]" : ""}
-              >
-                <CatalogProductCard
-                  name={product.name}
-                  meta={
-                    [product.storage, colors.length === 1 ? "1 cor" : `${Math.max(colors.length, 1)} cores`]
-                      .filter(Boolean)
-                      .join(" · ")
-                  }
-                  condition={conditionFromName(product.name, product.category)}
-                  priceCents={product.list_price_cents}
-                  images={[product.image_url, ...(product.product_images ?? [])].filter(
-                    (url): url is string => Boolean(url),
-                  )}
-                  colors={colors}
-                  onDetails={() => {
-                    document.getElementById(`reserve-${product.id}`)?.scrollIntoView({
-                      behavior: "smooth",
-                      block: "nearest",
-                    });
-                  }}
-                />
-                <div id={`reserve-${product.id}`} className="mt-4">
-                  <ReserveForm product={product} />
-                </div>
-              </Card>
-            );
-          })}
+          {visible.map((product) => (
+            <CatalogItem
+              key={product.id}
+              product={product}
+              swatches={swatches[product.id] ?? []}
+              rows={variants[product.id] ?? []}
+              highlighted={highlightId === product.id}
+            />
+          ))}
         </div>
       )}
     </div>
+  );
+}
+
+function CatalogItem({
+  product,
+  swatches,
+  rows,
+  highlighted,
+}: {
+  product: ProductWithStock;
+  swatches: string[];
+  rows: VariantRow[];
+  highlighted: boolean;
+}) {
+  const options = useMemo(() => buildVariantOptions(product, rows), [product, rows]);
+  const [variant, setVariant] = useState<CatalogVariant>(options.variants[0]);
+  const hasChoice = options.variants.length > 1;
+  // sem variantes cadastradas, as cores extras (swatches) continuam só ilustrativas
+  const colors = hasChoice
+    ? options.colors
+    : [...(product.color ? [product.color] : []), ...swatches.filter((c) => c !== product.color)];
+  const images = imagesForColor(
+    [product.image_url, ...(product.product_images ?? [])].filter((url): url is string => Boolean(url)),
+    variant.color,
+  );
+  const simulatorHref = `/app/simulador?product=${encodeURIComponent(product.id)}${variant.id ? `&variant=${encodeURIComponent(variant.id)}` : ""}`;
+
+  return (
+    <Card id={product.slug} className={highlighted ? "ring-2 ring-[var(--accent)]" : ""}>
+      <CatalogProductCard
+        name={product.name}
+        meta={
+          hasChoice
+            ? variantLabel(variant)
+            : [product.storage, colors.length === 1 ? "1 cor" : `${Math.max(colors.length, 1)} cores`].filter(Boolean).join(" · ")
+        }
+        condition={conditionFromName(product.name, product.category)}
+        priceCents={hasChoice ? variant.priceCents : minPriceCents(options)}
+        exactPrice={hasChoice}
+        images={images}
+        colors={colors}
+        colorHexes={options.colorHexes}
+        picker={hasChoice ? <CatalogVariantPicker options={options} value={variant} onChange={setVariant} /> : undefined}
+        onDetails={() => {
+          document.getElementById(`reserve-${product.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }}
+      />
+      <div id={`reserve-${product.id}`} className="mt-4">
+        <ReserveForm product={product} variant={hasChoice ? variant : null} />
+        <Link
+          href={simulatorHref}
+          className="mt-2 flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-[var(--accent)] hover:underline"
+        >
+          Simular aportes{hasChoice ? ` · ${variantLabel(variant)}` : ""}
+        </Link>
+      </div>
+    </Card>
   );
 }
