@@ -5,10 +5,14 @@
  * Lógica pura: usada no catálogo, no simulador e nos testes.
  */
 
+import { normalizeHex } from "./colors.ts";
+
 export interface VariantRow {
   id: string;
   product_id: string;
   color: string | null;
+  /** "#RRGGBB" da cor (migração 035); pode faltar em bancos antigos. */
+  color_hex?: string | null;
   storage: string | null;
   price_cents: number;
 }
@@ -17,6 +21,7 @@ export interface CatalogVariant {
   /** null = o próprio produto (sem variante). */
   id: string | null;
   color: string | null;
+  colorHex: string | null;
   storage: string | null;
   priceCents: number;
 }
@@ -24,6 +29,8 @@ export interface CatalogVariant {
 export interface VariantOptions {
   variants: CatalogVariant[];
   colors: string[];
+  /** Hex gravado por nome de cor (só as que têm hex). */
+  colorHexes: Record<string, string>;
   storages: string[];
 }
 
@@ -42,15 +49,15 @@ export function storageRank(storage: string): number {
 }
 
 export function buildVariantOptions(
-  product: { color: string | null; storage: string | null; list_price_cents: number },
+  product: { color: string | null; color_hex?: string | null; storage: string | null; list_price_cents: number },
   rows: VariantRow[] = [],
 ): VariantOptions {
   const variants: CatalogVariant[] = [
-    { id: null, color: clean(product.color), storage: clean(product.storage), priceCents: product.list_price_cents },
+    { id: null, color: clean(product.color), colorHex: normalizeHex(product.color_hex), storage: clean(product.storage), priceCents: product.list_price_cents },
   ];
   for (const row of rows) {
     if (!(row.price_cents > 0)) continue;
-    const v: CatalogVariant = { id: row.id, color: clean(row.color), storage: clean(row.storage), priceCents: row.price_cents };
+    const v: CatalogVariant = { id: row.id, color: clean(row.color), colorHex: normalizeHex(row.color_hex), storage: clean(row.storage), priceCents: row.price_cents };
     // linha só com cor ou só com armazenamento herda o outro eixo do produto
     v.color ??= variants[0].color;
     v.storage ??= variants[0].storage;
@@ -58,13 +65,18 @@ export function buildVariantOptions(
     variants.push(v);
   }
   const colors: string[] = [];
+  const colorHexes: Record<string, string> = {};
   const storages: string[] = [];
   for (const v of variants) {
     if (v.color && !colors.some((c) => same(c, v.color))) colors.push(v.color);
+    if (v.color && v.colorHex) {
+      const key = colors.find((c) => same(c, v.color)) ?? v.color;
+      colorHexes[key] ??= v.colorHex;
+    }
     if (v.storage && !storages.some((s) => same(s, v.storage))) storages.push(v.storage);
   }
   storages.sort((a, b) => storageRank(a) - storageRank(b));
-  return { variants, colors, storages };
+  return { variants, colors, colorHexes, storages };
 }
 
 export function findVariant(opts: VariantOptions, color: string | null, storage: string | null): CatalogVariant | null {
@@ -119,7 +131,7 @@ export function variantLabel(v: Pick<CatalogVariant, "color" | "storage">): stri
  * key = "produtoId:varianteId" (varianteId vazio = o próprio produto).
  */
 export function simulatorOptions(
-  products: Array<{ id: string; name: string; color: string | null; storage: string | null; list_price_cents: number }>,
+  products: Array<{ id: string; name: string; color: string | null; color_hex?: string | null; storage: string | null; list_price_cents: number }>,
   rows: Record<string, VariantRow[]>,
 ): Array<{ id: string; key: string; variantId: string | null; name: string; listPriceCents: number }> {
   return products.flatMap((product) => {

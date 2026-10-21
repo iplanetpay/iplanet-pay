@@ -1,3 +1,4 @@
+import { hexFromColorName } from "@/lib/catalog/colors";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { getCurrentUser } from "@/lib/auth/session";
 import { createCategory } from "@/lib/catalog/categories";
@@ -69,6 +70,7 @@ export async function listAllProducts(): Promise<{
         model,
         storage,
         color,
+        color_hex,
         list_price_cents,
         image_url,
         description,
@@ -103,6 +105,8 @@ export type ProductInput = {
   model: string;
   storage: string;
   color?: string | null;
+  /** "#RRGGBB" já validado pela rota. */
+  color_hex?: string | null;
   list_price_cents: number;
   image_url?: string | null;
   description?: string | null;
@@ -160,6 +164,7 @@ export async function createProduct(
     (input.slug?.trim() || slugify(`${name}-${storage}`)) || "produto";
   const brand = (input.brand?.trim() || "Apple").trim();
   const color = input.color?.trim() || null;
+  const color_hex = color ? (input.color_hex ?? hexFromColorName(color)) : null;
   const image_url = input.image_url?.trim() || null;
   const description = input.description?.trim() || null;
   const product_images = input.product_images ?? [];
@@ -176,6 +181,7 @@ export async function createProduct(
         model,
         storage,
         color,
+        color_hex,
         list_price_cents: input.list_price_cents,
         image_url,
         description,
@@ -198,6 +204,7 @@ export async function createProduct(
       model,
       storage,
       color,
+      color_hex,
       list_price_cents: Math.round(input.list_price_cents),
       image_url,
       description,
@@ -212,7 +219,7 @@ export async function createProduct(
       .insert(row)
       .select(
         `
-        id, name, slug, brand, model, storage, color,
+        id, name, slug, brand, model, storage, color, color_hex,
         list_price_cents, image_url, description, product_images, active, category, category_id, created_at
       `,
       )
@@ -274,6 +281,7 @@ export async function updateProduct(
     (input.slug?.trim() || slugify(`${name}-${storage}`)) || "produto";
   const brand = (input.brand?.trim() || "Apple").trim();
   const color = input.color?.trim() || null;
+  const color_hex = color ? (input.color_hex ?? hexFromColorName(color)) : null;
   const image_url = input.image_url?.trim() || null;
   const description = input.description?.trim() || null;
   const product_images = input.product_images ?? [];
@@ -290,6 +298,7 @@ export async function updateProduct(
         model,
         storage,
         color,
+        color_hex,
         list_price_cents: input.list_price_cents,
         image_url,
         description,
@@ -312,6 +321,7 @@ export async function updateProduct(
       model,
       storage,
       color,
+      color_hex,
       list_price_cents: Math.round(input.list_price_cents),
       image_url,
       description,
@@ -327,7 +337,7 @@ export async function updateProduct(
       .eq("id", input.id)
       .select(
         `
-        id, name, slug, brand, model, storage, color,
+        id, name, slug, brand, model, storage, color, color_hex,
         list_price_cents, image_url, description, product_images, active, category, category_id, created_at
       `,
       )

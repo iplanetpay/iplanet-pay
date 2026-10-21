@@ -26,6 +26,8 @@ export interface Product {
   model: string;
   storage: string;
   color: string | null;
+  /** "#RRGGBB" da cor do produto (migração 035). */
+  color_hex?: string | null;
   list_price_cents: number;
   image_url: string | null;
   description?: string | null;

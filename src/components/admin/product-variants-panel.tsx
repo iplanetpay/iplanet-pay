@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { formatCentsBRL } from "@/lib/utils";
 import { Layers, Plus } from "lucide-react";
+import { ColorPicker } from "@/components/admin/color-picker";
+import { hexFromColorName, swatchHex } from "@/lib/catalog/colors";
 
 type Variant = {
   id: string;
   model: string | null;
   color: string | null;
+  color_hex?: string | null;
   storage: string | null;
   price_cents: number;
   active: boolean;
@@ -30,6 +33,8 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [model, setModel] = useState("");
   const [color, setColor] = useState("");
+  const [colorHex, setColorHex] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [storage, setStorage] = useState("");
   const [priceReais, setPriceReais] = useState("");
 
@@ -75,6 +80,7 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
         body: JSON.stringify({
           model: model || null,
           color: color || null,
+          color_hex: color ? (colorHex ?? hexFromColorName(color)) : null,
           storage: storage || null,
           price_cents,
         }),
@@ -86,6 +92,7 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
       }
       setModel("");
       setColor("");
+      setColorHex(null);
       setStorage("");
       setPriceReais("");
       await load();
@@ -94,6 +101,24 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
     } finally {
       setLoading(false);
     }
+  }
+
+  const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  // arrastar o seletor gera muitos valores: grava só depois de 400 ms parado
+  function saveHex(variantId: string, hex: string) {
+    setVariants((list) => list.map((v) => (v.id === variantId ? { ...v, color_hex: hex } : v)));
+    clearTimeout(timers.current[variantId]);
+    timers.current[variantId] = setTimeout(() => void persistHex(variantId, hex), 400);
+  }
+
+  async function persistHex(variantId: string, hex: string) {
+    const res = await fetch(`/api/admin/products/${productId}/variants`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ variant_id: variantId, color_hex: hex }),
+    }).catch(() => null);
+    const data = res ? ((await res.json().catch(() => ({}))) as { ok?: boolean; error?: string }) : {};
+    if (!res || !res.ok || !data.ok) setError(data.error ?? "Falha ao salvar a cor.");
   }
 
   return (
@@ -119,7 +144,15 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
               key={v.id}
               className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm"
             >
-              <span>
+              <span className="flex items-center gap-2">
+                <button
+                  type="button"
+                  title={v.color ? `${v.color} · ${swatchHex(v.color, v.color_hex)} (editar cor)` : "Definir cor"}
+                  aria-label={`Editar cor de ${v.color ?? "variante"}`}
+                  onClick={() => setEditing(editing === v.id ? null : v.id)}
+                  className="h-6 w-6 rounded-full border border-black/10 shadow-inner"
+                  style={{ backgroundColor: swatchHex(v.color, v.color_hex) }}
+                />
                 {[v.model, v.storage, v.color].filter(Boolean).join(" · ") || "—"}
               </span>
               <div className="flex items-center gap-2">
@@ -128,6 +161,14 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
                   {v.active ? "ativa" : "inativa"}
                 </Pill>
               </div>
+              {editing === v.id ? (
+                <div className="w-full">
+                  <ColorPicker
+                    value={swatchHex(v.color, v.color_hex)}
+                    onChange={(hex) => saveHex(v.id, hex)}
+                  />
+                </div>
+              ) : null}
             </li>
           ))
         )}
@@ -135,7 +176,7 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
 
       <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={addVariant}>
         <Input label="Modelo" value={model} onChange={(e) => setModel(e.target.value)} />
-        <Input label="Cor" value={color} onChange={(e) => setColor(e.target.value)} />
+        <Input label="Cor" value={color} onChange={(e) => setColor(e.target.value)} placeholder="Titânio natural" />
         <Input
           label="Armazenamento"
           value={storage}
@@ -149,6 +190,13 @@ export function ProductVariantsPanel({ productId }: { productId: string }) {
           placeholder="8999,00"
           required
         />
+        <div className="sm:col-span-2">
+          <ColorPicker
+            value={colorHex ?? hexFromColorName(color)}
+            onChange={setColorHex}
+            onPickFavorite={(name) => setColor((c) => c || name)}
+          />
+        </div>
         <div className="sm:col-span-2">
           <Button
             type="submit"

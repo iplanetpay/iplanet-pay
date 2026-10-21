@@ -1,7 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
-import { colorHex } from "@/components/catalog/catalog-product-card";
+import { isLightHex, swatchHex } from "@/lib/catalog/colors";
 import {
   isComboAvailable,
   selectColor,
@@ -33,6 +33,7 @@ export function CatalogVariantPicker({
           <div className="mt-2 flex flex-wrap gap-2.5" role="radiogroup" aria-label="Cor">
             {options.colors.map((color) => {
               const on = (value.color ?? "").toLowerCase() === color.toLowerCase();
+              const hex = swatchHex(color, options.colorHexes[color]);
               return (
                 <button
                   key={color}
@@ -50,9 +51,12 @@ export function CatalogVariantPicker({
                 >
                   <span
                     className="flex h-6 w-6 items-center justify-center rounded-full border border-black/10 shadow-inner"
-                    style={{ backgroundColor: colorHex(color) }}
+                    style={{ backgroundColor: hex }}
+                    data-hex={hex}
                   >
-                    {on ? <Check className="h-3.5 w-3.5 text-white mix-blend-difference" strokeWidth={3} /> : null}
+                    {on ? (
+                      <Check className={`h-3.5 w-3.5 ${isLightHex(hex) ? "text-[#1d1d1f]" : "text-white"}`} strokeWidth={3} />
+                    ) : null}
                   </span>
                   {color}
                 </button>

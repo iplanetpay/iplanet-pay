@@ -92,22 +92,7 @@ function normalizeCatalogProducts(rows: ProductWithStock[]): ProductWithStock[] 
   }));
 }
 
-export async function listCatalogProducts(): Promise<{
-  products: ProductWithStock[];
-  error: string | null;
-}> {
-  if (USE_MOCK_AUTH) {
-    return { products: MOCK_CATALOG, error: null };
-  }
-
-  try {
-    const { createClient } = await import("@/lib/supabase/server");
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from("products")
-      .select(
-        `
+const PRODUCT_COLUMNS = `
         id,
         name,
         slug,
@@ -115,6 +100,7 @@ export async function listCatalogProducts(): Promise<{
         model,
         storage,
         color,
+        color_hex,
         list_price_cents,
         image_url,
         description,
@@ -130,10 +116,29 @@ export async function listCatalogProducts(): Promise<{
             slug
           )
         )
-      `,
-      )
-      .eq("active", true)
-      .order("list_price_cents", { ascending: true });
+      `;
+
+export async function listCatalogProducts(): Promise<{
+  products: ProductWithStock[];
+  error: string | null;
+}> {
+  if (USE_MOCK_AUTH) {
+    return { products: MOCK_CATALOG, error: null };
+  }
+
+  try {
+    const { createClient } = await import("@/lib/supabase/server");
+    const supabase = await createClient();
+
+    const select = (withHex: boolean) =>
+      supabase
+        .from("products")
+        .select(withHex ? PRODUCT_COLUMNS : PRODUCT_COLUMNS.replace(/\s*color_hex,/, ""))
+        .eq("active", true)
+        .order("list_price_cents", { ascending: true });
+    let { data, error } = await select(true);
+    // banco ainda sem a migração 035: segue sem o hex (cai no mapa por nome)
+    if (error && /color_hex/.test(error.message)) ({ data, error } = await select(false));
 
     if (error) {
       return { products: [], error: error.message };
@@ -181,21 +186,23 @@ export async function listProductVariants(): Promise<Record<string, VariantRow[]
   if (USE_MOCK_AUTH) {
     return {
       "mock-iphone-17": [
-        { id: "mock-v-512-lavanda", product_id: "mock-iphone-17", color: "Lavanda", storage: "512 GB", price_cents: 949900 },
-        { id: "mock-v-256-preto", product_id: "mock-iphone-17", color: "Preto", storage: "256 GB", price_cents: 799900 },
+        { id: "mock-v-512-lavanda", product_id: "mock-iphone-17", color: "Lavanda", color_hex: "#C9B8E8", storage: "512 GB", price_cents: 949900 },
+        { id: "mock-v-256-preto", product_id: "mock-iphone-17", color: "Preto", color_hex: "#1D1D1F", storage: "256 GB", price_cents: 799900 },
       ],
     };
   }
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("product_variants")
-      .select("id, product_id, color, storage, price_cents")
-      .eq("active", true);
+    const select = (cols: string) =>
+      supabase.from("product_variants").select(cols).eq("active", true);
+    let { data, error } = await select("id, product_id, color, color_hex, storage, price_cents");
+    if (error && /color_hex/.test(error.message)) {
+      ({ data, error } = await select("id, product_id, color, storage, price_cents"));
+    }
     if (error || !data) return {};
     const map: Record<string, VariantRow[]> = {};
-    for (const row of data as VariantRow[]) {
+    for (const row of data as unknown as VariantRow[]) {
       (map[row.product_id] ??= []).push(row);
     }
     return map;

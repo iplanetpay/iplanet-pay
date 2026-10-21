@@ -150,6 +150,7 @@ function CatalogItem({
         exactPrice={hasChoice}
         images={images}
         colors={colors}
+        colorHexes={options.colorHexes}
         picker={hasChoice ? <CatalogVariantPicker options={options} value={variant} onChange={setVariant} /> : undefined}
         onDetails={() => {
           document.getElementById(`reserve-${product.id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });

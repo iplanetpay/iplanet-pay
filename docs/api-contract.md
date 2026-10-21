@@ -16,7 +16,7 @@ Authorization: Bearer <access_token>
 
 O token é o JWT da sessão Supabase (três segmentos). `getCurrentUser` valida com `supabase.auth.getUser(token)`. O client PostgREST usa esse JWT, então a RLS do usuário vale. Um `Authorization` que não é JWT (por exemplo o segredo do cron) não troca o caminho do cookie.
 
-Segredos que nunca entram no app: service role, Mercado Pago, Evolution/WhatsApp, `CRON_SECRET`, `OPENWEATHER_API_KEY`.
+Segredos que nunca entram no app: service role, Mercado Pago, Evolution/WhatsApp, `CRON_SECRET`.
 
 ### Sessão nativa
 
@@ -40,7 +40,7 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/profile/identity` | sim | `phone`, `cpf`, `city`, `state`, `address`, `address_number`, `birth_date` | `{ ok: true }` |
 | `POST /api/profile/avatar` | sim | `multipart` campo `file` (imagem) | `avatar_url` |
 | `POST /api/profile/password` | sim | `password` (mínimo 8) | `{ ok: true }` |
-| `POST /api/reservations` | sim | `product_id`, `store_id` | `id`, `redirectTo` |
+| `POST /api/reservations` | sim | `product_id`, `store_id`, `variant_id?` (id de `product_variants` ativa do mesmo produto; a reserva usa o preço dela) | `id`, `redirectTo` |
 | `POST /api/reservations/cancel` | sim | `reservation_id` | `id` ou erro da política de cancelamento |
 | `GET /api/reservations/{id}/contributions` | sim | — | `contributions[]` |
 | `POST /api/reservations/{id}/contributions` | sim | `amount_cents` ou `amount_brl`, `contract_id?` | mesmo formato de `/api/pix/generate` |
@@ -49,7 +49,7 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/reservations/{id}/retirada` | sim | — | confirma retirada quando a regra do site permite |
 | `POST /api/pix/generate` | sim | `reservation_id`, `amount_cents` ou `amount_brl`, `contract_id?` | `contribution_id`, `amount_cents`, `gateway_configured`, `pix` `{ copy_paste, qr_base64, charge_id, provider }` ou `pix: null` e `error` se o gateway não estiver configurado |
 | `POST /api/aportes/contract` | sim | `reservation_id`, `scrolled_to_end: true`, `contract_version?`, `fingerprint` objeto | `contract_id` |
-| `POST /api/goals` | sim | Com plano: `name`, `product_id`, `start_date`, `target_date`, `frequency` (`daily`\|`weekly`\|`monthly`), `reservation_id?`. Sem frequência: meta legada com `amount_cents`, `installment_cents`, `installments_count`, `reminder_day?`, `whatsapp_phone?` | `goal_id`, e no plano também `reservation_id` |
+| `POST /api/goals` | sim | Com plano: `name`, `product_id`, `start_date`, `target_date`, `frequency` (`daily`\|`weekly`\|`monthly`), `reservation_id?`, `variant_id?` (sem reserva: cria a reserva da variante, com o preço dela). Sem frequência: meta legada com `amount_cents`, `installment_cents`, `installments_count`, `reminder_day?`, `whatsapp_phone?` | `goal_id`, e no plano também `reservation_id` |
 | `POST /api/wallet/apply` | sim | `reservation_id`, `amount_cents` | aplica crédito de indicação na reserva |
 | `POST /api/wallet/withdraw` | sim | `amount_cents` (mínimo 100000), `pix_key`, `pix_key_type`, `holder_full_name`, `holder_cpf` | saque da carteira, taxa 30% |
 | `POST /api/withdrawals/request` | sim | `reservation_id` | pedido de saque do valor aportado da reserva, taxa 30% |
@@ -60,13 +60,40 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/trade-in/respond` | sim | `offerId`, `action` `accept`\|`reject`\|`resubmit`\|`discard`, `expectedCents?` | resposta à contra-proposta |
 | `GET /api/notices` | sim | — | `notices[]` com `id`, `kind`, `title`, `body`, `couponCode`, `createdAt`, `read` |
 | `POST /api/notices/read` | sim | `notice_id` | marca como lido |
-| `GET /api/weather` | sim | `lat`, `lon` opcionais | `source` `openweather`\|`fallback`\|`needs_location`, `kind?`. A chave do OpenWeather fica no servidor |
 
 `401` quando falta sessão nas rotas marcadas. `400` para regra de negócio. Corpo inválido: `{ ok: false, error: "JSON inválido." }` onde a rota distingue o parse.
 
 ## Leituras
 
 Listas simples (perfil, catálogo, reservas, aportes, metas, carteira, indicações, avisos) podem ir direto ao PostgREST com a chave publishable e o JWT do usuário, sob RLS. Ranking de outras pessoas e criação de Pix, reserva, meta, saque, retirada e troca de usado passam pela API acima.
+
+## Catálogo: variantes e cores
+
+Leitura direta no PostgREST (RLS: público lê só `active = true`; só admin escreve).
+
+- `products`: `id`, `name`, `model`, `storage`, `color`, **`color_hex`**, `list_price_cents`, `image_url`, `product_images`, `category`, `active`.
+- `product_variants`: `id`, `product_id`, `model`, `color`, **`color_hex`**, `storage`, `price_cents`, `active`.
+
+`color_hex` é texto `"#RRGGBB"` maiúsculo (check `^#[0-9A-F]{6}$`) ou `null`. O admin escolhe a cor no seletor; sem escolha o banco preenche pelo nome da cor (`public.color_hex_from_name`). Se vier `null`, o cliente usa o mesmo mapa por nome de `src/lib/catalog/colors.ts` e, sem correspondência, `#C7C7CC`.
+
+O produto é a variante base (`variant_id` nulo, preço `list_price_cents`, cor `color`/`color_hex`). Cada linha de `product_variants` é outra combinação Cor × Armazenamento com `price_cents` próprio; linha sem `color` ou sem `storage` herda o eixo do produto. Combinação ausente fica indisponível.
+
+```
+GET /rest/v1/products?select=id,name,storage,color,color_hex,list_price_cents,product_variants(id,color,color_hex,storage,price_cents)&active=eq.true
+```
+
+```json
+{
+  "id": "uuid", "name": "iPhone 17", "storage": "256 GB", "color": "Lavanda", "color_hex": "#C9B8E8",
+  "list_price_cents": 799900,
+  "product_variants": [
+    { "id": "uuid", "color": "Lavanda", "color_hex": "#C9B8E8", "storage": "512 GB", "price_cents": 949900 },
+    { "id": "uuid", "color": "Preto", "color_hex": "#1D1D1F", "storage": "256 GB", "price_cents": 799900 }
+  ]
+}
+```
+
+A reserva grava `reservations.variant_id` (nulo sem variante). Admin: `POST /api/admin/products/{id}/variants` aceita `color_hex?`; `PATCH` com `variant_id`, `color_hex?`, `color?`, `active?`; `POST`/`PATCH /api/admin/products` aceitam `color_hex?`. Hex inválido → `400 { ok: false, error: "Cor inválida: use o formato #RRGGBB." }`.
 
 ## Pix
 

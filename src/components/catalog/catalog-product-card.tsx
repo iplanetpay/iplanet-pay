@@ -3,27 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { formatCentsBRL } from "@/lib/utils";
-
-const COLOR_HEX: Array<[RegExp, string]> = [
-  [/preto|black|meia-noite|midnight|space|grafite/i, "#1d1d1f"],
-  [/branco|white|starlight|estelar|prateado|prata|silver/i, "#f2f2f4"],
-  [/azul|blue|ultramar/i, "#3d7ea6"],
-  [/verde|green|teal/i, "#3d8c6e"],
-  [/amarelo|yellow/i, "#f5d76e"],
-  [/rosa|pink/i, "#f0b7c4"],
-  [/roxo|purple|lavanda/i, "#b7a6d8"],
-  [/dourado|gold|deserto|desert/i, "#d6b98c"],
-  [/natural|tit[aâ]nio|titanium/i, "#8d8d92"],
-  [/vermelho|red|product/i, "#c43b3b"],
-  [/laranja|orange/i, "#e07a3d"],
-];
-
-export function colorHex(name: string): string {
-  for (const [pattern, hex] of COLOR_HEX) {
-    if (pattern.test(name)) return hex;
-  }
-  return "#c7c7cc";
-}
+import { swatchHex } from "@/lib/catalog/colors";
 
 export function conditionFromName(name: string, category?: string | null): "Lacrado" | "Semi" {
   return /semi|usado|seminovo/i.test(`${name} ${category ?? ""}`) ? "Semi" : "Lacrado";
@@ -39,6 +19,7 @@ export function CatalogProductCard({
   onDetails,
   picker,
   exactPrice = false,
+  colorHexes = {},
 }: {
   name: string;
   meta: string;
@@ -51,6 +32,8 @@ export function CatalogProductCard({
   picker?: ReactNode;
   /** Preço da variante escolhida (sem "A partir de"). */
   exactPrice?: boolean;
+  /** Hex por nome de cor (color_hex do produto/variantes). */
+  colorHexes?: Record<string, string>;
 }) {
   const shots = images.length > 0 ? images : [];
   const [index, setIndex] = useState(0);
@@ -142,8 +125,10 @@ export function CatalogProductCard({
               <span
                 key={color}
                 title={color}
-                className="h-4 w-4 rounded-full border border-black/10"
-                style={{ backgroundColor: colorHex(color) }}
+                aria-label={color}
+                role="img"
+                className="h-4 w-4 rounded-full border border-black/10 shadow-inner"
+                style={{ backgroundColor: swatchHex(color, colorHexes[color]) }}
               />
             ))}
           </div>
