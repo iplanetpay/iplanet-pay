@@ -26,7 +26,12 @@ export type SimulatorProduct = {
   id: string;
   name: string;
   listPriceCents: number;
+  /** Variante do catálogo (cor/armazenamento); `key` diferencia as opções do mesmo produto. */
+  variantId?: string | null;
+  key?: string;
 };
+
+const optionKey = (product: SimulatorProduct) => product.key ?? product.id;
 
 export type SimulatorReservation = {
   id: string;
@@ -46,6 +51,7 @@ export function ContributionSimulator({
   initialStartDate = "",
   initialDate = "",
   initialFrequency = "monthly",
+  initialProductKey,
   onCreated,
 }: {
   products: SimulatorProduct[];
@@ -58,6 +64,7 @@ export function ContributionSimulator({
   initialStartDate?: string;
   initialDate?: string;
   initialFrequency?: ContributionFrequency;
+  initialProductKey?: string;
   onCreated?: (result: {
     reservationId: string;
     goalId: string;
@@ -85,7 +92,10 @@ export function ContributionSimulator({
 
   const [name, setName] = useState(initialName);
   const [productId, setProductId] = useState(
-    reservation?.productId ?? options[0]?.id ?? "",
+    reservation?.productId ??
+      (initialProductKey && options.some((p) => optionKey(p) === initialProductKey)
+        ? initialProductKey
+        : options[0] ? optionKey(options[0]) : ""),
   );
   const [startDate, setStartDate] = useState(initialStartDate || today);
   const [targetDate, setTargetDate] = useState(initialDate);
@@ -95,7 +105,7 @@ export function ContributionSimulator({
   const [error, setError] = useState<string | null>(null);
 
   const minEndDate = addCalendarDays(startDate || today, 1);
-  const selected = options.find((product) => product.id === productId) ?? null;
+  const selected = options.find((product) => optionKey(product) === productId) ?? null;
   const targetCents =
     reservation && productLocked
       ? reservation.listPriceCents
@@ -143,7 +153,8 @@ export function ContributionSimulator({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: name.trim(),
-          product_id: productLocked ? reservation?.productId : productId,
+          product_id: productLocked ? reservation?.productId : selected?.id,
+          variant_id: productLocked ? null : (selected?.variantId ?? null),
           target_date: targetDate,
           start_date: startDate,
           frequency,
@@ -229,7 +240,7 @@ export function ContributionSimulator({
             <option value="">Nenhum produto no catálogo</option>
           ) : (
             options.map((product) => (
-              <option key={product.id} value={product.id}>
+              <option key={optionKey(product)} value={optionKey(product)}>
                 {product.name}
               </option>
             ))

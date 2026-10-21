@@ -110,7 +110,7 @@ export default function suite(test) {
   });
 
   test("the metas screen drops the word topo and shows the aporte calendar", () => {
-    assert.equal(source("src/components/goals/climb/climb-scene.tsx").includes("Topo"), false);
+    assert.equal(source("src/components/goals/climb/rocket-scene.tsx").includes("Topo"), false);
     assert.equal(/topo/i.test(source("src/components/goals/climb/goal-stats.tsx")), false);
     assert.equal(/topo/i.test(source("src/app/app/metas/page.tsx")), false);
     assert.match(source("src/components/goals/climb/metas-screen.tsx"), /<ContributionCalendar/);

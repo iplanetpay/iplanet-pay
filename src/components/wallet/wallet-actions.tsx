@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,6 +8,14 @@ import { Select } from "@/components/ui/select";
 import { formatCentsBRL } from "@/lib/utils";
 import { PIX_KEY_TYPE_LABEL, type PixKeyType } from "@/lib/withdrawals/types";
 import type { ReservationWithDetails } from "@/lib/reservations/types";
+import type { WithdrawalSplit } from "@/lib/withdrawals/fee-window";
+import { WithdrawalFeeBreakdown } from "@/components/withdrawals/withdrawal-fee-breakdown";
+
+function reaisToCents(value: string) {
+  const n = Number(value.replace(/\./g, "").replace(",", "."));
+  if (!Number.isFinite(n) || n <= 0) return 0;
+  return Math.round(n * 100);
+}
 
 export function WalletActions({
   balanceCents,
@@ -29,12 +37,31 @@ export function WalletActions({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [feeNote, setFeeNote] = useState<string | null>(null);
+  const [split, setSplit] = useState<WithdrawalSplit | null>(null);
 
-  function reaisToCents(value: string) {
-    const n = Number(value.replace(/\./g, "").replace(",", "."));
-    if (!Number.isFinite(n) || n <= 0) return 0;
-    return Math.round(n * 100);
-  }
+  useEffect(() => {
+    const cents = reaisToCents(withdrawReais);
+    if (cents <= 0) {
+      setSplit(null);
+      return;
+    }
+    let ignore = false;
+    const t = setTimeout(() => {
+      void fetch(`/api/wallet/withdraw?amount_cents=${cents}`)
+        .then((r) => r.json() as Promise<{ ok?: boolean; split?: WithdrawalSplit }>)
+        .then((d) => {
+          if (!ignore) setSplit(d.ok && d.split ? d.split : null);
+        })
+        .catch(() => {
+          if (!ignore) setSplit(null);
+        });
+    }, 300);
+    return () => {
+      ignore = true;
+      clearTimeout(t);
+    };
+  }, [withdrawReais]);
+
 
   async function applyBalance() {
     setLoading(true);
@@ -132,7 +159,8 @@ export function WalletActions({
       <div className="space-y-3 rounded-[var(--radius-card)] border border-[var(--line)] bg-white p-4">
         <h2 className="text-lg font-bold">Sacar saldo</h2>
         <p className="text-sm text-[var(--ink-muted)]">
-          Mínimo R$ 1.000,00. Ao solicitar, 30% fica com a plataforma e 70% segue para o Pix.
+          Mínimo R$ 1.000,00, conta com 15 dias e aprovação do admin. Créditos lançados há até 7
+          dias voltam integralmente; sobre o restante incide a taxa de 30%.
         </p>
         <Input label="Valor (R$)" value={withdrawReais} onChange={(e) => setWithdrawReais(e.target.value)} />
         <Select label="Tipo da chave" value={pixType} onChange={(e) => setPixType(e.target.value as PixKeyType)}>
@@ -145,6 +173,19 @@ export function WalletActions({
         <Input label="Chave Pix" value={pixKey} onChange={(e) => setPixKey(e.target.value)} />
         <Input label="Titular" value={holder} onChange={(e) => setHolder(e.target.value)} />
         <Input label="CPF do titular" value={cpf} onChange={(e) => setCpf(e.target.value)} />
+        {split ? (
+          <WithdrawalFeeBreakdown
+            compact
+            totalLabel="Valor do saque"
+            totalPaidCents={split.totalCents}
+            feePct={split.feePct}
+            feeAmountCents={split.feeCents}
+            refundAmountCents={split.netCents}
+            fullRefundCents={split.fullRefundCents}
+            discountedCents={split.discountedCents}
+            windowDays={split.windowDays}
+          />
+        ) : null}
         <Button type="button" variant="outline" disabled={loading} onClick={() => void withdraw()}>
           Solicitar saque
         </Button>

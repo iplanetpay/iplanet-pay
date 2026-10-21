@@ -10,6 +10,7 @@ export type MutationResult =
 export async function createReservation(
   productId: string,
   storeId: string,
+  variantId: string | null = null,
 ): Promise<MutationResult> {
   if (!productId || !storeId) {
     return { ok: false, error: "Escolha o produto e a loja." };
@@ -27,10 +28,12 @@ export async function createReservation(
   try {
     const { createClient } = await import("@/lib/supabase/server");
     const supabase = await createClient();
-    const { data, error } = await supabase.rpc("create_reservation", {
-      p_product_id: productId,
-      p_store_id: storeId,
-    });
+    const { data, error } = await supabase.rpc(
+      "create_reservation",
+      variantId
+        ? { p_product_id: productId, p_store_id: storeId, p_variant_id: variantId }
+        : { p_product_id: productId, p_store_id: storeId },
+    );
 
     if (error || !data) {
       return { ok: false, error: mapReservationError(error?.message) };

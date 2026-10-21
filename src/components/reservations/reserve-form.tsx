@@ -7,12 +7,15 @@ import { Select } from "@/components/ui/select";
 import type { ProductWithStock } from "@/types/database";
 import { storesForProduct } from "@/lib/catalog/stores-for-product";
 import { trackEvent } from "@/lib/analytics/track";
+import { variantLabel, type CatalogVariant } from "@/lib/catalog/variants";
 
 interface ReserveFormProps {
   product: ProductWithStock;
+  /** Variante escolhida no catálogo (null = o próprio produto). */
+  variant?: CatalogVariant | null;
 }
 
-export function ReserveForm({ product }: ReserveFormProps) {
+export function ReserveForm({ product, variant = null }: ReserveFormProps) {
   const router = useRouter();
   const stores = useMemo(() => storesForProduct(product), [product]);
 
@@ -42,6 +45,7 @@ export function ReserveForm({ product }: ReserveFormProps) {
         body: JSON.stringify({
           product_id: product.id,
           store_id: storeId,
+          variant_id: variant?.id ?? null,
         }),
       });
       const data = (await res.json()) as {
@@ -89,7 +93,7 @@ export function ReserveForm({ product }: ReserveFormProps) {
         <input type="hidden" name="store_id" value={storeId} />
       )}
       <Button type="submit" variant="accent" fullWidth disabled={loading || !storeId}>
-        {loading ? "Reservando..." : "Reservar"}
+        {loading ? "Reservando..." : variant ? `Reservar ${variantLabel(variant)}` : "Reservar"}
       </Button>
       {message ? (
         <p className="text-sm text-[var(--danger)]">{message}</p>

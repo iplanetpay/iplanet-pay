@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,13 +11,21 @@ import {
   type PixKeyType,
 } from "@/lib/withdrawals/types";
 import { Wallet } from "lucide-react";
+import { formatCentsBRL } from "@/lib/utils";
+import type { WithdrawalSplit } from "@/lib/withdrawals/fee-window";
+import { WithdrawalFeeBreakdown } from "@/components/withdrawals/withdrawal-fee-breakdown";
 
 export function RequestSaqueButton({
   reservationId,
   size = "md",
+  mode = "reserva",
+  bonusCents = 0,
 }: {
-  reservationId: string;
+  reservationId?: string;
   size?: "sm" | "md" | "lg";
+  /** "bonus": saque do bônus de indicação, sempre com aprovação do admin. */
+  mode?: "reserva" | "bonus";
+  bonusCents?: number;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -27,22 +35,47 @@ export function RequestSaqueButton({
   const [holderCpf, setHolderCpf] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [split, setSplit] = useState<WithdrawalSplit | null>(null);
+  const [splitError, setSplitError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || mode !== "reserva" || !reservationId) return;
+    let ignore = false;
+    setSplit(null);
+    setSplitError(null);
+    void fetch(`/api/withdrawals/preview?reservation_id=${encodeURIComponent(reservationId)}`)
+      .then((r) => r.json() as Promise<{ ok?: boolean; split?: WithdrawalSplit; error?: string }>)
+      .then((d) => {
+        if (ignore) return;
+        if (d.ok && d.split) setSplit(d.split);
+        else setSplitError(d.error ?? "Não foi possível calcular o saque.");
+      })
+      .catch(() => {
+        if (!ignore) setSplitError("Erro de rede ao calcular o saque.");
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [open, mode, reservationId]);
 
   async function submit() {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/withdrawals/request", {
+      const res = await fetch(
+        mode === "bonus" ? "/api/referrals/withdraw-bonus" : "/api/withdrawals/request",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          reservation_id: reservationId,
+          ...(mode === "reserva" ? { reservation_id: reservationId } : {}),
           pix_key: pixKey,
           pix_key_type: pixKeyType,
           holder_full_name: holderName,
           holder_cpf: holderCpf,
         }),
-      });
+        },
+      );
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
         setMessage(data.error ?? "Não foi possível solicitar o saque.");
@@ -73,7 +106,7 @@ export function RequestSaqueButton({
           leftIcon={<Wallet className="h-4 w-4" />}
           onClick={() => setOpen(true)}
         >
-          Solicitar saque
+          {mode === "bonus" ? "Sacar bônus" : "Solicitar saque"}
         </Button>
       </div>
 
@@ -85,7 +118,7 @@ export function RequestSaqueButton({
       >
         <div className="flex items-center justify-between border-b border-[var(--line)] px-5 py-4">
           <h2 id="saque-title" className="text-lg font-bold tracking-tight">
-            Solicitar saque
+            {mode === "bonus" ? "Sacar bônus de indicação" : "Solicitar saque"}
           </h2>
           <button
             type="button"
@@ -100,6 +133,27 @@ export function RequestSaqueButton({
             O Pix do reembolso é efetuado em até <strong>24h</strong> após a
             aprovação no Financeiro.
           </p>
+          {mode === "bonus" ? (
+            <p className="rounded-[var(--radius-card)] bg-amber-50 p-3 text-sm text-amber-900">
+              Bônus de indicação de <strong>{formatCentsBRL(bonusCents)}</strong>, sem taxa. O
+              saque do bônus <strong>só sai com aprovação do admin</strong> na tela Saques; o
+              valor fica retido até a análise e volta para você se o pedido for rejeitado.
+            </p>
+          ) : split ? (
+            <WithdrawalFeeBreakdown
+              totalPaidCents={split.totalCents}
+              feePct={split.feePct}
+              feeAmountCents={split.feeCents}
+              refundAmountCents={split.netCents}
+              fullRefundCents={split.fullRefundCents}
+              discountedCents={split.discountedCents}
+              windowDays={split.windowDays}
+            />
+          ) : (
+            <p className="text-sm text-[var(--ink-muted)]">
+              {splitError ?? "Calculando o valor do saque…"}
+            </p>
+          )}
 
           <Select
             label="Tipo da chave Pix"

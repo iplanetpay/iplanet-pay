@@ -14,6 +14,8 @@ import { formatCentsBRL } from "@/lib/utils";
 import type { AdminProduct } from "@/lib/catalog/admin-products";
 import type { ProductCategory } from "@/types/database";
 import { ProductVariantsPanel } from "@/components/admin/product-variants-panel";
+import { ColorPicker } from "@/components/admin/color-picker";
+import { hexFromColorName, swatchHex } from "@/lib/catalog/colors";
 import { ImportRulesButton, ProductsTransferBar } from "@/components/admin/products-transfer";
 
 const NEW_CAT = "__new__";
@@ -26,6 +28,7 @@ type FormState = {
   model: string;
   storage: string;
   color: string;
+  color_hex: string | null;
   list_price_reais: string;
   image_url: string;
   /** Extra gallery URLs; first cover is image_url */
@@ -43,6 +46,7 @@ const emptyForm = (): FormState => ({
   model: "",
   storage: "",
   color: "",
+  color_hex: null,
   list_price_reais: "",
   image_url: "",
   product_images: [],
@@ -79,10 +83,11 @@ export function ProdutosAdminPanel({
   const [catName, setCatName] = useState("");
   const [catLoading, setCatLoading] = useState(false);
   const [draftVariants, setDraftVariants] = useState<
-    Array<{ model: string; color: string; storage: string; price_cents: number }>
+    Array<{ model: string; color: string; color_hex: string | null; storage: string; price_cents: number }>
   >([]);
   const [draftModel, setDraftModel] = useState("");
   const [draftColor, setDraftColor] = useState("");
+  const [draftHex, setDraftHex] = useState<string | null>(null);
   const [draftStorage, setDraftStorage] = useState("");
   const [draftPrice, setDraftPrice] = useState("");
 
@@ -108,6 +113,7 @@ export function ProdutosAdminPanel({
       model: p.model,
       storage: p.storage,
       color: p.color ?? "",
+      color_hex: p.color_hex ?? null,
       list_price_reais: centsToReais(p.list_price_cents),
       image_url: p.image_url ?? "",
       product_images: (p.product_images ?? []).filter(Boolean),
@@ -140,6 +146,7 @@ export function ProdutosAdminPanel({
       model: form.model,
       storage: form.storage,
       color: form.color || null,
+      color_hex: form.color ? (form.color_hex ?? hexFromColorName(form.color)) : null,
       list_price_cents,
       image_url: form.image_url || null,
       product_images: form.product_images
@@ -307,13 +314,20 @@ export function ProdutosAdminPanel({
               />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <Input
-                label="Cor"
-                value={form.color}
-                onChange={(e) =>
-                  setForm((f) => ({ ...f, color: e.target.value }))
-                }
-              />
+              <div className="space-y-2">
+                <Input
+                  label="Cor"
+                  value={form.color}
+                  onChange={(e) =>
+                    setForm((f) => ({ ...f, color: e.target.value }))
+                  }
+                />
+                <ColorPicker
+                  value={form.color_hex ?? hexFromColorName(form.color)}
+                  onChange={(hex) => setForm((f) => ({ ...f, color_hex: hex }))}
+                  onPickFavorite={(name) => setForm((f) => ({ ...f, color: f.color || name }))}
+                />
+              </div>
               <Input
                 label="Marca"
                 value={form.brand}
@@ -479,6 +493,13 @@ export function ProdutosAdminPanel({
                 <Input label="Cor" value={draftColor} onChange={(e) => setDraftColor(e.target.value)} />
                 <Input label="Armazenamento" value={draftStorage} onChange={(e) => setDraftStorage(e.target.value)} />
                 <Input label="Preço (R$)" value={draftPrice} onChange={(e) => setDraftPrice(e.target.value)} />
+                <div className="sm:col-span-2">
+                  <ColorPicker
+                    value={draftHex ?? hexFromColorName(draftColor)}
+                    onChange={setDraftHex}
+                    onPickFavorite={(name) => setDraftColor((c) => c || name)}
+                  />
+                </div>
               </div>
               <Button
                 type="button"
@@ -494,12 +515,14 @@ export function ProdutosAdminPanel({
                     {
                       model: draftModel,
                       color: draftColor,
+                      color_hex: draftColor ? (draftHex ?? hexFromColorName(draftColor)) : null,
                       storage: draftStorage,
                       price_cents,
                     },
                   ]);
                   setDraftModel("");
                   setDraftColor("");
+                  setDraftHex(null);
                   setDraftStorage("");
                   setDraftPrice("");
                 }}
@@ -508,7 +531,8 @@ export function ProdutosAdminPanel({
               </Button>
               <ul className="space-y-1 text-sm">
                 {draftVariants.map((variant, index) => (
-                  <li key={`${variant.color}-${variant.storage}-${index}`}>
+                  <li key={`${variant.color}-${variant.storage}-${index}`} className="flex items-center gap-2">
+                    <span className="h-4 w-4 rounded-full border border-black/10" style={{ backgroundColor: swatchHex(variant.color, variant.color_hex) }} />
                     {[variant.model, variant.color, variant.storage].filter(Boolean).join(" · ")}{" "}
                     · {formatCentsBRL(variant.price_cents)}
                   </li>

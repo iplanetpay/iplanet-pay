@@ -97,32 +97,66 @@ body {
   box-shadow: var(--shadow-soft);
 }
 
-/* Skeleton preloader — GPU-friendly shimmer (no JS). */
+/* Skeleton: só pulsa (opacidade), sem brilho deslizante nem entrada. */
 .experience-skeleton {
   position: relative;
   background: color-mix(in srgb, var(--line) 88%, var(--bg-subtle));
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
-.experience-skeleton::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  transform: translateX(-100%);
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 45%,
-    color-mix(in srgb, var(--bg) 85%, transparent) 50%,
-    color-mix(in srgb, var(--bg) 55%, transparent) 55%,
-    transparent 100%
-  );
-  animation: experience-shimmer 1.35s ease-in-out infinite;
-  will-change: transform;
-}
-
-@keyframes experience-shimmer {
+@keyframes skeleton-pulse {
+  0%,
   100% {
-    transform: translateX(100%);
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/*
+ * A página real, já no lugar, vira skeleton enquanto carrega (RouteExperienceLoader):
+ * textos e mídia viram blocos com o mesmo tamanho e posição; cards e fundos ficam.
+ */
+.route-skeleton {
+  --skel: color-mix(in srgb, var(--line) 88%, var(--bg-subtle));
+  animation: skeleton-pulse 1.6s ease-in-out infinite;
+  pointer-events: none;
+  user-select: none;
+}
+.route-skeleton :where(h1, h2, h3, h4, h5, p, a, button, label, legend, span, small, strong, b, li, td, th, dt, dd, input, select, textarea, [role="button"]) {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  text-shadow: none !important;
+  caret-color: transparent;
+}
+.route-skeleton :where(h1, h2, h3, h4, h5, p, small, strong, b, label, legend, dt, dd, td, th):not(:empty) {
+  background-color: var(--skel) !important;
+  border-radius: 8px;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.route-skeleton :where(button, a[class*="rounded"], input, select, textarea, [role="button"]) {
+  background: var(--skel) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+.route-skeleton :where(img, video, canvas, picture, iframe) {
+  content: linear-gradient(var(--skel), var(--skel));
+  background: var(--skel) !important;
+  border-radius: 14px;
+}
+.route-skeleton :where(svg) {
+  opacity: 0;
+}
+.route-skeleton :where(input, textarea)::placeholder {
+  color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .experience-skeleton,
+  .route-skeleton {
+    animation: none;
   }
 }
 
@@ -141,3 +175,19 @@ body {
   touch-action: none;
 }
 
+
+@keyframes catalog-fade {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  [class*="catalog-fade"] {
+    animation: none !important;
+  }
+}

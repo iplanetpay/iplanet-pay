@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { TERMS_VERSION } from "@/lib/withdrawals/types";
 import {
   MOCK_COOKIE,
   MOCK_USERS,
@@ -164,7 +165,7 @@ export async function POST(request: Request) {
         .from("profiles")
         .update({
           terms_accepted_at: new Date().toISOString(),
-          terms_version: body.terms_version || "withdrawal-v1",
+          terms_version: body.terms_version || TERMS_VERSION,
           phone,
           full_name: body.full_name ?? null,
         })
@@ -185,7 +186,7 @@ export async function POST(request: Request) {
         .from("profiles")
         .update({
           terms_accepted_at: new Date().toISOString(),
-          terms_version: body.terms_version || "withdrawal-v1",
+          terms_version: body.terms_version || TERMS_VERSION,
           phone,
         })
         .eq("id", userId);

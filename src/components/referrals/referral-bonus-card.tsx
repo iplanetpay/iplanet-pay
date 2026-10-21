@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { formatCentsBRL } from "@/lib/utils";
 import { Gift } from "lucide-react";
+import { RequestSaqueButton } from "@/components/withdrawals/request-saque-button";
 
 export function ReferralBonusCard({
   balanceCents,
@@ -78,6 +79,12 @@ export function ReferralBonusCard({
               Crie uma reserva ativa para usar o bônus.
             </p>
           )}
+          <div className="border-t border-[var(--line)] pt-3">
+            <p className="mb-2 text-xs text-[var(--ink-muted)]">
+              Prefere sacar? O bônus só sai via Pix com aprovação do admin.
+            </p>
+            <RequestSaqueButton mode="bonus" bonusCents={balanceCents} size="sm" />
+          </div>
           {message ? <p className="text-sm text-[var(--danger)]">{message}</p> : null}
         </div>
       </div>

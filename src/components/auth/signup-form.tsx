@@ -295,7 +295,7 @@ export function SignupForm({
                 className="font-semibold text-[var(--accent)] underline-offset-2 hover:underline"
                 onClick={() => setTermsOpen(true)}
               >
-                Termos de Uso (platform-v2)
+                Termos de Uso ({TERMS_VERSION})
               </button>{" "}
               — posso abrir o pop-up agora.
             </span>
