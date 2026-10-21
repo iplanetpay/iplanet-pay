@@ -100,6 +100,18 @@ export default function suite(test) {
     assert.match(guide, /Nunca\*\* peça senha/);
   });
 
+  test("guide explains the withdrawal rules (7-day full refund, 30% after, R$1.000, 15 days, admin)", () => {
+    const guide = source("docs/support-ai.md");
+    const saque = guide.slice(guide.indexOf("## Saque"), guide.indexOf("## Indicações"));
+    assert.match(saque, /7 dias ou menos[^\n]*100%/);
+    assert.match(saque, /mais de 7 dias[^\n]*30% de taxa/);
+    assert.match(saque, /R\$ 1\.000,00/);
+    assert.match(saque, /15 dias/);
+    assert.match(saque, /aprovação do admin/);
+    assert.match(guide, /saque do bônus \*\*só sai com aprovação do admin\*\*/);
+    assert.ok(source("supabase/migrations/036_support_ai.sql").includes(saque.trim()));
+  });
+
   test("customer menu shows Suporte right below Sair", () => {
     const menu = source("src/components/auth/cliente-header-menu.tsx");
     assert.ok(menu.indexOf("Sair") < menu.indexOf("Suporte"));

@@ -64,13 +64,17 @@ O iPlanet Pay é o "compre guardando" das lojas **iPlanet**, revenda de produtos
 ## Carteira
 
 - A Carteira reúne os aportes confirmados, o saldo de bônus de indicação e o histórico.
-- O bônus de indicação pode ser **aplicado em uma reserva ativa**.
+- O bônus de indicação pode ser **aplicado em uma reserva ativa** ou **sacado via Pix**, mas o saque do bônus **só sai com aprovação do admin** (o cliente toca em "Sacar bônus" no cartão do bônus; o valor fica retido até a análise e volta se o pedido for rejeitado ou cancelado). O saque do bônus não tem taxa.
 
 ## Saque (devolução)
 
-- O saque devolve aportes confirmados de uma reserva **Ativa**. Exige conta com pelo menos **15 dias** e mais de **R$ 1.000,00** confirmados na reserva (bônus e aportes pendentes não contam).
-- A plataforma retém **30% de taxa administrativa**; o cliente recebe **70%** na chave Pix informada.
-- O pedido é analisado pelo Financeiro; o Pix sai em até **24 horas úteis** após a aprovação. Durante a análise a reserva fica "Saque pendente" e, depois, "Sacada".
+- O saque devolve aportes confirmados de uma reserva **Ativa**. Exige conta com pelo menos **15 dias** e pelo menos **R$ 1.000,00** confirmados na reserva (bônus e aportes pendentes não contam).
+- **Reembolso integral em até 7 dias:** aportes Pix confirmados há **7 dias ou menos** da data do pedido voltam **100%**, sem taxa.
+- **Depois de 7 dias:** sobre os aportes confirmados há **mais de 7 dias** a plataforma retém **30% de taxa administrativa**; dessa parte o cliente recebe **70%**.
+- Exemplo: R$ 2.000,00 no saque, sendo R$ 500,00 confirmados há 3 dias e R$ 1.500,00 há 20 dias → R$ 500,00 voltam inteiros, taxa de R$ 450,00 sobre R$ 1.500,00 → o cliente recebe R$ 1.550,00.
+- Antes de confirmar, a tela do saque mostra a parte com reembolso integral, a parte com desconto, a taxa e o valor líquido.
+- Todo saque passa pela **aprovação do admin** no Financeiro; o Pix sai em até **24 horas úteis** após a aprovação. Durante a análise a reserva fica "Saque pendente" e, depois, "Sacada". O cliente pode cancelar o pedido enquanto estiver pendente.
+- O saque do saldo da Carteira segue as mesmas regras (mínimo R$ 1.000,00, 15 dias de conta, aprovação do admin, integral para créditos de até 7 dias e 30% sobre o resto).
 
 ## Indicações
 
