@@ -17,9 +17,8 @@ struct RocketSceneView: View {
     var body: some View {
         let status = climbStatus
         let deposits = climbDeposits
-        let condition = SpaceCondition.from(status)
         VStack(alignment: .leading, spacing: 16) {
-            scene(status: status, deposits: deposits, condition: condition)
+            scene(status: status, deposits: deposits)
             stats(status: status, deposits: deposits)
             if status != .done {
                 Button(status == .late ? "Aportar agora" : "Fazer aporte") {
@@ -53,7 +52,7 @@ struct RocketSceneView: View {
         }
     }
 
-    private func scene(status: ClimbStatus, deposits: [ClimbDeposit], condition: SpaceCondition) -> some View {
+    private func scene(status: ClimbStatus, deposits: [ClimbDeposit]) -> some View {
         let stations = Self.route.stations(count: deposits.count).enumerated().map { index, pose in
             Station(index: index, x: pose.x, y: pose.y, kind: deposits[index].status)
         }
@@ -75,7 +74,6 @@ struct RocketSceneView: View {
                     nebulaTop: rgb(nebula.top),
                     nebulaBottom: rgb(nebula.bottom),
                     nebulaGlow: rgb(nebula.glow),
-                    condition: condition,
                     profile: profile,
                     stations: stations,
                     selected: selected,
@@ -108,7 +106,7 @@ struct RocketSceneView: View {
         .overlay(alignment: .topLeading) { hudPill(status: status).padding(12) }
         .overlay(alignment: .topTrailing) { viewSwitch.padding(12) }
         .overlay(alignment: .bottom) {
-            hudFooter(status: status, condition: condition)
+            hudFooter(status: status)
                 .padding(12)
                 .allowsHitTesting(false)
         }
@@ -155,7 +153,7 @@ struct RocketSceneView: View {
         .allowsHitTesting(false)
     }
 
-    private func hudFooter(status: ClimbStatus, condition: SpaceCondition) -> some View {
+    private func hudFooter(status: ClimbStatus) -> some View {
         VStack(spacing: 8) {
             if let selected, selected < schedule.slots.count {
                 Text(selectionLine(selected))
@@ -167,13 +165,6 @@ struct RocketSceneView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
             HStack {
-                Label(condition.label, systemImage: conditionIcon(condition))
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(.ultraThinMaterial)
-                    .clipShape(Capsule())
-                Spacer()
                 Text(status == .done ? "Prêmio conquistado" : "Faltam \(MoneyFormat.reais(remainingCents))")
                     .font(.caption.weight(.semibold))
                     .padding(.horizontal, 10)
@@ -184,14 +175,6 @@ struct RocketSceneView: View {
         }
         .foregroundStyle(.white)
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: selected)
-    }
-
-    private func conditionIcon(_ condition: SpaceCondition) -> String {
-        switch condition {
-        case .calm: "sparkles"
-        case .asteroidField: "circle.hexagongrid.fill"
-        case .meteorStorm: "flame.fill"
-        }
     }
 
     private var viewSwitch: some View {
@@ -356,7 +339,6 @@ private struct RocketFrame: Sendable {
     var nebulaTop: Color
     var nebulaBottom: Color
     var nebulaGlow: Color
-    var condition: SpaceCondition
     var profile: RocketMotionProfile
     var stations: [Station]
     var selected: Int?
@@ -435,7 +417,6 @@ private func drawSpace(context: inout GraphicsContext, size: CGSize, frame: Rock
     world.translateBy(x: -focus.x, y: -focus.y)
     let s = min(w / 520, h / 700)
 
-    drawConditions(context: &world, size: size, frame: frame, scale: s)
 
     // Terra
     let earth = viewPoint(RocketRoute.earth.x, RocketRoute.earth.y + 40, size: size)
@@ -578,40 +559,6 @@ private func drawPlanet(context: inout GraphicsContext, size: CGSize, frame: Roc
         fr.stroke(Path(ellipseIn: outer), with: .color(.white.opacity(0.35)), lineWidth: 0.8)
         context.draw(Text("iPlanet").font(.caption2.weight(.heavy)).foregroundStyle(.white.opacity(0.85)),
                      at: CGPoint(x: c.x, y: c.y + r * 1.3))
-    }
-}
-
-private func drawConditions(context: inout GraphicsContext, size: CGSize, frame: RocketFrame, scale s: Double) {
-    switch frame.condition {
-    case .calm:
-        // Cometa ocasional
-        guard !frame.reduce else { return }
-        let t = (frame.time / 7).truncatingRemainder(dividingBy: 1)
-        let p = CGPoint(x: size.width * (1.1 - t * 1.3), y: size.height * (0.08 + t * 0.25))
-        var tail = Path(); tail.move(to: p); tail.addLine(to: CGPoint(x: p.x + 40 * s, y: p.y - 10 * s))
-        context.stroke(tail, with: .linearGradient(Gradient(colors: [.white.opacity(0.7), .clear]), startPoint: p, endPoint: CGPoint(x: p.x + 40 * s, y: p.y - 10 * s)), lineWidth: 1.5)
-    case .asteroidField:
-        for i in 0..<9 {
-            let drift = frame.reduce ? 0 : frame.time * (6 + hash(i) * 10)
-            var x = hash(i + 50) * size.width + drift
-            x = x.truncatingRemainder(dividingBy: size.width + 40) - 20
-            let y = size.height * (0.25 + hash(i + 80) * 0.5)
-            let r = (4 + hash(i + 90) * 7) * s
-            let rock = Path(roundedRect: CGRect(x: x - r, y: y - r * 0.8, width: r * 2, height: r * 1.6), cornerRadius: r * 0.7)
-            context.fill(rock, with: .linearGradient(Gradient(colors: [Color(white: 0.6), Color(white: 0.25)]), startPoint: CGPoint(x: x - r, y: y - r), endPoint: CGPoint(x: x + r, y: y + r)))
-        }
-    case .meteorStorm:
-        for i in 0..<14 {
-            let speed = 0.5 + hash(i) * 0.7
-            let t = frame.reduce ? hash(i + 3) : (frame.time * speed + hash(i + 3)).truncatingRemainder(dividingBy: 1)
-            let start = CGPoint(x: size.width * (hash(i + 20) * 1.4), y: -20)
-            let p = CGPoint(x: start.x - t * size.width * 0.6, y: start.y + t * size.height * 1.1)
-            let tailEnd = CGPoint(x: p.x + 26 * s, y: p.y - 46 * s)
-            var tail = Path(); tail.move(to: p); tail.addLine(to: tailEnd)
-            context.stroke(tail, with: .linearGradient(Gradient(colors: [Color(red: 1, green: 0.6, blue: 0.3), .clear]), startPoint: p, endPoint: tailEnd), style: StrokeStyle(lineWidth: 2.2, lineCap: .round))
-            context.fill(Path(ellipseIn: CGRect(x: p.x - 2.5, y: p.y - 2.5, width: 5, height: 5)), with: .color(Color(red: 1, green: 0.85, blue: 0.6)))
-        }
-        context.fill(Path(CGRect(x: -size.width, y: -size.height, width: size.width * 3, height: size.height * 3)), with: .color(Color.red.opacity(0.06)))
     }
 }
 

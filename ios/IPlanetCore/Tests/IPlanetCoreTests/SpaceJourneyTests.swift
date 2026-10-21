@@ -2,14 +2,6 @@ import XCTest
 @testable import IPlanetCore
 
 final class SpaceJourneyTests: XCTestCase {
-    func testConditionFollowsHealth() {
-        XCTAssertEqual(SpaceCondition.from(.onTrack), .calm)
-        XCTAssertEqual(SpaceCondition.from(.done), .calm)
-        XCTAssertEqual(SpaceCondition.from(.nearLate), .asteroidField)
-        XCTAssertEqual(SpaceCondition.from(.late), .meteorStorm)
-        XCTAssertEqual(SpaceCondition.meteorStorm.label, "Chuva de meteoros")
-    }
-
     func testPaceSlowsWithHealth() {
         XCTAssertGreaterThan(RocketMotionProfile.from(.onTrack).pace, RocketMotionProfile.from(.nearLate).pace)
         XCTAssertGreaterThan(RocketMotionProfile.from(.nearLate).pace, RocketMotionProfile.from(.late).pace)

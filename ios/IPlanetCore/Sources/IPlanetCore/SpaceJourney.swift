@@ -1,25 +1,14 @@
 import Foundation
 
-/// Condições do espaço na viagem até o planeta, derivadas da saúde da meta.
-public enum SpaceCondition: String, Sendable, CaseIterable {
-    case calm
-    case asteroidField = "asteroid_field"
-    case meteorStorm = "meteor_storm"
+public struct RGBColor: Equatable, Sendable {
+    public var red: Double
+    public var green: Double
+    public var blue: Double
 
-    public var label: String {
-        switch self {
-        case .calm: "Espaço calmo"
-        case .asteroidField: "Campo de asteroides"
-        case .meteorStorm: "Chuva de meteoros"
-        }
-    }
-
-    public static func from(_ status: ClimbStatus) -> SpaceCondition {
-        switch status {
-        case .onTrack, .done: .calm
-        case .nearLate: .asteroidField
-        case .late: .meteorStorm
-        }
+    public init(red: Double, green: Double, blue: Double) {
+        self.red = red
+        self.green = green
+        self.blue = blue
     }
 }
 
