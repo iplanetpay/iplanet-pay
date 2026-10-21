@@ -9,8 +9,11 @@ public struct VariantOption: Equatable, Sendable {
     public var storage: String
     public var priceCents: Int
     public var imageUrl: String?
+    /// "#RRGGBB" gravado no banco (pode faltar antes da migração 035).
+    public var colorHex: String?
 
-    public init(productId: UUID, variantId: UUID? = nil, color: String, storage: String, priceCents: Int, imageUrl: String?) {
+    public init(productId: UUID, variantId: UUID? = nil, color: String, colorHex: String? = nil, storage: String, priceCents: Int, imageUrl: String?) {
+        self.colorHex = colorHex
         self.productId = productId
         self.variantId = variantId
         self.color = color
@@ -26,6 +29,12 @@ public struct VariantMatrix: Equatable, Sendable {
     public private(set) var options: [VariantOption] = []
     public private(set) var colors: [String] = []
     public private(set) var storages: [String] = []
+    private var storedHex: [String: String] = [:]
+
+    /// Hex da cor: o primeiro gravado entre as opções dessa cor, senão pelo nome.
+    public func hex(for color: String) -> String {
+        ColorSwatch.hex(color, stored: storedHex[color.lowercased()])
+    }
 
     public init(options input: [VariantOption]) {
         for option in input where option.priceCents > 0 {
@@ -35,6 +44,9 @@ public struct VariantMatrix: Equatable, Sendable {
             clean.color = color
             clean.storage = storage
             if options.contains(where: { $0.color.lowercased() == color.lowercased() && $0.storage.lowercased() == storage.lowercased() }) { continue }
+            if let hex = ColorSwatch.normalize(option.colorHex), storedHex[color.lowercased()] == nil {
+                storedHex[color.lowercased()] = hex
+            }
             options.append(clean)
             if !color.isEmpty, !colors.contains(where: { $0.lowercased() == color.lowercased() }) { colors.append(color) }
             if !storage.isEmpty, !storages.contains(where: { $0.lowercased() == storage.lowercased() }) { storages.append(storage) }
@@ -96,25 +108,66 @@ public struct VariantMatrix: Equatable, Sendable {
     }
 }
 
-/// Mesma tabela de cores do site (catalog-product-card.tsx → colorHex).
+/// Porte de src/lib/catalog/colors.ts: hex gravado > hex pelo nome > cinza neutro.
 public enum ColorSwatch {
-    private static let table: [([String], String)] = [
-        (["preto", "black", "meia-noite", "midnight", "space", "grafite"], "#1d1d1f"),
-        (["branco", "white", "starlight", "estelar", "prateado", "prata", "silver"], "#f2f2f4"),
-        (["azul", "blue", "ultramar"], "#3d7ea6"),
-        (["verde", "green", "teal"], "#3d8c6e"),
-        (["amarelo", "yellow"], "#f5d76e"),
-        (["rosa", "pink"], "#f0b7c4"),
-        (["roxo", "purple", "lavanda"], "#b7a6d8"),
-        (["dourado", "gold", "deserto", "desert"], "#d6b98c"),
-        (["natural", "titânio", "titanio", "titanium"], "#8d8d92"),
-        (["vermelho", "red", "product"], "#c43b3b"),
-        (["laranja", "orange"], "#e07a3d"),
+    public static let fallbackHex = "#C7C7CC"
+
+    /// Regras por nome, da mais específica para a mais genérica (mesma ordem do site).
+    private static let rules: [(String, String)] = [
+        (#"tit[aâ]nio\s*natural|natural"#, "#BAB4A9"),
+        (#"tit[aâ]nio\s*preto|black\s*titanium"#, "#3C3C3D"),
+        (#"tit[aâ]nio\s*branco|white\s*titanium"#, "#F2F1ED"),
+        (#"tit[aâ]nio\s*deserto|deserto|desert"#, "#BFA48F"),
+        (#"azul[\s-]*sierra|sierra"#, "#9BB5CE"),
+        (#"meia[\s-]*noite|midnight"#, "#232A31"),
+        (#"cinza[\s-]*espacial|space\s*gr[ae]y"#, "#535150"),
+        (#"grafite|graphite"#, "#41424C"),
+        (#"estelar|starlight"#, "#F0E8DC"),
+        (#"lavanda|lavender"#, "#C9B8E8"),
+        (#"product|vermelho|red"#, "#BA0C2E"),
+        (#"preto|black|space"#, "#1D1D1F"),
+        (#"branco|white"#, "#F5F5F0"),
+        (#"prata|prateado|silver"#, "#E3E4E5"),
+        (#"azul|blue|ultramar"#, "#3D7EA6"),
+        (#"verde|green|teal"#, "#ADC7B4"),
+        (#"rosa|pink"#, "#F2C9CE"),
+        (#"roxo|purple"#, "#B7A6D8"),
+        (#"amarelo|yellow"#, "#F5E39A"),
+        (#"dourado|gold"#, "#F4E3C1"),
+        (#"laranja|orange|c[oó]smico"#, "#E07A3D"),
+        (#"tit[aâ]nio|titanium"#, "#8D8D92"),
     ]
 
-    public static func hex(_ name: String) -> String {
-        let lower = name.lowercased()
-        for (keys, hex) in table where keys.contains(where: { lower.contains($0) }) { return hex }
-        return "#c7c7cc"
+    /// Hex aproximado pelo nome da cor (nil se não reconhecer).
+    public static func hexFromName(_ name: String?) -> String? {
+        let n = (name ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !n.isEmpty else { return nil }
+        for (pattern, hex) in rules where n.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil {
+            return hex
+        }
+        return nil
+    }
+
+    /// "#abc", "abc", "#aabbcc", "AABBCC" → "#AABBCC"; inválido → nil.
+    public static func normalize(_ value: String?) -> String? {
+        guard var v = value?.trimmingCharacters(in: .whitespaces) else { return nil }
+        if v.hasPrefix("#") { v.removeFirst() }
+        let isHex = !v.isEmpty && v.allSatisfy(\.isHexDigit)
+        guard isHex else { return nil }
+        if v.count == 3 { v = v.map { "\($0)\($0)" }.joined() }
+        guard v.count == 6 else { return nil }
+        return "#" + v.uppercased()
+    }
+
+    public static func hex(_ name: String?, stored: String? = nil) -> String {
+        normalize(stored) ?? hexFromName(name) ?? fallbackHex
+    }
+
+    /// Cor clara (luminância > 160): ganha borda sutil e ✓ escuro.
+    public static func isLight(_ hex: String) -> Bool {
+        let n = normalize(hex) ?? fallbackHex
+        let value = Int(n.dropFirst(), radix: 16) ?? 0
+        let r = Double((value >> 16) & 0xFF), g = Double((value >> 8) & 0xFF), b = Double(value & 0xFF)
+        return 0.299 * r + 0.587 * g + 0.114 * b > 160
     }
 }

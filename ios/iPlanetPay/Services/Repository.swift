@@ -43,24 +43,37 @@ enum Repository {
     }
 
     static func products() async throws -> [Product] {
-        let rows: [Product] = try await client
-            .from("products")
-            .select("id, name, slug, brand, model, storage, color, list_price_cents, image_url, description, active, category, category_id")
-            .eq("active", value: true)
-            .order("list_price_cents", ascending: true)
-            .execute()
-            .value
-        return rows
+        func load(_ withHex: Bool) async throws -> [Product] {
+            try await client
+                .from("products")
+                .select("id, name, slug, brand, model, storage, color, \(withHex ? "color_hex, " : "")list_price_cents, image_url, description, active, category, category_id")
+                .eq("active", value: true)
+                .order("list_price_cents", ascending: true)
+                .execute()
+                .value
+        }
+        do {
+            return try await load(true)
+        } catch where isMissingColorHex(error) {
+            // Banco ainda sem a migração 035: segue sem o hex (cai no mapa por nome), como no site.
+            return try await load(false)
+        }
+    }
+
+    private static func isMissingColorHex(_ error: Error) -> Bool {
+        String(describing: error).contains("color_hex") || error.localizedDescription.contains("color_hex")
     }
 
     /// Variantes ativas (cores extras por produto), como `listProductSwatches` no site.
     static func productVariants() async throws -> [ProductVariant] {
-        try await client
-            .from("product_variants")
-            .select("id, product_id, model, color, storage, price_cents, active")
-            .eq("active", value: true)
-            .execute()
-            .value
+        func load(_ columns: String) async throws -> [ProductVariant] {
+            try await client.from("product_variants").select(columns).eq("active", value: true).execute().value
+        }
+        do {
+            return try await load("id, product_id, model, color, color_hex, storage, price_cents, active")
+        } catch where isMissingColorHex(error) {
+            return try await load("id, product_id, model, color, storage, price_cents, active")
+        }
     }
 
     static func allProducts() async throws -> [Product] {

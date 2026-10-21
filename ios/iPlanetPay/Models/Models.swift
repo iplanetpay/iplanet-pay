@@ -65,6 +65,7 @@ struct Product: Codable, Identifiable, Hashable, Sendable {
     var model: String
     var storage: String
     var color: String?
+    var colorHex: String?
     var listPriceCents: Int
     var imageUrl: String?
     var description: String?
@@ -85,6 +86,7 @@ struct ProductVariant: Codable, Identifiable, Hashable, Sendable {
     var productId: UUID
     var model: String?
     var color: String?
+    var colorHex: String?
     var storage: String?
     var priceCents: Int
     var active: Bool

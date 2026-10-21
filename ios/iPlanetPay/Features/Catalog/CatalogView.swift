@@ -61,6 +61,7 @@ struct CatalogView: View {
                                         Text(product.subtitle)
                                             .font(.subheadline)
                                             .foregroundStyle(Brand.inkMuted)
+                                        cardSwatches(product)
                                         Text(Money.format(cents: product.listPriceCents))
                                             .font(.headline)
                                             .contentTransition(.numericText())
@@ -89,6 +90,31 @@ struct CatalogView: View {
                     router.reservationID = reservationID
                     router.selectedTab = .home
                 }
+            }
+        }
+    }
+
+    /// Bolinhas de cor do cartão: cor do produto + cores das variantes (como o site).
+    @ViewBuilder
+    private func cardSwatches(_ product: Product) -> some View {
+        var seen = Set<String>()
+        let entries: [(String, String)] = ([(product.color, product.colorHex)] + variants.filter { $0.productId == product.id }.map { ($0.color, $0.colorHex) })
+            .compactMap { name, hex in
+                let n = (name ?? "").trimmingCharacters(in: .whitespaces)
+                guard !n.isEmpty, seen.insert(n.lowercased()).inserted else { return nil }
+                return (n, ColorSwatch.hex(n, stored: hex))
+            }
+        if !entries.isEmpty {
+            HStack(spacing: 6) {
+                ForEach(entries.prefix(6), id: \.0) { entry in
+                    ColorDot(hex: entry.1, selected: false, size: 14)
+                        .accessibilityLabel(entry.0)
+                }
+                if entries.count > 6 {
+                    Text("+\(entries.count - 6)").font(.caption2.weight(.semibold)).foregroundStyle(Brand.inkMuted)
+                }
+                Text(entries.count == 1 ? "1 cor" : "\(entries.count) cores")
+                    .font(.caption).foregroundStyle(Brand.inkMuted)
             }
         }
     }
@@ -154,7 +180,7 @@ struct ProductReserveSheet: View {
 
     private var matrix: VariantMatrix {
         var options: [VariantOption] = family.map {
-            VariantOption(productId: $0.id, color: $0.color ?? "", storage: $0.storage, priceCents: $0.listPriceCents, imageUrl: $0.imageUrl)
+            VariantOption(productId: $0.id, color: $0.color ?? "", colorHex: $0.colorHex, storage: $0.storage, priceCents: $0.listPriceCents, imageUrl: $0.imageUrl)
         }
         // Cores extras de product_variants: mesmo produto, mesmo preço e imagem (como no site).
         for variant in variants {
@@ -163,6 +189,7 @@ struct ProductReserveSheet: View {
                 productId: owner.id,
                 variantId: variant.id,
                 color: variant.color ?? owner.color ?? "",
+                colorHex: variant.color == nil ? owner.colorHex : variant.colorHex,
                 storage: (variant.storage?.isEmpty == false ? variant.storage : nil) ?? owner.storage,
                 priceCents: variant.priceCents,
                 imageUrl: owner.imageUrl
@@ -266,13 +293,7 @@ struct ProductReserveSheet: View {
                             let isOn = name.lowercased() == (color ?? "").lowercased()
                             Button { pick(color: name) } label: {
                                 VStack(spacing: 6) {
-                                    Circle()
-                                        .fill(Color(hex: ColorSwatch.hex(name)))
-                                        .frame(width: 34, height: 34)
-                                        .overlay(Circle().strokeBorder(Color.black.opacity(0.12)))
-                                        .padding(3)
-                                        .overlay(Circle().strokeBorder(isOn ? Brand.accent : .clear, lineWidth: 2))
-                                        .scaleEffect(isOn ? 1.06 : 1)
+                                    ColorDot(hex: m.hex(for: name), selected: isOn, size: 34)
                                     Text(name).font(.caption2).foregroundStyle(isOn ? Brand.ink : Brand.inkMuted)
                                         .lineLimit(1)
                                 }
@@ -376,5 +397,39 @@ extension Color {
         let raw = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
         let value = UInt64(raw, radix: 16) ?? 0xC7C7CC
         self.init(red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
+    }
+}
+
+/// Bolinha de cor real (hex do banco ou pelo nome), borda sutil em cores claras e anel animado quando escolhida.
+struct ColorDot: View {
+    let hex: String
+    var selected: Bool
+    var size: CGFloat
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        let light = ColorSwatch.isLight(hex)
+        Circle()
+            .fill(Color(hex: hex))
+            .overlay(Circle().fill(LinearGradient(colors: [.white.opacity(0.28), .clear], startPoint: .topLeading, endPoint: .center)))
+            .overlay(Circle().strokeBorder(Color.black.opacity(light ? 0.18 : 0.06), lineWidth: light ? 1 : 0.5))
+            .overlay {
+                if selected && size >= 24 {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: size * 0.36, weight: .bold))
+                        .foregroundStyle(light ? Brand.ink : .white)
+                        .transition(.scale.combined(with: .opacity))
+                }
+            }
+            .frame(width: size, height: size)
+            .padding(size >= 24 ? 3 : 0)
+            .overlay(
+                Circle()
+                    .strokeBorder(Brand.accent, lineWidth: 2)
+                    .scaleEffect(selected ? 1 : 0.8)
+                    .opacity(selected ? 1 : 0)
+            )
+            .scaleEffect(selected ? 1.06 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.6), value: selected)
     }
 }

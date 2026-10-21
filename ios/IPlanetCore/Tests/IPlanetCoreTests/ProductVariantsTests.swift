@@ -52,8 +52,24 @@ final class ProductVariantsTests: XCTestCase {
     func testCapacityAndSwatch() {
         XCTAssertEqual(VariantMatrix.capacityGB("1TB"), 1024)
         XCTAssertEqual(VariantMatrix.capacityGB("64 GB"), 64)
-        XCTAssertEqual(ColorSwatch.hex("Titânio Natural"), "#8d8d92")
-        XCTAssertEqual(ColorSwatch.hex("Meia-noite"), "#1d1d1f")
-        XCTAssertEqual(ColorSwatch.hex("Qualquer"), "#c7c7cc")
+        XCTAssertEqual(ColorSwatch.hex("Titânio Natural"), "#BAB4A9")
+        XCTAssertEqual(ColorSwatch.hex("Titânio preto"), "#3C3C3D")
+        XCTAssertEqual(ColorSwatch.hex("Meia-noite"), "#232A31")
+        XCTAssertEqual(ColorSwatch.hex("Space Gray"), "#535150")
+        XCTAssertEqual(ColorSwatch.hex("Vermelho (PRODUCT)RED"), "#BA0C2E")
+        XCTAssertEqual(ColorSwatch.hex("Laranja cósmico"), "#E07A3D")
+        XCTAssertEqual(ColorSwatch.hex("Qualquer"), "#C7C7CC")
+        XCTAssertEqual(ColorSwatch.hex("Preto", stored: "#abc"), "#AABBCC")
+        XCTAssertEqual(ColorSwatch.hex("Preto", stored: "zz"), "#1D1D1F")
+        XCTAssertNil(ColorSwatch.normalize("#12345"))
+        XCTAssertEqual(ColorSwatch.normalize("aabbcc"), "#AABBCC")
+        XCTAssertTrue(ColorSwatch.isLight("#F5F5F0"))
+        XCTAssertFalse(ColorSwatch.isLight("#1D1D1F"))
+        let m = VariantMatrix(options: [
+            VariantOption(productId: a, color: "Lavanda", storage: "256 GB", priceCents: 1, imageUrl: nil),
+            VariantOption(productId: a, color: "lavanda", colorHex: "#c9b8e9", storage: "512 GB", priceCents: 2, imageUrl: nil),
+        ])
+        XCTAssertEqual(m.hex(for: "Lavanda"), "#C9B8E9")
+        XCTAssertEqual(m.hex(for: "Azul"), "#3D7EA6")
     }
 }
