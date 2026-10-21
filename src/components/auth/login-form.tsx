@@ -7,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Pill } from "@/components/ui/pill";
 import { AuthDivider, GoogleAuthButton } from "@/components/auth/google-auth-button";
-import { ExperiencePreloader } from "@/components/ui/experience-preloader";
 import {
   markShellWarm,
   routesForShell,
@@ -114,10 +113,8 @@ export function LoginForm({
           aria-busy="true"
           aria-live="polite"
         >
-          <ExperiencePreloader
-            variant={shellVariantForPath(resolveRedirect("/app"))}
-            className="min-h-screen"
-          />
+          {/* fundo liso: o skeleton aparece já na página de destino, no lugar certo */}
+          <span className="sr-only">Entrando…</span>
         </div>
       ) : null}
       {productSlug ? (

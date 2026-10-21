@@ -68,10 +68,10 @@ export function calcWithdrawalAmounts(
   return { fee_amount_cents: fee, refund_amount_cents: refund, fee_percentage: feePct };
 }
 
-export const TERMS_VERSION = "platform-v2";
+export const TERMS_VERSION = "platform-v3";
 
 export const TERMS_OF_USE_PT = `
-TERMOS DE USO — iPlanet Pay (versão platform-v2)
+TERMOS DE USO — iPlanet Pay (versão platform-v3)
 
 1. Aportes e reserva
 Ao reservar um produto e realizar aportes via Pix, você concorda com as regras da plataforma iPlanet Pay.
@@ -96,6 +96,16 @@ A cada R$ 100,00 em aportes confirmados você recebe 1 ficha para o sorteio mens
 6. Prazo de reembolso Pix
 Após aprovação do saque pelo Financeiro, o Pix é efetuado em até 24 horas úteis (estimativa).
 
-7. Aceite
-Ao criar conta e marcar os aceites, você declara ter lido estes termos, política de saque, regras de retirada, indicação e sorteio.
+7. Contrato de aporte
+Este contrato vale para todos os aportes feitos na plataforma; não é preciso aceitá-lo de novo a cada Pix.
+7.1 Partes: você, usuário cadastrado na iPlanet Pay, faz aportes voluntários vinculados a uma reserva de produto. A iPlanet Pay registra o valor, a reserva e a forma de pagamento (Pix).
+7.2 Objeto: cada aporte é um pagamento parcial ou total do preço da reserva. Ele não transfere a posse do aparelho antes da quitação e da retirada ou envio, conforme as regras da plataforma.
+7.3 Valor e Pix: o valor informado na tela é o valor daquele aporte, e o código Pix gerado vale só para esse lançamento. O aporte é confirmado quando o sistema reconhece a compensação. Valor mínimo, saldo restante e status da reserva aparecem na tela do aporte.
+7.4 Registro: cada aporte fica registrado com data e hora, valor, reserva e a sua conta.
+7.5 Cancelamento e saque: valem as regras de cancelamento, reembolso, taxa e retirada destes Termos.
+7.6 Declaração: ao gerar um Pix de aporte, você confirma que os dados da conta são seus e que o valor parte de decisão sua.
+Texto sujeito à versão final do contrato enviada pela iPlanet.
+
+8. Aceite
+Ao criar conta e marcar os aceites, você declara ter lido estes termos, o contrato de aporte, a política de saque e as regras de retirada, indicação e sorteio.
 `.trim();

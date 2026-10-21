@@ -43,12 +43,12 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/reservations` | sim | `product_id`, `store_id`, `variant_id?` (id de `product_variants` ativa do mesmo produto; a reserva usa o preço dela) | `id`, `redirectTo` |
 | `POST /api/reservations/cancel` | sim | `reservation_id` | `id` ou erro da política de cancelamento |
 | `GET /api/reservations/{id}/contributions` | sim | — | `contributions[]` |
-| `POST /api/reservations/{id}/contributions` | sim | `amount_cents` ou `amount_brl`, `contract_id?` | mesmo formato de `/api/pix/generate` |
+| `POST /api/reservations/{id}/contributions` | sim | `amount_cents` ou `amount_brl`; `contract_id?` obsoleto e ignorado se inválido | mesmo formato de `/api/pix/generate` |
 | `POST /api/reservations/{id}/switch` | sim | `product_id` | `id` |
 | `POST /api/reservations/{id}/pickup` | sim | `mode` `store`\|`shipping`, `shipping_method?`, `address?`, `freight_cents?`, `insurance_cents?`, `loan_contract_signed?` | pedido criado. Abaixo de 70% recusa. De 70% a 99% exige `loan_contract_signed: true` |
 | `POST /api/reservations/{id}/retirada` | sim | — | confirma retirada quando a regra do site permite |
-| `POST /api/pix/generate` | sim | `reservation_id`, `amount_cents` ou `amount_brl`, `contract_id?` | `contribution_id`, `amount_cents`, `gateway_configured`, `pix` `{ copy_paste, qr_base64, charge_id, provider }` ou `pix: null` e `error` se o gateway não estiver configurado |
-| `POST /api/aportes/contract` | sim | `reservation_id`, `scrolled_to_end: true`, `contract_version?`, `fingerprint` objeto | `contract_id` |
+| `POST /api/pix/generate` | sim | `reservation_id`, `amount_cents` ou `amount_brl`; `contract_id?` obsoleto (não é mais exigido; se vier e for do usuário, é ligado ao lançamento) | `contribution_id`, `amount_cents`, `gateway_configured`, `pix` `{ copy_paste, qr_base64, charge_id, provider }` ou `pix: null` e `error` se o gateway não estiver configurado |
+| `POST /api/aportes/contract` | sim | **Obsoleto.** `reservation_id`, `scrolled_to_end: true`, `contract_version?`, `fingerprint` objeto. Continua respondendo para apps antigos, mas o aceite por aporte não é mais necessário: o contrato de aporte está nos Termos de Uso (item 7, versão `platform-v3`) e é aceito no cadastro (`terms_accepted`, `terms_version`) | `contract_id` |
 | `POST /api/goals` | sim | Com plano: `name`, `product_id`, `start_date`, `target_date`, `frequency` (`daily`\|`weekly`\|`monthly`), `reservation_id?`, `variant_id?` (sem reserva: cria a reserva da variante, com o preço dela). Sem frequência: meta legada com `amount_cents`, `installment_cents`, `installments_count`, `reminder_day?`, `whatsapp_phone?` | `goal_id`, e no plano também `reservation_id` |
 | `POST /api/wallet/apply` | sim | `reservation_id`, `amount_cents` | aplica crédito de indicação na reserva |
 | `POST /api/wallet/withdraw` | sim | `amount_cents` (mínimo 100000), `pix_key`, `pix_key_type`, `holder_full_name`, `holder_cpf` | saque da carteira, taxa 30% |
@@ -96,5 +96,8 @@ GET /rest/v1/products?select=id,name,storage,color,color_hex,list_price_cents,pr
 A reserva grava `reservations.variant_id` (nulo sem variante). Admin: `POST /api/admin/products/{id}/variants` aceita `color_hex?`; `PATCH` com `variant_id`, `color_hex?`, `color?`, `active?`; `POST`/`PATCH /api/admin/products` aceitam `color_hex?`. Hex inválido → `400 { ok: false, error: "Cor inválida: use o formato #RRGGBB." }`.
 
 ## Pix
+
+Não há aceite de contrato por aporte. O contrato de aporte faz parte dos Termos de Uso (`/termos#contrato-de-aporte`, versão `platform-v3`), aceitos no cadastro. O app não deve abrir tela de contrato antes do Pix.
+
 
 O app chama `POST /api/pix/generate`. Não fala com o Mercado Pago. O QR mostrado no aparelho é gerado do copia-e-cola (`CIQRCodeGenerator`). A confirmação chega pelo webhook `POST /api/webhooks/pix` (só o servidor). O app observa `contributions` via Realtime ou consulta de novo enquanto a tela está aberta.
