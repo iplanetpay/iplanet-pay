@@ -879,33 +879,11 @@
   color: #fff;
   background: linear-gradient(135deg, rgba(59, 139, 255, 0.55), rgba(139, 92, 246, 0.55));
 }
-.metas-climb .space-chip i {
-  width: 8px;
-  height: 8px;
-  border-radius: 99px;
-  background: #30d158;
-  box-shadow: 0 0 10px currentColor;
-}
-.metas-climb .space-asteroid_field i {
-  background: #ffcc00;
-}
-.metas-climb .space-meteor_storm i {
-  background: #ff453a;
-}
 .metas-climb .stars circle {
   animation: metas-twinkle 4s ease-in-out infinite;
 }
 .metas-climb .stars-2 circle {
   animation-duration: 2.6s;
-}
-.metas-climb .asteroid {
-  transform-box: fill-box;
-  transform-origin: center;
-  animation: space-drift 18s linear infinite;
-}
-.metas-climb .meteor {
-  animation: space-meteor 1.6s linear infinite;
-  opacity: 0;
 }
 .metas-climb .planet-glow {
   animation: metas-glow 3.6s ease-in-out infinite;
@@ -916,27 +894,6 @@
   transform-box: fill-box;
   transform-origin: center;
   animation: space-prize 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
-}
-@keyframes space-drift {
-  from {
-    transform: translate(40px, -20px) rotate(0deg);
-  }
-  to {
-    transform: translate(-40px, 20px) rotate(360deg);
-  }
-}
-@keyframes space-meteor {
-  0% {
-    transform: translate(0, 0);
-    opacity: 0;
-  }
-  10% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate(-420px, 640px);
-    opacity: 0;
-  }
 }
 @keyframes space-prize {
   from {
@@ -950,16 +907,11 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .metas-climb .stars circle,
-  .metas-climb .asteroid,
   .metas-climb .planet-glow,
   .metas-climb .prize-in {
     animation: none !important;
   }
-  .metas-climb .meteor {
-    animation: none !important;
-    opacity: 0.6;
   }
-}
 .metas-climb .scene.space .status-pill .sp-label {
   color: #fff;
 }

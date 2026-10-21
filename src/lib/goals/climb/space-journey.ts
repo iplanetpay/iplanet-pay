@@ -1,33 +1,9 @@
 /**
  * Viagem até o planeta iPlanet (substitui a escalada da montanha).
  * Lógica pura, espelhada do app iOS (IPlanetCore/SpaceJourney.swift):
- * condição do espaço pela saúde da meta, ritmo do foguete, rota curva e tom da nebulosa.
+ * ritmo do foguete, rota curva e tom da nebulosa.
  */
 import type { GoalStatus } from "./types.ts";
-
-export type SpaceCondition = "calm" | "asteroid_field" | "meteor_storm";
-
-export const SPACE_LABEL: Record<SpaceCondition, string> = {
-  calm: "Espaço calmo",
-  asteroid_field: "Campo de asteroides",
-  meteor_storm: "Chuva de meteoros",
-};
-
-export function spaceCondition(status: GoalStatus): SpaceCondition {
-  switch (status) {
-    case "on_track":
-    case "done":
-      return "calm";
-    case "near_late":
-      return "asteroid_field";
-    case "late":
-      return "meteor_storm";
-    default: {
-      const exhaustive: never = status;
-      throw new Error(`Status inválido: ${String(exhaustive)}`);
-    }
-  }
-}
 
 export interface RocketMotionProfile {
   /** 1 = ritmo normal; menor = mais lento. */

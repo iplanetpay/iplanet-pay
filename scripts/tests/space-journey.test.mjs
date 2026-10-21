@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import {
-  SPACE_LABEL,
   SPACE_LANDSCAPE,
   SPACE_PORTRAIT,
   buildRoute,
@@ -10,23 +9,12 @@ import {
   rocketDuration,
   rocketProfile,
   sampleRocket,
-  spaceCondition,
 } from "../../src/lib/goals/climb/space-journey.ts";
 
 const source = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 const exists = (path) => existsSync(new URL(`../../${path}`, import.meta.url));
 
 export default function suite(test) {
-  test("goal health picks the space condition like the iOS app", () => {
-    assert.equal(spaceCondition("on_track"), "calm");
-    assert.equal(spaceCondition("done"), "calm");
-    assert.equal(spaceCondition("near_late"), "asteroid_field");
-    assert.equal(spaceCondition("late"), "meteor_storm");
-    assert.equal(SPACE_LABEL.calm, "Espaço calmo");
-    assert.equal(SPACE_LABEL.asteroid_field, "Campo de asteroides");
-    assert.equal(SPACE_LABEL.meteor_storm, "Chuva de meteoros");
-  });
-
   test("the rocket is fastest on time and slower with wobble and turbulence when late", () => {
     const on = rocketProfile("on_track");
     const near = rocketProfile("near_late");
@@ -93,5 +81,9 @@ export default function suite(test) {
     assert.match(scene, /Meta conquistada/);
     assert.match(scene, /Prêmio conquistado/);
     assert.match(source("src/components/goals/climb/iplanet-planet.tsx"), /#1B2350/);
+    for (const path of ["src/components/goals/climb/metas-climb.tsx", "src/components/goals/climb/rocket-scene.tsx", "src/lib/goals/climb/space-journey.ts"]) {
+      const text = source(path);
+      assert.equal(/asteroid|meteor|Espaço calmo|SpaceCondition|temperat/i.test(text), false, `${path} has no space weather`);
+    }
   });
 }

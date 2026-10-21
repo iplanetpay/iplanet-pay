@@ -11,7 +11,6 @@ import {
   sampleRocket,
   seeded,
   type RouteSize,
-  type SpaceCondition,
 } from "@/lib/goals/climb/space-journey";
 import { IPlanetPlanet } from "./iplanet-planet";
 import { Milestones } from "./milestones";
@@ -26,7 +25,6 @@ interface Props {
   ppu: number;
   percent: number;
   status: GoalStatus;
-  condition: SpaceCondition;
   deposits: Deposit[];
   view: ViewMode;
   onToggleView: () => void;
@@ -43,7 +41,7 @@ function stars(seed: number, n: number, W: number, H: number) {
   return Array.from({ length: n }, () => ({ x: rnd() * W * 1.3 - W * 0.15, y: rnd() * H * 1.3 - H * 0.15, r: 0.4 + rnd() * 1.2, o: 0.35 + rnd() * 0.65, d: rnd() * 4 }));
 }
 
-export function RocketScene({ size, ppu, percent, status, condition, deposits, view, onToggleView, selected, onSelect, onLanded }: Props) {
+export function RocketScene({ size, ppu, percent, status, deposits, view, onToggleView, selected, onSelect, onLanded }: Props) {
   const { W, H } = size;
   const route = useMemo(() => buildRoute(size), [size]);
   const R = planetRadius(size);
@@ -196,8 +194,6 @@ export function RocketScene({ size, ppu, percent, status, condition, deposits, v
         </g>
       ))}
 
-      {condition !== "calm" ? <SpaceHazards condition={condition} W={W} H={H} /> : null}
-
       <g ref={camRef}>
         {/* Terra */}
         <g transform={`translate(${route.earth.x} ${route.earth.y + earthR * 0.55})`}>
@@ -247,38 +243,6 @@ export function RocketScene({ size, ppu, percent, status, condition, deposits, v
         </g>
       </g>
     </svg>
-  );
-}
-
-/** Asteroides (perto de atrasar) ou chuva de meteoros (atrasada). */
-function SpaceHazards({ condition, W, H }: { condition: SpaceCondition; W: number; H: number }) {
-  const rnd = seeded(condition === "asteroid_field" ? 3 : 11);
-  if (condition === "asteroid_field") {
-    return (
-      <g className="hazards asteroids" aria-hidden>
-        {Array.from({ length: 9 }, (_, i) => {
-          const x = rnd() * W;
-          const y = rnd() * H;
-          const r = 4 + rnd() * 9;
-          return (
-            <g key={i} transform={`translate(${x} ${y})`}>
-              <path className="asteroid" style={{ animationDelay: `${-rnd() * 20}s`, animationDuration: `${14 + rnd() * 12}s` }} d={`M${-r},0 L${-r * 0.5},${-r * 0.85} L${r * 0.6},${-r * 0.7} L${r},${r * 0.1} L${r * 0.3},${r * 0.9} L${-r * 0.7},${r * 0.6} Z`} fill="#5b5f73" stroke="#8c90a6" strokeWidth="1" />
-            </g>
-          );
-        })}
-      </g>
-    );
-  }
-  return (
-    <g className="hazards meteors" aria-hidden>
-      {Array.from({ length: 14 }, (_, i) => {
-        const x = W * 0.2 + rnd() * W;
-        const y = -20 - rnd() * H * 0.4;
-        return (
-          <line key={i} className="meteor" x1={x} y1={y} x2={x + 34} y2={y - 22} stroke="#ffd2a1" strokeWidth="2" strokeLinecap="round" style={{ animationDelay: `${-rnd() * 3}s`, animationDuration: `${1.2 + rnd() * 1.4}s` }} />
-        );
-      })}
-    </g>
   );
 }
 

@@ -5,12 +5,10 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, ty
 import type { MetasClimbProps, ViewMode } from "@/lib/goals/climb/types";
 import { brl, formatDate, percentOf } from "@/lib/goals/climb/goal-logic";
 import {
-  SPACE_LABEL,
   SPACE_LANDSCAPE,
   SPACE_PORTRAIT,
   nebulaTint,
   presetHour,
-  spaceCondition,
 } from "@/lib/goals/climb/space-journey";
 import { CelebrationEffect } from "./celebration-effect";
 import { RocketScene } from "./rocket-scene";
@@ -31,7 +29,6 @@ const STATUS_PT: Record<string, string> = {
  */
 export function MetasClimb({
   goal,
-  spaceOverride = "real",
   timeOverride = "real",
   initialView = "overview",
   onViewChange,
@@ -66,7 +63,6 @@ export function MetasClimb({
   const ppu = Math.max(0.2, width / size.W);
 
   const percent = percentOf(goal);
-  const condition = spaceOverride === "real" ? spaceCondition(goal.status) : spaceOverride;
   const nebula = nebulaTint(hour);
   const sel = goal.deposits.find((d) => d.id === selected);
   const idx = sel ? goal.deposits.indexOf(sel) : -1;
@@ -87,7 +83,7 @@ export function MetasClimb({
   };
 
   return (
-    <div className="metas-climb" data-testid="metas-trail" data-status={goal.status} data-view={view} data-space={condition}>
+    <div className="metas-climb" data-testid="metas-trail" data-status={goal.status} data-view={view}>
       <div className="scene-col">
         <div
           ref={sceneRef}
@@ -107,7 +103,6 @@ export function MetasClimb({
             ppu={ppu}
             percent={percent}
             status={goal.status}
-            condition={condition}
             deposits={goal.deposits}
             view={view}
             onToggleView={() => changeView(view === "overview" ? "closeup" : "overview")}
@@ -137,10 +132,6 @@ export function MetasClimb({
             )}
           </AnimatePresence>
           <div className="hud hud-bottom">
-            <div className={`pill glass space-chip space-${condition}`} data-testid="space-chip">
-              <i aria-hidden />
-              {SPACE_LABEL[condition]}
-            </div>
             <AnimatePresence mode="wait">
               {sel ? (
                 <motion.div key={sel.id} className="pill glass tip" initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>

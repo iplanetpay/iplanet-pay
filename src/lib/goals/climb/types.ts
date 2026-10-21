@@ -3,7 +3,7 @@
  * Tudo que o backend de metas/aportes precisa entregar está aqui.
  */
 
-/** Estado de saúde da meta. Controla escalador, clima e mensagens. */
+/** Estado de saúde da meta. Controla o ritmo do foguete, as cores e as mensagens. */
 export type GoalStatus = 'on_track' | 'near_late' | 'late' | 'done';
 
 /** Situação de cada aporte agendado. */
@@ -56,8 +56,6 @@ export type TimeOfDayPreset = 'real' | 'morning' | 'afternoon' | 'dusk' | 'night
 
 export interface MetasClimbProps {
   goal: GoalState;
-  /** Força a condição do espaço (painel de testes). 'real' = regra da meta. */
-  spaceOverride?: import("./space-journey.ts").SpaceCondition | 'real';
   /** Força o horário da nebulosa (painel de testes). */
   timeOverride?: TimeOfDayPreset;
   initialView?: ViewMode;

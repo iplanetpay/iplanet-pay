@@ -1,12 +1,9 @@
 import type { TimeOfDayPreset } from '@/lib/goals/climb/types';
 import { GOAL_PRESETS } from '@/lib/goals/climb/dev-presets';
-import { SPACE_LABEL, type SpaceCondition } from '@/lib/goals/climb/space-journey';
 
 interface Props {
   presetKey: string;
   onPreset: (k: string) => void;
-  weather: SpaceCondition | 'real';
-  onWeather: (w: SpaceCondition | 'real') => void;
   time: TimeOfDayPreset;
   onTime: (t: TimeOfDayPreset) => void;
 }
@@ -20,8 +17,7 @@ const TIMES: Array<[TimeOfDayPreset, string]> = [
 ];
 
 /** Painel de testes (recolhido por padrão). Não faz parte do produto. */
-export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTime }: Props) {
-  const kinds = Object.keys(SPACE_LABEL) as SpaceCondition[];
+export function DemoPanel({ presetKey, onPreset, time, onTime }: Props) {
   return (
     <details className="demo glass-card" aria-label="Painel de testes">
       <summary>
@@ -45,19 +41,6 @@ export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTim
             {GOAL_PRESETS.map((p) => (
               <button type="button" key={p.key} className={presetKey === p.key ? "on" : ""} onClick={() => onPreset(p.key)} data-preset={p.key}>
                 {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="demo-row">
-          <span className="demo-k">Espaço</span>
-          <div className="chips">
-            <button type="button" className={weather === "real" ? "on" : ""} onClick={() => onWeather("real")} data-weather="real">
-              Regra da meta
-            </button>
-            {kinds.map((k) => (
-              <button type="button" key={k} className={weather === k ? "on" : ""} onClick={() => onWeather(k)} data-weather={k}>
-                {SPACE_LABEL[k]}
               </button>
             ))}
           </div>
