@@ -76,7 +76,7 @@ struct ProfileView: View {
         Form {
             if onboarding {
                 Section {
-                    Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão platform-v2.")
+                    Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão \(LegalCopy.termsVersion).")
                         .font(.footnote)
                         .foregroundStyle(Brand.inkMuted)
                     Link("Ler termos de uso", destination: AppConfig.web("/termos"))
@@ -195,6 +195,9 @@ struct ReferralsView: View {
         List {
             Section("Seu código") {
                 Text("O bônus é ativado quando o indicado confirma R$ 100,00 em aportes.")
+                    .font(.footnote)
+                    .foregroundStyle(Brand.inkMuted)
+                Text(LegalCopy.referralBonusWithdrawalNote)
                     .font(.footnote)
                     .foregroundStyle(Brand.inkMuted)
                 Text(session.profile?.referralCode ?? "—")

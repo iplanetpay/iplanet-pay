@@ -1,21 +1,30 @@
 import Foundation
+import IPlanetCore
 
 enum LegalCopy {
-    static let termsVersion = "platform-v2"
+    static let termsVersion = "platform-v4"
     static let aporteContractVersion = "aporte-v1"
     static let minimumContributionCents = 500
 
+    static let referralBonusWithdrawalNote = "O saque do bônus de indicação depende de aprovação do administrador."
+
+    static let cancelWithAportesNote = "Cancelar com aportes segue a política de saque: aportes Pix dos últimos 7 dias voltam integralmente; nos demais incide a taxa administrativa."
+
+    static func withdrawalRule(feePercent: Double) -> String {
+        "Aportes Pix confirmados nos últimos 7 dias voltam integralmente. Sobre os confirmados há mais de 7 dias incide taxa administrativa de \(WithdrawalFee.percentLabel(feePercent))%."
+    }
+
     static let terms = """
-    TERMOS DE USO — iPlanet Pay (versão platform-v2)
+    TERMOS DE USO — iPlanet Pay (versão platform-v4)
 
     1. Aportes e reserva
     Ao reservar um produto e realizar aportes via Pix, você concorda com as regras da plataforma iPlanet Pay.
 
     2. Política de saque (reembolso de aportes)
     Saques liberados após 15 dias de conta ativa e apenas quando os aportes confirmados na reserva superarem R$ 1.000,00.
-    Sobre o valor total dos aportes confirmados elegíveis:
-    • Você recebe 70% (reembolso líquido).
-    • A plataforma retém 30% a título de taxa administrativa.
+    • Aportes Pix confirmados nos últimos 7 dias antes do pedido são reembolsados integralmente.
+    • Sobre os aportes confirmados há mais de 7 dias, a plataforma retém uma taxa administrativa (padrão 30%, definida pela plataforma).
+    • A mesma taxa vale para saque da reserva e da carteira, e o pedido mostra o detalhamento: parte integral, parte com desconto, taxa e valor líquido.
     Bônus de indicação não aplicados e valores não confirmados não entram na base de saque.
 
     3. Retirada do aparelho
@@ -23,7 +32,7 @@ enum LegalCopy {
     Com 70% ou mais, a entrega antecipada exige assinatura de contrato de empréstimo do aparelho até quitação total.
 
     4. Indicações
-    O indicado deve aportar no mínimo R$ 100,00 confirmados para liberar o bônus ao indicador, que poderá direcionar o valor a uma reserva ativa.
+    O indicado deve aportar no mínimo R$ 100,00 confirmados para liberar o bônus ao indicador, que poderá direcionar o valor a uma reserva ativa. O saque do bônus de indicação depende de aprovação do administrador.
 
     5. Fichas e sorteio
     A cada R$ 100,00 em aportes confirmados você recebe 1 ficha para o sorteio mensal (dia 1). Mais fichas aumentam suas chances de liberação antecipada do aparelho. Só entram fichas de reservas com pelo menos 30% aportados.

@@ -1,3 +1,4 @@
+import IPlanetCore
 import Foundation
 import Supabase
 
@@ -331,6 +332,19 @@ enum Repository {
 
     static func applyReferral(code: String) async throws {
         try await WebAPI.applyReferral(code: code)
+    }
+
+    /// Taxa de saque configurada no admin (`app_settings.withdrawal_fee_pct`); sem leitura, 30%.
+    static func withdrawalFeePercent() async -> Double {
+        struct Row: Decodable { var value: String }
+        let rows: [Row]? = try? await client
+            .from("app_settings")
+            .select("value")
+            .eq("key", value: "withdrawal_fee_pct")
+            .limit(1)
+            .execute()
+            .value
+        return WithdrawalFee.percent(fromSetting: rows?.first?.value)
     }
 
     static func applyBonus(reservationId: UUID) async throws {

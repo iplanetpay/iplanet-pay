@@ -143,6 +143,11 @@ struct ReservationDetailView: View {
                 .buttonStyle(SecondaryButtonStyle())
             Button("Oferecer usado") { showTradeIn = true }
                 .buttonStyle(SecondaryButtonStyle())
+            if reservation.amountPaidCents > 0 {
+                Text(LegalCopy.cancelWithAportesNote)
+                    .font(.footnote)
+                    .foregroundStyle(Brand.inkMuted)
+            }
             Button("Cancelar reserva", role: .destructive) {
                 Task { await cancel() }
             }
@@ -578,14 +583,28 @@ struct WithdrawalSheet: View {
     @State private var cpf = ""
     @State private var message: String?
     @State private var busy = false
+    @State private var feePercent = WithdrawalFee.defaultPercent
+    @State private var aportes: [WithdrawalFee.Aporte] = []
+    @State private var loadingBreakdown = true
 
     private let types = ["cpf", "cnpj", "email", "phone", "random"]
+
+    private var breakdown: WithdrawalBreakdown {
+        WithdrawalFee.breakdown(aportes: aportes, requestedAt: Date(), feePercent: feePercent)
+    }
 
     var body: some View {
         NavigationStack {
             Form {
-                Text("O saque vale para aportes confirmados acima de R$ 1.000, depois de 15 dias de conta. A taxa é de 30%.")
-                    .font(.footnote)
+                Section {
+                    Text(LegalCopy.withdrawalRule(feePercent: feePercent))
+                        .font(.footnote)
+                    if loadingBreakdown {
+                        LoadingSkeleton(lines: 4)
+                    } else {
+                        breakdownRows
+                    }
+                }
                 TextField("Nome do titular", text: $holder)
                 TextField("CPF do titular", text: $cpf)
                 Picker("Tipo da chave", selection: $pixType) {
@@ -606,6 +625,7 @@ struct WithdrawalSheet: View {
                     Button("Fechar") { onDone() }
                 }
             }
+            .task { await loadBreakdown() }
             .onAppear {
                 holder = session.profile?.fullName ?? ""
                 cpf = session.profile?.cpf ?? ""
@@ -613,6 +633,46 @@ struct WithdrawalSheet: View {
                 pixType = session.profile?.pixKeyType ?? "cpf"
             }
         }
+    }
+
+    @ViewBuilder
+    private var breakdownRows: some View {
+        let b = breakdown
+        let pct = WithdrawalFee.percentLabel(b.feePercent)
+        row("Aportes confirmados", Money.format(cents: b.totalCents))
+        row("Reembolso integral (últimos 7 dias)", Money.format(cents: b.fullRefundCents))
+        row("Com taxa (há mais de 7 dias)", Money.format(cents: b.discountedCents))
+        row("Taxa administrativa (\(pct)%)", "− \(Money.format(cents: b.feeCents))", tint: Brand.danger)
+        HStack {
+            Text("Você receberá").fontWeight(.semibold)
+            Spacer()
+            Text(Money.format(cents: b.netCents)).font(.headline).foregroundStyle(Brand.accent)
+        }
+        Text("Estimativa. O valor final é calculado pelo servidor na data do pedido.")
+            .font(.caption)
+            .foregroundStyle(Brand.inkMuted)
+    }
+
+    private func row(_ title: String, _ value: String, tint: Color = Brand.ink) -> some View {
+        HStack {
+            Text(title).foregroundStyle(Brand.inkMuted)
+            Spacer()
+            Text(value).fontWeight(.semibold).foregroundStyle(tint)
+        }
+        .font(.subheadline)
+    }
+
+    private func loadBreakdown() async {
+        defer { loadingBreakdown = false }
+        async let pct = Repository.withdrawalFeePercent()
+        let rows = (try? await Repository.contributions(reservationId: reservation.id)) ?? []
+        aportes = rows
+            .filter { $0.status == "confirmed" && $0.paymentMethod.lowercased().contains("pix") }
+            .compactMap { c in
+                guard let at = c.confirmedAt ?? c.createdAt else { return nil }
+                return WithdrawalFee.Aporte(amountCents: c.amountCents, confirmedAt: at)
+            }
+        feePercent = await pct
     }
 
     private func submit() async {
