@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createProduct, updateProduct } from "@/lib/catalog/admin-products";
+import { parseColorHexInput } from "@/lib/catalog/colors";
 
 function parseProductImages(body: Record<string, unknown>): string[] | null {
   if (!Array.isArray(body.product_images)) return null;
@@ -19,6 +20,10 @@ export async function POST(request: Request) {
     );
   }
 
+  const hex = parseColorHexInput(body.color_hex);
+  if (!hex.ok) {
+    return NextResponse.json({ ok: false, error: hex.error }, { status: 400 });
+  }
   const list_price_cents = Number(body.list_price_cents);
   const result = await createProduct({
     name: String(body.name ?? ""),
@@ -27,6 +32,7 @@ export async function POST(request: Request) {
     model: String(body.model ?? ""),
     storage: String(body.storage ?? ""),
     color: body.color != null ? String(body.color) : null,
+    color_hex: hex.hex,
     list_price_cents,
     image_url: body.image_url != null ? String(body.image_url) : null,
     product_images: parseProductImages(body) ?? undefined,
@@ -66,6 +72,10 @@ export async function PATCH(request: Request) {
     );
   }
 
+  const hex = parseColorHexInput(body.color_hex);
+  if (!hex.ok) {
+    return NextResponse.json({ ok: false, error: hex.error }, { status: 400 });
+  }
   const list_price_cents = Number(body.list_price_cents);
   const result = await updateProduct({
     id,
@@ -75,6 +85,7 @@ export async function PATCH(request: Request) {
     model: String(body.model ?? ""),
     storage: String(body.storage ?? ""),
     color: body.color != null ? String(body.color) : null,
+    color_hex: hex.hex,
     list_price_cents,
     image_url: body.image_url != null ? String(body.image_url) : null,
     product_images: parseProductImages(body) ?? undefined,

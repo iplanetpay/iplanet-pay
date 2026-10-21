@@ -19,9 +19,11 @@ import {
 export function SimulatorExperience({
   products,
   today,
+  initialProductKey,
 }: {
   products: SimulatorProduct[];
   today: string;
+  initialProductKey?: string;
 }) {
   const [created, setCreated] = useState<{
     reservationId: string;
@@ -43,6 +45,7 @@ export function SimulatorExperience({
       <ContributionSimulator
         products={products}
         today={today}
+        initialProductKey={initialProductKey}
         onCreated={(result) => {
           setCreated({
             reservationId: result.reservationId,

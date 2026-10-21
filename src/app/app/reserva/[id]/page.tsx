@@ -409,6 +409,8 @@ export default async function ReservaDetailPage({
                 feePct: paidWithdrawal.fee_percentage,
                 feeAmountCents: paidWithdrawal.fee_amount_cents,
                 refundAmountCents: paidWithdrawal.refund_amount_cents,
+                fullRefundCents: paidWithdrawal.full_refund_cents,
+                discountedCents: paidWithdrawal.discounted_cents,
               }
             : null
         }

@@ -139,10 +139,10 @@ export function RouteTransition({
       <m.div
         key={pathname}
         className={className}
-        initial={{ opacity: 0, y: 6 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.16, ease: materialDecelerate }}
-        style={{ willChange: "opacity, transform" }}
+        // só opacidade, sem deslocar: nada pula de posição ao trocar de tela
+        initial={{ opacity: 0.6 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.14, ease: materialDecelerate }}
       >
         {children}
       </m.div>

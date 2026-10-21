@@ -1,6 +1,9 @@
 export function mapReservationError(message: string | null | undefined): string {
   if (!message) return "Não foi possível concluir.";
   const m = message.toLowerCase();
+  if (m.includes("could not find the function") || m.includes("p_variant_id")) {
+    return "Essa variante ainda não pode ser reservada. Tente novamente em instantes.";
+  }
   if (m.includes("autenticado")) return "Entre para continuar.";
   if (m.includes("estoque") && m.includes("novo")) {
     return "Sem estoque disponível nesta loja para o novo aparelho.";

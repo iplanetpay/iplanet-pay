@@ -1,15 +1,11 @@
-import type { RealWeather, TimeOfDayPreset, WeatherKind } from '@/lib/goals/climb/types';
+import type { TimeOfDayPreset } from '@/lib/goals/climb/types';
 import { GOAL_PRESETS } from '@/lib/goals/climb/dev-presets';
-import { WEATHER_LABEL } from '@/lib/goals/climb/weather';
 
 interface Props {
   presetKey: string;
   onPreset: (k: string) => void;
-  weather: WeatherKind | 'real';
-  onWeather: (w: WeatherKind | 'real') => void;
   time: TimeOfDayPreset;
   onTime: (t: TimeOfDayPreset) => void;
-  real: RealWeather | null;
 }
 
 const TIMES: Array<[TimeOfDayPreset, string]> = [
@@ -21,8 +17,7 @@ const TIMES: Array<[TimeOfDayPreset, string]> = [
 ];
 
 /** Painel de testes (recolhido por padrão). Não faz parte do produto. */
-export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTime, real }: Props) {
-  const kinds = Object.keys(WEATHER_LABEL) as WeatherKind[];
+export function DemoPanel({ presetKey, onPreset, time, onTime }: Props) {
   return (
     <details className="demo glass-card" aria-label="Painel de testes">
       <summary>
@@ -51,19 +46,6 @@ export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTim
           </div>
         </div>
         <div className="demo-row">
-          <span className="demo-k">Clima</span>
-          <div className="chips">
-            <button type="button" className={weather === "real" ? "on" : ""} onClick={() => onWeather("real")} data-weather="real">
-              Real + regra da meta
-            </button>
-            {kinds.map((k) => (
-              <button type="button" key={k} className={weather === k ? "on" : ""} onClick={() => onWeather(k)} data-weather={k}>
-                {WEATHER_LABEL[k]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="demo-row">
           <span className="demo-k">Horário</span>
           <div className="chips">
             {TIMES.map(([k, l]) => (
@@ -73,11 +55,6 @@ export function DemoPanel({ presetKey, onPreset, weather, onWeather, time, onTim
             ))}
           </div>
         </div>
-        <p className="demo-note">
-          {real
-            ? `Clima real (${real.source}, ${real.place}): ${WEATHER_LABEL[real.kind]}, ${Math.round(real.temperatureC)}°C, vento ${Math.round(real.windKmh)} km/h — hora local ${Math.floor(real.localHour)}:${String(Math.round((real.localHour % 1) * 60) % 60).padStart(2, '0')}.`
-            : 'Carregando clima real…'}
-        </p>
       </div>
     </details>
   );

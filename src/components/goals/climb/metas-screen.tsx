@@ -10,10 +10,8 @@ import { selectClimbGoal, type ClimbGoalEntry } from "@/lib/goals/climb/goal-car
 import type { GoalCalendarData } from "@/lib/goals/goal-calendar";
 import type {
   GoalState,
-  RealWeather,
   TimeOfDayPreset,
   ViewMode,
-  WeatherKind,
 } from "@/lib/goals/climb/types";
 import { GoalGrid } from "./goal-grid";
 import { MetasClimb } from "./metas-climb";
@@ -47,21 +45,6 @@ function goalForPreset(key: string | null, live: GoalState | null): GoalState | 
   return devPresets.find((preset) => preset.key === key)?.goal ?? live;
 }
 
-function readWeather(value: string | null): WeatherKind | "real" {
-  if (!CLIMB_DEV || !value || value === "real") return "real";
-  const kinds: WeatherKind[] = [
-    "clear",
-    "partly_cloudy",
-    "cloudy",
-    "fog",
-    "rain",
-    "storm",
-    "snow",
-    "blizzard",
-  ];
-  return kinds.includes(value as WeatherKind) ? (value as WeatherKind) : "real";
-}
-
 function readTime(value: string | null): TimeOfDayPreset {
   if (!CLIMB_DEV || !value) return "real";
   switch (value) {
@@ -87,9 +70,7 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
   const selected = selectClimbGoal(entries, metaId);
   const [presetKey, setPresetKey] = useState<string | null>(() => readPreset(params.get("estado")));
   const [trackedMeta, setTrackedMeta] = useState(metaId);
-  const [weather, setWeather] = useState<WeatherKind | "real">(() => readWeather(params.get("clima")));
   const [time, setTime] = useState<TimeOfDayPreset>(() => readTime(params.get("hora")));
-  const [real, setReal] = useState<RealWeather | null>(null);
   const initialView = readView(params.get("visao"));
 
   if (trackedMeta !== metaId) {
@@ -109,15 +90,11 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
           depositHref={null}
           presetKey={presetKey}
           setPresetKey={setPresetKey}
-          weather={weather}
-          setWeather={setWeather}
-          time={time}
+                  time={time}
           setTime={setTime}
-          setReal={setReal}
-          initialView={initialView}
+              initialView={initialView}
           router={router}
-          real={real}
-          onBack={() => setPresetKey(null)}
+              onBack={() => setPresetKey(null)}
         />
       );
     }
@@ -126,7 +103,7 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
         <div className="space-y-6">
           <EmptyState
             title="Nenhuma meta ainda"
-            description="Simule os aportes e crie uma meta para acompanhar a subida."
+            description="Simule os aportes e crie uma meta para acompanhar a viagem até o planeta."
             action={
               <Link
                 href="/app/simulador"
@@ -141,12 +118,9 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
               <DemoPanel
                 presetKey={presetKey ?? ""}
                 onPreset={setPresetKey}
-                weather={weather}
-                onWeather={setWeather}
-                time={time}
+                            time={time}
                 onTime={setTime}
-                real={real}
-              />
+                        />
             </div>
           ) : null}
         </div>
@@ -163,14 +137,10 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
       today={selected.today}
       presetKey={presetKey}
       setPresetKey={setPresetKey}
-      weather={weather}
-      setWeather={setWeather}
       time={time}
       setTime={setTime}
-      setReal={setReal}
       initialView={initialView}
       router={router}
-      real={real}
     />
   );
 }
@@ -182,14 +152,10 @@ function ClimbView({
   today = "",
   presetKey,
   setPresetKey,
-  weather,
-  setWeather,
   time,
   setTime,
-  setReal,
   initialView,
   router,
-  real,
   onBack,
 }: {
   goal: GoalState;
@@ -198,12 +164,8 @@ function ClimbView({
   today?: string;
   presetKey: string | null;
   setPresetKey: (key: string | null) => void;
-  weather: WeatherKind | "real";
-  setWeather: (value: WeatherKind | "real") => void;
   time: TimeOfDayPreset;
   setTime: (value: TimeOfDayPreset) => void;
-  real: RealWeather | null;
-  setReal: (value: RealWeather | null) => void;
   initialView: ViewMode;
   router: ReturnType<typeof useRouter>;
   onBack?: () => void;
@@ -226,22 +188,17 @@ function ClimbView({
       <MetasClimb
         key={`${goal.id}-${initialView}`}
         goal={goal}
-        weatherOverride={CLIMB_DEV ? weather : "real"}
         timeOverride={CLIMB_DEV ? time : "real"}
         initialView={initialView}
         onDeposit={deposit}
-        onRealWeather={setReal}
         footer={
           DemoPanel ? (
             <DemoPanel
               presetKey={presetKey ?? "live"}
               onPreset={(key) => setPresetKey(key === "live" ? null : key)}
-              weather={weather}
-              onWeather={setWeather}
-              time={time}
+                      time={time}
               onTime={setTime}
-              real={real}
-            />
+                    />
           ) : null
         }
       />
