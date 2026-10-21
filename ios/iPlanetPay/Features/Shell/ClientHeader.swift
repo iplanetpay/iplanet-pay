@@ -3,6 +3,7 @@ import SwiftUI
 struct ClientHeader: View {
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
+    @Environment(\.openURL) private var openURL
     @State private var tickets = 0
     @State private var unread = 0
 
@@ -10,10 +11,6 @@ struct ClientHeader: View {
         HStack(spacing: 8) {
             Wordmark(height: 22)
                 .accessibilityHidden(true)
-            Text("Olá, \(firstName)")
-                .font(.subheadline.weight(.semibold))
-                .lineLimit(1)
-                .accessibilityLabel("Olá, \(firstName)")
             Spacer(minLength: 8)
             Button {
                 router.overlay = .settings
@@ -45,8 +42,9 @@ struct ClientHeader: View {
                 Button("Sair", role: .destructive) {
                     Task { await session.signOut() }
                 }
+                Button("Suporte") { router.overlay = .support }
                 Divider()
-                Button("Guia · Termos de uso") { router.overlay = .terms }
+                Button("Guia · Termos de uso") { openURL(AppConfig.web("/termos")) }
                 if session.isAdmin {
                     Button("Admin") { router.overlay = .admin }
                 }
@@ -64,11 +62,6 @@ struct ClientHeader: View {
             Rectangle().fill(Brand.line).frame(height: 1)
         }
         .task { await refresh() }
-    }
-
-    private var firstName: String {
-        let name = session.profile?.displayName ?? "Cliente"
-        return name.split(separator: " ").first.map(String.init) ?? name
     }
 
     @ViewBuilder

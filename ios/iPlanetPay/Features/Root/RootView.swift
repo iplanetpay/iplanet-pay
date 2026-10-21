@@ -101,6 +101,9 @@ struct ClientShell: View {
         .safeAreaInset(edge: .top, spacing: 0) {
             ClientHeader()
         }
+        .overlay(alignment: .bottom) {
+            FirstRunGuideOverlay()
+        }
         .sheet(item: overlayBinding) { overlay in
             NavigationStack {
                 switch overlay {
@@ -114,6 +117,9 @@ struct ClientShell: View {
                     TermsView()
                 case .admin:
                     AdminLinkView()
+                case .support:
+                    SupportChatView()
+                        .toolbar(.hidden, for: .navigationBar)
                 }
             }
         }

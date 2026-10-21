@@ -127,7 +127,7 @@ struct AuthView: View {
             .sheet(isPresented: $showTerms) {
                 NavigationStack {
                     ScrollView {
-                        Text(LegalCopy.terms)
+                        Text(LegalCopy.termsAttributed)
                             .font(.body)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(20)

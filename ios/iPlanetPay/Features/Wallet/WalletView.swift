@@ -4,20 +4,16 @@ struct WalletView: View {
     @Environment(SessionStore.self) private var session
     @State private var contributions: [Contribution] = []
     @State private var ledger: [WalletEntry] = []
-    @State private var withdrawals: [WithdrawalRequest] = []
     @State private var error: String?
     @State private var loading = true
     @State private var showApply = false
-    @State private var showWithdraw = false
     @State private var reservations: [ReservationRow] = []
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Saldo e Pix")
-                        .font(.largeTitle.weight(.bold))
-                    Text("Aportes confirmados, extrato e pedidos de saque.")
+                    Text("Aportes confirmados e extrato.")
                         .foregroundStyle(Brand.inkMuted)
                     BrandCard {
                         VStack(alignment: .leading, spacing: 6) {
@@ -27,19 +23,15 @@ struct WalletView: View {
                                 .contentTransition(.numericText())
                             Text("Bônus \(Money.format(cents: session.profile?.bonusCents ?? 0))")
                                 .foregroundStyle(Brand.accent)
-                            Text("Mínimo R$ 1.000,00 para saque. Ao solicitar, 30% fica com a plataforma e 70% segue para o Pix.")
-                                .font(.footnote)
-                                .foregroundStyle(Brand.inkMuted)
                             Button("Usar saldo em uma reserva") { showApply = true }
-                                .buttonStyle(SecondaryButtonStyle())
-                            Button("Sacar saldo") { showWithdraw = true }
                                 .buttonStyle(SecondaryButtonStyle())
                         }
                     }
                     if let error { Text(error).foregroundStyle(Brand.danger) }
-                    if loading { LoadingSkeleton(lines: 3) }
                     Text("Aportes").font(.title3.weight(.bold))
-                    if contributions.isEmpty {
+                    if loading && contributions.isEmpty {
+                        LoadingSkeleton(.rows(3))
+                    } else if contributions.isEmpty {
                         Text("Nenhum aporte ainda.").foregroundStyle(Brand.inkMuted)
                     }
                     ForEach(contributions) { item in
@@ -71,21 +63,6 @@ struct WalletView: View {
                             }
                         }
                     }
-                    Text("Saques").font(.title3.weight(.bold))
-                    if withdrawals.isEmpty {
-                        Text("Nenhum saque pedido.").foregroundStyle(Brand.inkMuted)
-                    }
-                    ForEach(withdrawals) { item in
-                        BrandCard {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(item.statusLabel).font(.headline)
-                                Text("Reembolso \(Money.format(cents: item.refundAmountCents))")
-                                Text("Taxa \(Money.format(cents: item.feeAmountCents))")
-                                    .font(.caption)
-                                    .foregroundStyle(Brand.inkMuted)
-                            }
-                        }
-                    }
                 }
                 .padding(20)
             }
@@ -96,12 +73,6 @@ struct WalletView: View {
             .sheet(isPresented: $showApply) {
                 WalletApplySheet(reservations: reservations.filter { $0.status == "ativa" }) {
                     showApply = false
-                    Task { await load() }
-                }
-            }
-            .sheet(isPresented: $showWithdraw) {
-                WalletWithdrawSheet {
-                    showWithdraw = false
                     Task { await load() }
                 }
             }
@@ -119,7 +90,6 @@ struct WalletView: View {
         do {
             contributions = try await Repository.myContributions(userId: userId)
             ledger = try await Repository.ledger(userId: userId)
-            withdrawals = try await Repository.withdrawals(userId: userId)
             reservations = try await Repository.myReservations(userId: userId)
             error = nil
         } catch {
@@ -174,70 +144,3 @@ private struct WalletApplySheet: View {
     }
 }
 
-private struct WalletWithdrawSheet: View {
-    var onDone: () -> Void
-    @Environment(SessionStore.self) private var session
-    @State private var amount = ""
-    @State private var pixKey = ""
-    @State private var pixType = "cpf"
-    @State private var holder = ""
-    @State private var cpf = ""
-    @State private var message: String?
-    @State private var busy = false
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Text("Mínimo R$ 1.000,00. Ao solicitar, 30% fica com a plataforma e 70% segue para o Pix.")
-                    .font(.footnote)
-                TextField("Valor (R$)", text: $amount).keyboardType(.decimalPad)
-                TextField("Titular", text: $holder)
-                TextField("CPF do titular", text: $cpf)
-                Picker("Tipo da chave", selection: $pixType) {
-                    Text("CPF").tag("cpf")
-                    Text("CNPJ").tag("cnpj")
-                    Text("E-mail").tag("email")
-                    Text("Telefone").tag("phone")
-                    Text("Aleatória").tag("random")
-                }
-                TextField("Chave Pix", text: $pixKey)
-                if let message { Text(message).foregroundStyle(Brand.danger) }
-                Button(busy ? "Enviando…" : "Solicitar saque") { Task { await submit() } }
-                    .disabled(busy)
-            }
-            .navigationTitle("Sacar saldo")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Fechar") { onDone() } }
-            }
-            .onAppear {
-                holder = session.profile?.fullName ?? ""
-                cpf = session.profile?.cpf ?? ""
-                pixKey = session.profile?.pixKey ?? ""
-                pixType = session.profile?.pixKeyType ?? "cpf"
-            }
-        }
-    }
-
-    private func submit() async {
-        guard let cents = Money.cents(from: amount) else {
-            message = "Informe o valor."
-            return
-        }
-        busy = true
-        defer { busy = false }
-        do {
-            try await WebAPI.withdrawWallet(
-                WebAPI.WalletWithdrawBody(
-                    amountCents: cents,
-                    pixKey: pixKey.trimmingCharacters(in: .whitespacesAndNewlines),
-                    pixKeyType: pixType,
-                    holderFullName: holder.trimmingCharacters(in: .whitespacesAndNewlines),
-                    holderCpf: BrazilID.normalizeCPF(cpf) ?? cpf
-                )
-            )
-            onDone()
-        } catch {
-            message = describeError(error)
-        }
-    }
-}

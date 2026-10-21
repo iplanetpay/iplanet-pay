@@ -116,26 +116,157 @@ struct StatusPill: View {
     }
 }
 
-struct LoadingSkeleton: View {
-    var lines: Int = 3
-    @State private var pulse = false
+/// Esqueletos de carregamento: já nascem no layout final do conteúdo real e só pulsam a opacidade.
+/// Nada desliza, cresce ou aparece com fade; com "Reduzir movimento" ficam estáticos.
+struct SkeletonPulse: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        TimelineView(.animation(minimumInterval: 1.0 / 30, paused: reduceMotion)) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            content.opacity(reduceMotion ? 0.75 : 0.55 + 0.35 * (0.5 + 0.5 * cos(t * 2 * .pi / 1.6)))
+        }
+        .transaction { $0.animation = nil }
+        .transition(.identity)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Carregando")
+    }
+}
+
+/// Bloco cinza com o tamanho de um elemento real (texto, imagem, botão).
+struct SkeletonBox: View {
+    var width: CGFloat? = nil
+    var height: CGFloat
+    var radius: CGFloat = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            ForEach(0..<lines, id: \.self) { index in
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(Brand.line.opacity(pulse ? 0.35 : 0.8))
-                    .frame(height: index == 0 ? 22 : 14)
-                    .frame(maxWidth: index == lines - 1 ? 160 : .infinity, alignment: .leading)
+        RoundedRectangle(cornerRadius: radius, style: .continuous)
+            .fill(Brand.line)
+            .frame(width: width, height: height)
+            .frame(maxWidth: width == nil ? .infinity : nil, alignment: .leading)
+    }
+}
+
+/// Cartão com a mesma moldura do BrandCard.
+private struct SkeletonCard<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    var body: some View {
+        BrandCard { content() }
+    }
+}
+
+enum SkeletonLayout {
+    case lines(Int)
+    /// Início: cartão da reserva ativa (pílula, título, subtítulo, valor, imagem, anel + 2 botões).
+    case reservationCard
+    /// Catálogo: cartões com imagem de 96 pt à esquerda.
+    case catalog(Int)
+    /// Carteira: linhas de aporte (valor + status | data).
+    case rows(Int)
+    /// Metas: grade 2 colunas com anel de 88 pt e nome.
+    case goals(Int)
+    /// Reserva: título, subtítulo, imagem e cartão de progresso.
+    case reservationDetail
+}
+
+struct LoadingSkeleton: View {
+    var layout: SkeletonLayout
+
+    init(lines: Int = 3) { layout = .lines(lines) }
+    init(_ layout: SkeletonLayout) { self.layout = layout }
+
+    var body: some View {
+        Group {
+            switch layout {
+            case .lines(let n):
+                SkeletonCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(0..<n, id: \.self) { i in
+                            SkeletonBox(width: i == n - 1 ? 160 : nil, height: i == 0 ? 22 : 14)
+                        }
+                    }
+                }
+            case .reservationCard:
+                SkeletonCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        SkeletonBox(width: 110, height: 24, radius: 12)
+                        SkeletonBox(width: 220, height: 28)
+                        SkeletonBox(width: 140, height: 18)
+                        SkeletonBox(width: 150, height: 18)
+                        SkeletonBox(height: 160, radius: 20)
+                        HStack(alignment: .center) {
+                            Circle().stroke(Brand.line, lineWidth: 10).frame(width: 96, height: 96)
+                            Spacer()
+                            VStack(spacing: 8) {
+                                SkeletonBox(width: 150, height: 50, radius: 16)
+                                SkeletonBox(width: 150, height: 50, radius: 16)
+                            }
+                        }
+                    }
+                }
+            case .catalog(let n):
+                VStack(spacing: 16) {
+                    ForEach(0..<n, id: \.self) { _ in
+                        SkeletonCard {
+                            HStack(alignment: .top, spacing: 12) {
+                                SkeletonBox(width: 96, height: 120, radius: 20)
+                                VStack(alignment: .leading, spacing: 6) {
+                                    SkeletonBox(width: 70, height: 14)
+                                    SkeletonBox(height: 20)
+                                    SkeletonBox(width: 120, height: 16)
+                                    SkeletonBox(width: 90, height: 14)
+                                    SkeletonBox(width: 100, height: 20)
+                                    SkeletonBox(width: 120, height: 16)
+                                }
+                            }
+                        }
+                    }
+                }
+            case .rows(let n):
+                VStack(spacing: 16) {
+                    ForEach(0..<n, id: \.self) { _ in
+                        SkeletonCard {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    SkeletonBox(width: 110, height: 20)
+                                    SkeletonBox(width: 80, height: 13)
+                                }
+                                Spacer()
+                                SkeletonBox(width: 70, height: 13)
+                            }
+                        }
+                    }
+                }
+            case .goals(let n):
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
+                    ForEach(0..<n, id: \.self) { _ in
+                        VStack(spacing: 8) {
+                            Circle().stroke(Brand.line, lineWidth: 9).frame(width: 88, height: 88)
+                            SkeletonBox(width: 90, height: 16)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 44)
+                        .padding(.vertical, 12)
+                        .background(Brand.background)
+                        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(Brand.line, lineWidth: 1))
+                    }
+                }
+            case .reservationDetail:
+                VStack(alignment: .leading, spacing: 16) {
+                    SkeletonBox(width: 220, height: 30)
+                    SkeletonBox(width: 150, height: 18)
+                    SkeletonBox(height: 200, radius: 20)
+                    SkeletonCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            SkeletonBox(width: 140, height: 20)
+                            SkeletonBox(height: 10, radius: 5)
+                            SkeletonBox(width: 180, height: 14)
+                        }
+                    }
+                }
             }
         }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Brand.background)
-        .clipShape(RoundedRectangle(cornerRadius: Brand.cardRadius, style: .continuous))
-        .accessibilityLabel("Carregando")
-        .onAppear { pulse = true }
-        .animation(.easeInOut(duration: 0.9).repeatForever(autoreverses: true), value: pulse)
+        .modifier(SkeletonPulse())
     }
 }
 
@@ -164,10 +295,7 @@ struct RemoteImage: View {
         AsyncImage(url: url) { phase in
             switch phase {
             case .empty:
-                ZStack {
-                    Brand.backgroundSubtle
-                    ProgressView()
-                }
+                Brand.line.modifier(SkeletonPulse())
             case .success(let image):
                 image
                     .resizable()

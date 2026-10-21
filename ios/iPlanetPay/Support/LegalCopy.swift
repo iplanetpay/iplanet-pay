@@ -1,39 +1,40 @@
 import Foundation
+import IPlanetCore
 
 enum LegalCopy {
-    static let termsVersion = "platform-v2"
+    static let termsVersion = "platform-v4"
     static let aporteContractVersion = "aporte-v1"
     static let minimumContributionCents = 500
 
-    static let terms = """
-    TERMOS DE USO — iPlanet Pay (versão platform-v2)
+    /// Texto do card de bônus no site (referral-bonus-card.tsx).
+    static let referralBonusWithdrawalNote = "Prefere sacar? O bônus só sai via Pix com aprovação do admin."
 
-    1. Aportes e reserva
-    Ao reservar um produto e realizar aportes via Pix, você concorda com as regras da plataforma iPlanet Pay.
+    static let cancelWithAportesNote = "Cancelar com aportes segue a cláusula 11 dos Termos: aportes confirmados há 7 dias ou menos voltam integralmente; sobre os confirmados há mais de 7 dias é descontada a taxa administrativa."
 
-    2. Política de saque (reembolso de aportes)
-    Saques liberados após 15 dias de conta ativa e apenas quando os aportes confirmados na reserva superarem R$ 1.000,00.
-    Sobre o valor total dos aportes confirmados elegíveis:
-    • Você recebe 70% (reembolso líquido).
-    • A plataforma retém 30% a título de taxa administrativa.
-    Bônus de indicação não aplicados e valores não confirmados não entram na base de saque.
+    static let pixPayoutNote = "O Pix do reembolso é efetuado em até 24h após a aprovação no Financeiro."
 
-    3. Retirada do aparelho
-    Com 100% quitado, você pode solicitar retirada na loja ou envio (frete + seguro via Pix).
-    Com 70% ou mais, a entrega antecipada exige assinatura de contrato de empréstimo do aparelho até quitação total.
+    /// Introdução de withdrawal-fee-breakdown.tsx (markdown inline).
+    static func withdrawalRule(feePercent: Double, windowDays: Int, settled: Bool = false) -> String {
+        "Aportes confirmados há \(windowDays) dias ou menos voltam **integralmente**. Sobre os confirmados há mais de \(windowDays) dias \(settled ? "foi" : "será") descontada a **taxa administrativa de \(WithdrawalFee.percentLabel(feePercent))%**."
+    }
 
-    4. Indicações
-    O indicado deve aportar no mínimo R$ 100,00 confirmados para liberar o bônus ao indicador, que poderá direcionar o valor a uma reserva ativa.
+    static func bonusWithdrawalNote(cents: Int) -> String {
+        "Bônus de indicação de \(Money.format(cents: cents)), sem taxa. O saque do bônus só sai com aprovação do admin na tela Saques; o valor fica retido até a análise e volta para você se o pedido for rejeitado."
+    }
 
-    5. Fichas e sorteio
-    A cada R$ 100,00 em aportes confirmados você recebe 1 ficha para o sorteio mensal (dia 1). Mais fichas aumentam suas chances de liberação antecipada do aparelho. Só entram fichas de reservas com pelo menos 30% aportados.
+    /// Termos exatos de docs/termos-de-uso.md.
+    static var terms: String { TermsOfUse.markdown }
 
-    6. Prazo de reembolso Pix
-    Após aprovação do saque pelo Financeiro, o Pix é efetuado em até 24 horas úteis (estimativa).
-
-    7. Aceite
-    Ao criar conta e marcar os aceites, você declara ter lido estes termos, política de saque, regras de retirada, indicação e sorteio.
-    """
+    /// Markdown renderizado: títulos viram negrito, ênfases inline preservadas.
+    static let termsAttributed: AttributedString = {
+        let lines = TermsOfUse.markdown.split(separator: "\n", omittingEmptySubsequences: false).map { line -> String in
+            if let r = line.range(of: #"^#{1,6}\s+"#, options: .regularExpression) { return "**" + line[r.upperBound...] + "**" }
+            if line.trimmingCharacters(in: .whitespaces) == "---" { return "" }
+            return String(line)
+        }
+        let text = lines.joined(separator: "\n")
+        return (try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(text)
+    }()
 
     static let aporteContract = """
     CONTRATO DE APORTE — iPLANET PAY

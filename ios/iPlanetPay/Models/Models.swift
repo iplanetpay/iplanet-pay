@@ -65,6 +65,7 @@ struct Product: Codable, Identifiable, Hashable, Sendable {
     var model: String
     var storage: String
     var color: String?
+    var colorHex: String?
     var listPriceCents: Int
     var imageUrl: String?
     var description: String?
@@ -78,6 +79,17 @@ struct Product: Codable, Identifiable, Hashable, Sendable {
             return trimmed?.isEmpty == false ? trimmed : nil
         }.joined(separator: " · ")
     }
+}
+
+struct ProductVariant: Codable, Identifiable, Hashable, Sendable {
+    let id: UUID
+    var productId: UUID
+    var model: String?
+    var color: String?
+    var colorHex: String?
+    var storage: String?
+    var priceCents: Int
+    var active: Bool
 }
 
 struct Store: Codable, Identifiable, Hashable, Sendable {
@@ -278,6 +290,15 @@ struct WithdrawalRequest: Codable, Identifiable, Hashable, Sendable {
     var status: String
     var payoutStatus: String?
     var createdAt: Date?
+    /// Migration 037: 'reserva' ou 'bonus' e a quebra integral/desconto gravada pelo servidor.
+    var source: String?
+    var fullRefundCents: Int?
+    var discountedCents: Int?
+
+    var breakdown: WithdrawalBreakdown {
+        .fromServer(totalPaidCents: totalPaidCents, feePct: feePercentage, feeAmountCents: feeAmountCents,
+                    refundAmountCents: refundAmountCents, fullRefundCents: fullRefundCents, discountedCents: discountedCents)
+    }
 
     var statusLabel: String {
         switch status {
