@@ -29,7 +29,7 @@ struct ReservationDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if loading && reservation == nil {
-                    LoadingSkeleton(lines: 5)
+                    LoadingSkeleton(.reservationDetail)
                 }
                 if let reservation {
                     content(reservation)
@@ -424,10 +424,6 @@ struct AporteSheet: View {
     var onDone: () -> Void
     @Environment(SessionStore.self) private var session
     @State private var amount = ""
-    @State private var reachedEnd = false
-    @State private var accepted = false
-    @State private var contractFrame: CGRect = .zero
-    @State private var contractViewport: CGFloat = 0
     @State private var message: String?
     @State private var messageIsSuccess = false
     @State private var busy = false
@@ -444,38 +440,9 @@ struct AporteSheet: View {
                     .padding(14)
                     .background(Brand.backgroundSubtle)
                     .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-                ScrollView {
-                    Text(LegalCopy.aporteContract)
-                        .font(.footnote)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(
-                            GeometryReader { proxy in
-                                Color.clear.preference(
-                                    key: ContractFrameKey.self,
-                                    value: proxy.frame(in: .named("contract"))
-                                )
-                            }
-                        )
-                }
-                .coordinateSpace(name: "contract")
-                .frame(maxHeight: 280)
-                .background(
-                    GeometryReader { proxy in
-                        Color.clear.preference(key: ContractViewportKey.self, value: proxy.size.height)
-                    }
-                )
-                .onPreferenceChange(ContractFrameKey.self) { frame in
-                    contractFrame = frame
-                    updateReachedEnd()
-                }
-                .onPreferenceChange(ContractViewportKey.self) { height in
-                    contractViewport = height
-                    updateReachedEnd()
-                }
-                .background(Brand.backgroundSubtle)
-                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
-                Toggle("Li o contrato até o fim e aceito este aporte", isOn: $accepted)
-                    .disabled(!reachedEnd)
+                Text("Ao gerar o Pix, você concorda com os Termos de Uso.")
+                    .font(.footnote)
+                    .foregroundStyle(Brand.inkMuted)
                 if let pix, let code = pix.pix?.copyPaste, !code.isEmpty {
                     Text("Valor \(Money.format(cents: pix.amountCents ?? 0))")
                         .font(.headline)
@@ -500,7 +467,7 @@ struct AporteSheet: View {
                         Task { await submit() }
                     }
                     .buttonStyle(PrimaryButtonStyle())
-                    .disabled(busy || !accepted)
+                    .disabled(busy)
                 }
                 Text(LegalCopy.pixServerNote)
                     .font(.footnote)
@@ -518,11 +485,6 @@ struct AporteSheet: View {
         }
     }
 
-    private func updateReachedEnd() {
-        guard contractViewport > 0, contractFrame != .zero else { return }
-        reachedEnd = contractFrame.maxY <= contractViewport + 24
-    }
-
     private func submit() async {
         guard let userId = session.profile?.id else { return }
         if session.profile?.identityComplete != true {
@@ -538,6 +500,8 @@ struct AporteSheet: View {
         busy = true
         defer { busy = false }
         do {
+            // A produção (src/lib/pix/generate.ts) ainda exige contractId; o aceite é registrado
+            // automaticamente, sem tela, enquanto o contrato migra para os Termos de Uso.
             let contractId = try await Repository.acceptAporteContract(userId: userId, reservationId: reservation.id)
             let generated = try await Repository.createContribution(
                 reservationId: reservation.id,
@@ -853,19 +817,7 @@ struct TradeInSheet: View {
     }
 }
 
-private struct ContractFrameKey: PreferenceKey {
-    static var defaultValue: CGRect { .zero }
-    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
-        value = nextValue()
-    }
-}
 
-private struct ContractViewportKey: PreferenceKey {
-    static var defaultValue: CGFloat { 0 }
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
-        value = max(value, nextValue())
-    }
-}
 
 struct PickedPhoto: Transferable {
     let data: Data

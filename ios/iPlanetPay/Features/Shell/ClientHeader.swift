@@ -3,6 +3,7 @@ import SwiftUI
 struct ClientHeader: View {
     @Environment(SessionStore.self) private var session
     @Environment(AppRouter.self) private var router
+    @Environment(\.openURL) private var openURL
     @State private var tickets = 0
     @State private var unread = 0
 
@@ -43,7 +44,7 @@ struct ClientHeader: View {
                 }
                 Button("Suporte") { router.overlay = .support }
                 Divider()
-                Button("Guia · Termos de uso") { router.overlay = .terms }
+                Button("Guia · Termos de uso") { openURL(AppConfig.web("/termos")) }
                 if session.isAdmin {
                     Button("Admin") { router.overlay = .admin }
                 }

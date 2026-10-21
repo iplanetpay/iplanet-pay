@@ -33,7 +33,7 @@ struct AccountView: View {
                 }
                 Section("Ajuda") {
                     NavigationLink("Perguntas frequentes", destination: HelpView())
-                    NavigationLink("Termos de uso", destination: TermsView())
+                    Link("Termos de uso", destination: AppConfig.web("/termos"))
                     Link("Abrir o site", destination: AppConfig.webAppURL)
                 }
                 Section {
@@ -79,7 +79,7 @@ struct ProfileView: View {
                     Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão platform-v2.")
                         .font(.footnote)
                         .foregroundStyle(Brand.inkMuted)
-                    NavigationLink("Ler termos de uso", destination: TermsView())
+                    Link("Ler termos de uso", destination: AppConfig.web("/termos"))
                 }
             }
             Section("Conta") {
@@ -398,12 +398,22 @@ struct HelpView: View {
 }
 
 struct TermsView: View {
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         ScrollView {
-            Text(LegalCopy.terms)
-                .font(.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
+            VStack(alignment: .leading, spacing: 16) {
+                Button {
+                    openURL(AppConfig.web("/termos"))
+                } label: {
+                    Label("Abrir os Termos de Uso no site", systemImage: "safari")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Text(LegalCopy.terms)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(20)
         }
         .background(Brand.background)
         .navigationTitle("Termos")

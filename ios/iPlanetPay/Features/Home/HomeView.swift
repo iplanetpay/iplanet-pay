@@ -25,7 +25,7 @@ struct HomeView: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(Brand.accent)
                         Text("Continue no seu ritmo")
-                            .font(.largeTitle.weight(.bold))
+                            .font(.title2.weight(.bold))
                         Text("Acompanhe o aporte, pague com Pix e explore o catálogo.")
                             .foregroundStyle(Brand.inkMuted)
                     }
@@ -34,7 +34,7 @@ struct HomeView: View {
                         Text(error).foregroundStyle(Brand.danger)
                     }
                     if loading {
-                        LoadingSkeleton(lines: 4)
+                        LoadingSkeleton(.reservationCard)
                     } else if active.isEmpty {
                         EmptyPane(
                             title: "Nenhuma reserva ativa",
@@ -66,7 +66,6 @@ struct HomeView: View {
                 }
                 .padding(20)
             }
-            .animation(.spring(response: 0.5, dampingFraction: 0.86), value: loading)
             .background(Brand.backgroundSubtle)
             .navigationTitle("Início")
             .navigationDestination(item: reservationBinding) { id in

@@ -13,8 +13,6 @@ struct WalletView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Saldo e Pix")
-                        .font(.largeTitle.weight(.bold))
                     Text("Aportes confirmados e extrato.")
                         .foregroundStyle(Brand.inkMuted)
                     BrandCard {
@@ -30,9 +28,10 @@ struct WalletView: View {
                         }
                     }
                     if let error { Text(error).foregroundStyle(Brand.danger) }
-                    if loading { LoadingSkeleton(lines: 3) }
                     Text("Aportes").font(.title3.weight(.bold))
-                    if contributions.isEmpty {
+                    if loading && contributions.isEmpty {
+                        LoadingSkeleton(.rows(3))
+                    } else if contributions.isEmpty {
                         Text("Nenhum aporte ainda.").foregroundStyle(Brand.inkMuted)
                     }
                     ForEach(contributions) { item in

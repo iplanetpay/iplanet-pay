@@ -40,7 +40,7 @@ struct CatalogView: View {
                         Text(error).foregroundStyle(Brand.danger)
                     }
                     if loading {
-                        LoadingSkeleton(lines: 5)
+                        LoadingSkeleton(.catalog(3))
                     }
                     ForEach(filtered) { product in
                         Button {
