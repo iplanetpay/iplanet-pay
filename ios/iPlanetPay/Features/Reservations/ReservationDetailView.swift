@@ -146,12 +146,26 @@ struct ReservationDetailView: View {
             .foregroundStyle(Brand.inkMuted)
         Text(reservation.store?.name ?? "Loja")
             .font(.subheadline)
-        ProgressRing(percent: reservation.progress * 100, caption: "Aportes")
+        let credits = offers.map(\.credit)
+        let trade = TradeInCredit.summary(credits)
+        let cash = TradeInCredit.cashCents(amountPaidCents: reservation.amountPaidCents, offers: credits)
+        let seg = TradeInCredit.segments(
+            listPriceCents: reservation.listPriceCents, cashCents: cash, tradeCents: trade.activeCents
+        )
+        ProgressRing(percent: Double(seg.cashPct), caption: "Aportes", secondaryPercent: Double(seg.tradePct))
         Text("Total: \(Money.format(cents: reservation.listPriceCents))")
-        Text("Pago: \(Money.format(cents: reservation.amountPaidCents))")
+        (
+            Text("Pago: \(Money.format(cents: cash))")
+            + (trade.activeCents > 0
+                ? Text(" + \(Money.format(cents: trade.activeCents))").foregroundColor(TradeInTone.yellow)
+                : Text(""))
+            + (trade.expiredCents > 0
+                ? Text(" + \(Money.format(cents: trade.expiredCents))").foregroundColor(TradeInTone.expiredRed)
+                : Text(""))
+        )
             .font(.headline)
             .contentTransition(.numericText())
-        Text("Restante: \(Money.format(cents: reservation.remainingCents))")
+        Text("Restante: \(Money.format(cents: max(0, reservation.listPriceCents - cash - trade.activeCents)))")
             .foregroundStyle(Brand.inkMuted)
             .contentTransition(.numericText())
         if let created = reservation.createdAt {
@@ -281,6 +295,20 @@ struct ReservationDetailView: View {
                         Text(offer.statusLabel)
                         Text("Esperado \(Money.format(cents: offer.expectedValueCents))")
                             .font(.subheadline)
+                        if offer.status == "approved", let credit = offer.approvedValueCents, !offer.credit.isDiscarded {
+                            Text("Crédito aplicado: \(Money.format(cents: credit))")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Brand.accent)
+                        }
+                        if let days = TradeInCredit.daysRemaining(offer.credit), days > 0,
+                           !offer.credit.isMarkedExpired, let expires = TradeInCredit.expiresAt(offer.credit) {
+                            Text("Expira em \(days) \(days == 1 ? "dia" : "dias") · \(DatesPT.short(expires))")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(TradeInTone.chipText)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(TradeInTone.chipBackground, in: Capsule())
+                        }
                         if offer.isCounterOffer, let proposed = offer.approvedValueCents {
                             Text("Contra-proposta: \(Money.format(cents: proposed))")
                                 .font(.subheadline.weight(.semibold))

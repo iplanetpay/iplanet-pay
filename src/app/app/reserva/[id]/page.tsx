@@ -21,6 +21,9 @@ import {
   tradeInCashCents,
   tradeInCreditSummary,
   tradeInVisual,
+  tradeInProgressSegments,
+  TRADE_IN_EXPIRED_RED,
+  TRADE_IN_YELLOW,
 } from "@/lib/trade-in/offer-state";
 import { syncTradeInExpiry } from "@/lib/trade-in/workflow";
 import { listUsedDeviceOffersForReservation } from "@/lib/trade-in/queries";
@@ -115,12 +118,11 @@ export default async function ReservaDetailPage({
   const tradeCents = tradeSummary.activeCents;
   const expiredTradeCents = tradeSummary.expiredCents;
   const cashCents = tradeInCashCents(paidCents, usedDeviceOffers);
-  const cashProgress = reservation.list_price_cents
-    ? Math.max(0, Math.min(100, Math.round((cashCents / reservation.list_price_cents) * 100)))
-    : 0;
-  const tradeProgress = reservation.list_price_cents
-    ? Math.max(0, Math.min(100, Math.round((tradeCents / reservation.list_price_cents) * 100)))
-    : 0;
+  const { cashPct: cashProgress, tradePct: tradeProgress } = tradeInProgressSegments(
+    reservation.list_price_cents,
+    cashCents,
+    tradeCents,
+  );
   const canOfferUsedDevice =
     isOwner &&
     reservation.status === "ativa" &&
@@ -262,7 +264,9 @@ export default async function ReservaDetailPage({
 
 
         <ProgressRing
-          value={Math.min(100, effectiveProgress)}
+          value={cashProgress}
+          secondaryValue={tradeProgress}
+          secondaryColor={TRADE_IN_YELLOW}
           label="Aportes"
         />
         <div className="grid gap-3 text-sm text-[var(--ink-muted)] sm:grid-cols-2">
@@ -270,12 +274,12 @@ export default async function ReservaDetailPage({
           <p>
             Pago: {formatCentsBRL(cashCents)}
             {tradeCents > 0 ? (
-              <span className="font-semibold text-[#e0a100]">
+              <span className="font-semibold" style={{ color: TRADE_IN_YELLOW }}>
                 {" "}+ {formatCentsBRL(tradeCents)}
               </span>
             ) : null}
             {expiredTradeCents > 0 ? (
-              <span className="font-semibold text-[#e11d48]">
+              <span className="font-semibold" style={{ color: TRADE_IN_EXPIRED_RED }}>
                 {" "}+ {formatCentsBRL(expiredTradeCents)}
               </span>
             ) : null}
