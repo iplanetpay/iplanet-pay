@@ -60,6 +60,8 @@ Todas as respostas de sucesso incluem `ok: true`, salvo indicação.
 | `POST /api/trade-in/respond` | sim | `offerId`, `action` `accept`\|`reject`\|`resubmit`\|`discard`, `expectedCents?` | resposta à contra-proposta |
 | `GET /api/notices` | sim | — | `notices[]` com `id`, `kind`, `title`, `body`, `couponCode`, `createdAt`, `read` |
 | `POST /api/notices/read` | sim | `notice_id` | marca como lido |
+| `GET /api/dev/simulate-payment/status` | não | — | **somente teste** · `{ enabled }`: mostra ou esconde o botão "Pago (teste)" |
+| `POST /api/dev/simulate-payment` | sim | `contribution_id` (ou `pixId`, ou `paymentId` do Mercado Pago) | **somente teste** · `{ ok, contribution_id, already_confirmed, simulated: true }` — ver "Pagamento simulado" |
 | `POST /api/support/chat` | sim | `messages[]` `{ role: "user"\|"assistant", content }`, `stream?` (padrão `true`) | stream SSE ou `{ ok, reply, whatsapp }` — ver "Suporte com IA" |
 
 `401` quando falta sessão nas rotas marcadas. `400` para regra de negócio. Corpo inválido: `{ ok: false, error: "JSON inválido." }` onde a rota distingue o parse.
@@ -166,3 +168,13 @@ Erros (JSON `{ ok: false, error }`):
 | `502` | falha do provedor de IA |
 
 Configuração (só admin, site): `POST /api/admin/support-ai` com `enabled`, `provider` (`openai`\|`xai`\|`openrouter`\|`groq`\|`custom`), `base_url` (https), `model`, `behavior_md`, `api_key?` (somente escrita), `clear_api_key?`. Responde `api_key_set` e `api_key_last4`; a chave nunca volta.
+
+## Pagamento simulado (somente teste)
+
+Enquanto o Mercado Pago usa chaves de teste, o botão **Pago (teste)** da tela do Pix confirma o aporte sem Pix real.
+
+- **Trava:** variável `ALLOW_PAYMENT_SIMULATION=true` no servidor. Sem ela, `POST /api/dev/simulate-payment` responde **404** e `/status` devolve `{ "enabled": false }`. A rota antiga `POST /api/pix/simulate` segue a mesma trava.
+- **Acesso:** sessão do site ou `Authorization: Bearer <JWT>`. `401` sem sessão, `403` se o aporte não for do usuário, `409` se o aporte não estiver pendente, `400` sem identificador.
+- **Mesmo caminho do webhook:** a confirmação chama `confirmContributionAsWebhook` (`src/lib/pix/confirm.ts`), o mesmo código do webhook do Mercado Pago: `confirm_contribution` com a service role e os mesmos avisos (e-mail, WhatsApp do 1º aporte, marcos do admin). Saldo, meta e fichas mudam igual a um Pix pago.
+- **Registro:** o aporte ganha `simulated_at` / `simulated_by` e cada tentativa vai para `payment_simulation_log` (migration 038; só admin lê).
+- **Desligar:** remover a variável (ou mudar para `false`) e refazer o deploy quando as chaves de produção entrarem.

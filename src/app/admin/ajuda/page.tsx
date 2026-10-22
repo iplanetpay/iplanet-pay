@@ -162,10 +162,11 @@ export default function AdminAjudaPage() {
           pagamento e de login.
         </p>
         <p>
-          Se a tela de pagamento do cliente mostrar{" "}
-          <strong>Pagamento de teste</strong> e o botão Avançar, aquele aporte
-          é lançado como pago sem um Pix cobrado de verdade. É o modo de teste
-          da loja.
+          Com <code>ALLOW_PAYMENT_SIMULATION=true</code> na Vercel, a tela do Pix
+          (site e app) mostra o botão <strong>Pago (teste)</strong>: o aporte é
+          confirmado pelo mesmo caminho do webhook do Mercado Pago, sem Pix cobrado,
+          e fica marcado como simulado. Desligue a variável quando as chaves de
+          produção do Mercado Pago entrarem.
         </p>
       </GuideSection>
     </div>
