@@ -64,7 +64,8 @@ export default function suite(test) {
     assert.match(sql, /alter table public\.products add column if not exists color_hex text/);
     assert.match(sql, /alter table public\.product_variants add column if not exists color_hex text/);
     assert.match(sql, /check \(color_hex is null or color_hex ~ '\^#\[0-9A-F\]\{6\}\$'\)/);
-    const sqlHexes = [...sql.matchAll(/then '(#[0-9A-F]{6})'/g)].map((m) => m[1]);
+    const latest = source("supabase/migrations/041_color_hex_bordo_laranja.sql");
+    const sqlHexes = [...latest.matchAll(/then '(#[0-9A-F]{6})'/g)].map((m) => m[1]);
     const tsHexes = [...source("src/lib/catalog/colors.ts").matchAll(/^\s*\[\/.*\/i, "(#[0-9A-F]{6})"\]/gm)].map((m) => m[1]);
     assert.deepEqual(sqlHexes, tsHexes, "SQL backfill mirrors NAME_RULES in order");
     assert.match(source("docs/api-contract.md"), /color_hex/);

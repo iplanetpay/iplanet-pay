@@ -57,7 +57,8 @@ final class ProductVariantsTests: XCTestCase {
         XCTAssertEqual(ColorSwatch.hex("Meia-noite"), "#232A31")
         XCTAssertEqual(ColorSwatch.hex("Space Gray"), "#535150")
         XCTAssertEqual(ColorSwatch.hex("Vermelho (PRODUCT)RED"), "#BA0C2E")
-        XCTAssertEqual(ColorSwatch.hex("Laranja cósmico"), "#E07A3D")
+        XCTAssertEqual(ColorSwatch.hex("Laranja cósmico"), "#F77E2D")
+        XCTAssertEqual(ColorSwatch.hex("Bordô"), "#6B2A35")
         XCTAssertEqual(ColorSwatch.hex("Qualquer"), "#C7C7CC")
         XCTAssertEqual(ColorSwatch.hex("Preto", stored: "#abc"), "#AABBCC")
         XCTAssertEqual(ColorSwatch.hex("Preto", stored: "zz"), "#1D1D1F")
@@ -71,5 +72,26 @@ final class ProductVariantsTests: XCTestCase {
         ])
         XCTAssertEqual(m.hex(for: "Lavanda"), "#C9B8E9")
         XCTAssertEqual(m.hex(for: "Azul"), "#3D7EA6")
+    }
+
+    /// Regressão: trocar a cor muda o preço (lista por cor × armazenamento) e versões
+    /// do mesmo modelo (eSIM × Anatel Chip) não se misturam no seletor.
+    func testPriceFollowsColorAndVersionsStaySeparate() {
+        let esim = UUID(), anatel = UUID()
+        let m = VariantMatrix(options: [
+            VariantOption(productId: esim, color: "Laranja", storage: "256 GB", priceCents: 675_000, imageUrl: nil),
+            VariantOption(productId: esim, variantId: UUID(), color: "Azul", storage: "256 GB", priceCents: 680_000, imageUrl: nil),
+            VariantOption(productId: esim, variantId: UUID(), color: "Branco", storage: "256 GB", priceCents: 695_000, imageUrl: nil),
+            VariantOption(productId: esim, variantId: UUID(), color: "Laranja", storage: "512 GB", priceCents: 810_000, imageUrl: nil),
+        ])
+        XCTAssertEqual(m.select(color: "Azul", storage: "256 GB", changed: .color)?.priceCents, 680_000)
+        XCTAssertEqual(m.select(color: "Branco", storage: "256 GB", changed: .color)?.priceCents, 695_000)
+        XCTAssertEqual(m.select(color: "Laranja", storage: "512 GB", changed: .storage)?.priceCents, 810_000)
+        XCTAssertFalse(m.isAvailable(color: "Azul", storage: "512 GB"))
+
+        struct P { let id: UUID; let name: String }
+        let all = [P(id: esim, name: "iPhone 17 Pro Max (eSIM)"), P(id: anatel, name: "iPhone 17 Pro Max (Anatel Chip)")]
+        XCTAssertEqual(ProductFamily.members(of: all[0], in: all, name: \.name).map(\.id), [esim])
+        XCTAssertEqual(ProductFamily.members(of: all[1], in: all, name: \.name).map(\.id), [anatel])
     }
 }
