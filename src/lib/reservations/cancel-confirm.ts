@@ -32,7 +32,7 @@ export function cancelShouldSubmit(step: CancelConfirmStep, action: CancelConfir
 export const CANCEL_COPY = {
   warnTitle: "Cancelar esta reserva?",
   warnWithAportes:
-    "Os aportes confirmados vão para a sua carteira e podem ser usados em outro aparelho ou sacados. Pela cláusula 11 dos Termos, aportes confirmados há 7 dias ou menos voltam integralmente; sobre os confirmados há mais de 7 dias é descontada a taxa administrativa no saque.",
+    "Os aportes confirmados vão para a sua Wallet e podem ser usados em outro aparelho ou sacados. Pela cláusula 11 dos Termos, aportes confirmados há 7 dias ou menos voltam integralmente; sobre os confirmados há mais de 7 dias é descontada a taxa administrativa no saque.",
   warnNoAportes: "Você perde a reserva deste aparelho e a posição na fila.",
   keep: "Manter reserva",
   continue: "Continuar",

@@ -26,7 +26,7 @@ export async function creditWallet(input: {
 }): Promise<{ ok: true } | { ok: false; error: string }> {
   if (input.amountCents <= 0) return { ok: true };
   const admin = tryCreateServiceClient();
-  if (!admin) return { ok: false, error: "Carteira indisponível no servidor." };
+  if (!admin) return { ok: false, error: "Wallet indisponível no servidor." };
   const { error } = await admin.from("wallet_ledger").insert({
     user_id: input.userId,
     reservation_id: input.reservationId ?? null,
@@ -48,10 +48,10 @@ export async function debitWallet(input: {
   if (input.amountCents <= 0) return { ok: false, error: "Valor inválido." };
   const balance = await getWalletBalanceCents(input.userId);
   if (balance < input.amountCents) {
-    return { ok: false, error: "Saldo da carteira insuficiente." };
+    return { ok: false, error: "Saldo da Wallet insuficiente." };
   }
   const admin = tryCreateServiceClient();
-  if (!admin) return { ok: false, error: "Carteira indisponível no servidor." };
+  if (!admin) return { ok: false, error: "Wallet indisponível no servidor." };
   const { error } = await admin.from("wallet_ledger").insert({
     user_id: input.userId,
     reservation_id: input.reservationId ?? null,

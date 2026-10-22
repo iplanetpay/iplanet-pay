@@ -62,7 +62,7 @@ export default function AjudaPage() {
             perfil.
           </p>
           <p>
-            Depois do login, a área do cliente tem Início, Catálogo, Carteira,
+            Depois do login, a área do cliente tem Início, Catálogo, Wallet,
             Indicações e Conta. O número de fichas do sorteio aparece no topo.
           </p>
         </GuideSection>
@@ -92,7 +92,7 @@ export default function AjudaPage() {
             da reserva lista cada pagamento.
           </p>
           <p>
-            A Carteira reúne os aportes da sua conta. O progresso da reserva
+            A Wallet reúne os aportes da sua conta. O progresso da reserva
             mostra quanto já foi confirmado e quanto falta para o preço de
             lista.
           </p>

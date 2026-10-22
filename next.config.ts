@@ -40,6 +40,10 @@ const nextConfig: NextConfig = {
       process.env.EMAIL_FROM?.trim() || "noreply@iplanet.com.br",
   },
   reactStrictMode: true,
+  async redirects() {
+    // Nome novo na interface (Wallet); a rota interna continua /app/carteira.
+    return [{ source: "/app/wallet", destination: "/app/carteira", permanent: false }];
+  },
   images: {
     qualities: [75, 85],
     // Fotos de produto ficam no Storage do Supabase (bucket product-images).

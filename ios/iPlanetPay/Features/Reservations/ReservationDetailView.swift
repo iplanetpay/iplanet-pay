@@ -62,7 +62,7 @@ struct ReservationDetailView: View {
             }
         } message: {
             if let paid = reservation?.amountPaidCents, paid > 0 {
-                Text("\(Money.format(cents: paid)) em aportes voltam para a carteira. \(CancelConfirm.warnWithAportes)")
+                Text("\(Money.format(cents: paid)) em aportes voltam para a Wallet. \(CancelConfirm.warnWithAportes)")
             } else {
                 Text(CancelConfirm.warnNoAportes)
             }

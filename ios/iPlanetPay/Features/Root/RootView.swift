@@ -84,7 +84,7 @@ struct ClientShell: View {
                 .tabItem { Label("Catálogo", systemImage: "square.grid.2x2") }
                 .tag(AppTab.catalog)
             WalletView()
-                .tabItem { Label("Carteira", systemImage: "wallet.pass") }
+                .tabItem { Label("Wallet", systemImage: "wallet.pass") }
                 .tag(AppTab.wallet)
             GoalsView()
                 .tabItem { Label("Metas", systemImage: "flag") }

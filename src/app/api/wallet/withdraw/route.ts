@@ -48,19 +48,19 @@ export async function POST(request: Request) {
   }
   if (amount < MIN_CENTS) {
     return NextResponse.json(
-      { ok: false, error: "O saque da carteira segue o contrato: mínimo de R$ 1.000,00." },
+      { ok: false, error: "O saque da Wallet segue o contrato: mínimo de R$ 1.000,00." },
       { status: 400 },
     );
   }
 
   const balance = await getWalletBalanceCents(user.id);
   if (amount > balance) {
-    return NextResponse.json({ ok: false, error: "Saldo da carteira insuficiente." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Saldo da Wallet insuficiente." }, { status: 400 });
   }
 
   const admin = tryCreateServiceClient();
   if (!admin) {
-    return NextResponse.json({ ok: false, error: "Carteira indisponível no servidor." }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "Wallet indisponível no servidor." }, { status: 503 });
   }
 
   const { data: anchor } = await admin

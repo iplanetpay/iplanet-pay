@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
   const admin = tryCreateServiceClient();
   if (!admin) {
-    return NextResponse.json({ ok: false, error: "Carteira indisponível no servidor." }, { status: 503 });
+    return NextResponse.json({ ok: false, error: "Wallet indisponível no servidor." }, { status: 503 });
   }
 
   const { data: reservation, error } = await admin
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Essa reserva não é sua." }, { status: 403 });
   }
   if (reservation.status !== "ativa") {
-    return NextResponse.json({ ok: false, error: "Só reservas ativas recebem saldo da carteira." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Só reservas ativas recebem saldo da Wallet." }, { status: 400 });
   }
 
   const remaining = Math.max(0, reservation.list_price_cents - reservation.amount_paid_cents);
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   }
   const balance = await getWalletBalanceCents(user.id);
   if (amount > balance) {
-    return NextResponse.json({ ok: false, error: "Saldo da carteira insuficiente." }, { status: 400 });
+    return NextResponse.json({ ok: false, error: "Saldo da Wallet insuficiente." }, { status: 400 });
   }
 
   const debit = await debitWallet({

@@ -67,7 +67,7 @@ struct WalletView: View {
                 .padding(20)
             }
             .background(Brand.backgroundSubtle)
-            .navigationTitle("Carteira")
+            .navigationTitle("Wallet")
             .refreshable { await load() }
             .task { await load() }
             .sheet(isPresented: $showApply) {

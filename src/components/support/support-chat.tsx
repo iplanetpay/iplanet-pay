@@ -19,7 +19,7 @@ export const OPEN_SUPPORT_EVENT = "iplanet:open-support";
 const STORAGE_KEY = "iplanet:support-chat";
 const GREETING: Msg = {
   role: "assistant",
-  content: "Olá! Sou a assistente do iPlanet Pay. Posso ajudar com reservas, Pix, metas, carteira e indicações. Como posso ajudar?",
+  content: "Olá! Sou a assistente do iPlanet Pay. Posso ajudar com reservas, Pix, metas, Wallet e indicações. Como posso ajudar?",
 };
 
 export function openSupportChat() {

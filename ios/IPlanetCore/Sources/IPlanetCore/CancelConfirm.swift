@@ -21,7 +21,7 @@ public enum CancelConfirm {
     }
 
     public static let warnTitle = "Cancelar esta reserva?"
-    public static let warnWithAportes = "Os aportes confirmados vão para a sua carteira e podem ser usados em outro aparelho ou sacados. Pela cláusula 11 dos Termos, aportes confirmados há 7 dias ou menos voltam integralmente; sobre os confirmados há mais de 7 dias é descontada a taxa administrativa no saque."
+    public static let warnWithAportes = "Os aportes confirmados vão para a sua Wallet e podem ser usados em outro aparelho ou sacados. Pela cláusula 11 dos Termos, aportes confirmados há 7 dias ou menos voltam integralmente; sobre os confirmados há mais de 7 dias é descontada a taxa administrativa no saque."
     public static let warnNoAportes = "Você perde a reserva deste aparelho e a posição na fila."
     public static let keep = "Manter reserva"
     public static let continueLabel = "Continuar"

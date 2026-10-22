@@ -124,7 +124,7 @@ Sign in with Apple pede a capability no App ID (`com.iplanetpay.app`). Sem conta
 1. Publicar na Vercel o aceite de `Authorization: Bearer` nas rotas da API. Sem esse deploy, login nativo, Pix, meta, saque, retirada e troca de usado falham no app.
 2. Não há migração nova para aplicar.
 3. Não há envio APNs no backend (o lembrete de meta segue pelo cron de WhatsApp). O app não pede push.
-4. Conferir no simulador iPhone 16 (390×844): abas Início, Catálogo, Carteira, Metas, Indicações e Conta; carrossel; Pix com QR local; metas com cena e calendário; atalho Admin só abre o site.
+4. Conferir no simulador iPhone 16 (390×844): abas Início, Catálogo, Wallet, Metas, Indicações e Conta; carrossel; Pix com QR local; metas com cena e calendário; atalho Admin só abre o site.
 5. Conta Apple Developer paga ainda não existe: Sign in with Apple fica no código e será ligado depois. Google continua no fluxo OAuth do navegador.
 
 ### Supabase (projeto `xeeogfmmasvgbpmodqym`)

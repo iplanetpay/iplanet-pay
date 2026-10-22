@@ -76,7 +76,7 @@ export function CancelReservationButton({
       </Button>
       {amountPaidCents > 0 ? (
         <p className="max-w-[240px] text-xs text-[var(--ink-muted)]">
-          {formatCentsBRL(amountPaidCents)} voltam para a carteira.
+          {formatCentsBRL(amountPaidCents)} voltam para a Wallet.
         </p>
       ) : null}
       {message ? (
@@ -92,7 +92,7 @@ export function CancelReservationButton({
               </h2>
               {amountPaidCents > 0 ? (
                 <p className="text-sm text-[var(--ink)]">
-                  {formatCentsBRL(amountPaidCents)} em aportes voltam para a carteira.
+                  {formatCentsBRL(amountPaidCents)} em aportes voltam para a Wallet.
                 </p>
               ) : null}
               <p className="text-sm text-[var(--ink-muted)]">

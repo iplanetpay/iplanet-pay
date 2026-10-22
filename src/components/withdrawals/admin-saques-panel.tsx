@@ -188,7 +188,7 @@ export function AdminSaquesPanel({
                     refundAmountCents={w.refund_amount_cents}
                     fullRefundCents={w.full_refund_cents}
                     discountedCents={w.discounted_cents}
-                    totalLabel={withdrawalSource(w) === "carteira" ? "Saldo da carteira" : "Aportes confirmados"}
+                    totalLabel={withdrawalSource(w) === "carteira" ? "Saldo da Wallet" : "Aportes confirmados"}
                   />
                 ) : null}
                 <p className="text-sm text-[var(--ink-muted)] [overflow-wrap:anywhere]">
