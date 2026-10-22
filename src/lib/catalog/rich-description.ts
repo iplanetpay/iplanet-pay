@@ -63,7 +63,7 @@ function splitRow(line: string): string[] {
     .map((c) => c.trim().replace(/\*\*(.+?)\*\*/g, "$1"));
 }
 
-const IMAGE_RE = /^!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)$/;
+const IMAGE_RE = /^!\[([^\]]*)\]\(\s*(\S+)\s*\)$/;
 const TABLE_SEP_RE = /^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$/;
 
 export function parseRichDescription(source: string | null | undefined): RichBlock[] {

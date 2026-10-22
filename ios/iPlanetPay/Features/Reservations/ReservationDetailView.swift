@@ -24,6 +24,7 @@ struct ReservationDetailView: View {
     @State private var showSimulator = false
     @State private var showPickup = false
     @State private var goals: [PaymentGoal] = []
+    @State private var cancelStep: CancelConfirm.Step = .idle
 
     var body: some View {
         ScrollView {
@@ -53,6 +54,28 @@ struct ReservationDetailView: View {
             openPixIfRequested(id)
         }
         .onAppear { openPixIfRequested(router.requestPixReservationID) }
+        .alert(CancelConfirm.warnTitle, isPresented: cancelAlertBinding(.warn)) {
+            Button(CancelConfirm.keep, role: .cancel) { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            Button(CancelConfirm.continueLabel, role: .destructive) {
+                cancelStep = CancelConfirm.next(cancelStep, .continue)
+            }
+        } message: {
+            if let paid = reservation?.amountPaidCents, paid > 0 {
+                Text("\(Money.format(cents: paid)) em aportes voltam para a carteira. \(CancelConfirm.warnWithAportes)")
+            } else {
+                Text(CancelConfirm.warnNoAportes)
+            }
+        }
+        .alert(CancelConfirm.finalTitle, isPresented: cancelAlertBinding(.final)) {
+            Button(CancelConfirm.back, role: .cancel) { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            Button(CancelConfirm.confirm, role: .destructive) {
+                guard CancelConfirm.shouldSubmit(cancelStep, .confirm) else { return }
+                cancelStep = CancelConfirm.next(cancelStep, .confirm)
+                Task { await cancel() }
+            }
+        } message: {
+            Text(CancelConfirm.finalBody)
+        }
         .sheet(isPresented: $showAporte) {
             if let reservation {
                 AporteSheet(reservation: reservation) {
@@ -148,9 +171,10 @@ struct ReservationDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(Brand.inkMuted)
             }
-            Button("Cancelar reserva", role: .destructive) {
-                Task { await cancel() }
+            Button(cancelStep == .submitting ? CancelConfirm.submitting : "Cancelar reserva", role: .destructive) {
+                cancelStep = CancelConfirm.next(cancelStep, .open)
             }
+            .disabled(cancelStep == .submitting)
             .frame(minHeight: 44)
             .frame(maxWidth: .infinity)
         }
@@ -380,12 +404,23 @@ struct ReservationDetailView: View {
         }
     }
 
+    /// Binding de cada alerta da dupla confirmação; fechar pelo sistema conta como "dismiss".
+    private func cancelAlertBinding(_ step: CancelConfirm.Step) -> Binding<Bool> {
+        Binding(
+            get: { cancelStep == step },
+            set: { shown in
+                if !shown, cancelStep == step { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            })
+    }
+
     private func cancel() async {
         do {
             try await Repository.cancelReservation(id: reservationID)
+            cancelStep = CancelConfirm.next(cancelStep, .done)
             info = "Reserva cancelada."
             await load()
         } catch {
+            cancelStep = CancelConfirm.next(cancelStep, .failed)
             self.error = describeError(error)
         }
     }
