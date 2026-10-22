@@ -1,0 +1,43 @@
+import XCTest
+@testable import IPlanetCore
+
+final class SpaceJourneyTests: XCTestCase {
+    func testPaceSlowsWithHealth() {
+        XCTAssertGreaterThan(RocketMotionProfile.from(.onTrack).pace, RocketMotionProfile.from(.nearLate).pace)
+        XCTAssertGreaterThan(RocketMotionProfile.from(.nearLate).pace, RocketMotionProfile.from(.late).pace)
+        XCTAssertEqual(RocketMotionProfile.from(.late).turbulence, 1)
+    }
+
+    func testMotionCruisesThenStopsAtTarget() {
+        let p = RocketMotionProfile.from(.onTrack)
+        let a = p.sample(target: 0.5, elapsed: 0.5), b = p.sample(target: 0.5, elapsed: 1.0)
+        XCTAssertEqual(a.speed, b.speed, accuracy: 1e-9)
+        XCTAssertEqual(b.progress, 2 * a.progress, accuracy: 1e-9)
+        // A parada começa na velocidade do cruzeiro (sem salto).
+        let cruise = RocketMotionProfile.cruiseSeconds / p.pace
+        let before = p.sample(target: 0.5, elapsed: cruise - 1e-6)
+        let after = p.sample(target: 0.5, elapsed: cruise + 1e-6)
+        XCTAssertEqual(before.speed, after.speed, accuracy: 1e-4)
+        XCTAssertEqual(before.progress, after.progress, accuracy: 1e-4)
+        let easing = p.sample(target: 0.5, elapsed: cruise + 0.8)
+        XCTAssertLessThan(easing.speed, a.speed)
+        XCTAssertEqual(p.sample(target: 0.5, elapsed: p.duration + 0.01).progress, 0.5)
+        let end = p.sample(target: 0.5, elapsed: 10)
+        XCTAssertEqual(end.progress, 0.5)
+        XCTAssertEqual(end.flame, 0)
+        XCTAssertEqual(p.sample(target: 0, elapsed: 1).progress, 0)
+    }
+
+    func testRouteRunsEarthToPlanet() {
+        let r = RocketRoute()
+        XCTAssertEqual(r.point(at: 0).x, RocketRoute.earth.x, accuracy: 0.01)
+        XCTAssertEqual(r.point(at: 1).y, RocketRoute.planet.y, accuracy: 0.01)
+        XCTAssertEqual(r.stations(count: 5).count, 4)
+        XCTAssertTrue(r.stations(count: 1).isEmpty)
+    }
+
+    func testNebulaByHour() {
+        XCTAssertNotEqual(NebulaTint.colors(hour: 12).top, NebulaTint.colors(hour: 2).top)
+        XCTAssertEqual(NebulaTint.colors(hour: 18).glow, NebulaTint.colors(hour: 19).glow)
+    }
+}

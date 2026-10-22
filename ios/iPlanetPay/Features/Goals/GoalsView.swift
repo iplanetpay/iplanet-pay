@@ -17,18 +17,16 @@ struct GoalsView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    Text("Metas")
-                        .font(.largeTitle.weight(.bold))
-                    Text("Simule os aportes e acompanhe a subida.")
+                    Text("Simule os aportes e acompanhe a viagem até o planeta.")
                         .foregroundStyle(Brand.inkMuted)
                     Button("Abrir simulador") { showSimulator = true }
                         .buttonStyle(PrimaryButtonStyle(fill: Brand.accent))
                     if let error { Text(error).foregroundStyle(Brand.danger) }
-                    if loading { LoadingSkeleton(lines: 4) }
+                    if loading { LoadingSkeleton(.goals(4)) }
                     if goals.isEmpty && !loading {
                         EmptyPane(
                             title: "Nenhuma meta ainda",
-                            message: "Simule os aportes e crie uma meta para acompanhar a subida."
+                            message: "Simule os aportes e crie uma meta para acompanhar a viagem até o planeta."
                         )
                     }
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 16) {
@@ -124,7 +122,7 @@ private struct GoalDetail: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 if let schedule = snapshot.schedule {
-                    ClimbSceneView(
+                    RocketSceneView(
                         schedule: schedule,
                         productName: reservation?.product?.name ?? "Produto"
                     ) {

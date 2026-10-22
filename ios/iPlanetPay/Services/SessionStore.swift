@@ -216,6 +216,8 @@ final class AppRouter {
     var selectedTab: AppTab = .home
     var authMessage: String?
     var overlay: AppOverlay?
+    /// Guia do primeiro acesso: o cliente abriu algum produto do catálogo.
+    var guideViewedProduct = false
 
     func open(_ url: URL) {
         guard let scheme = url.scheme?.lowercased() else { return }
@@ -260,6 +262,7 @@ enum AppOverlay: String, Identifiable {
     case settings
     case terms
     case admin
+    case support
 
     var id: String { rawValue }
 }

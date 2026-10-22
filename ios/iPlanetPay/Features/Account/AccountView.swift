@@ -3,6 +3,7 @@ import UIKit
 
 struct AccountView: View {
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
 
     var body: some View {
         NavigationStack {
@@ -32,12 +33,17 @@ struct AccountView: View {
                 }
                 Section("Ajuda") {
                     NavigationLink("Perguntas frequentes", destination: HelpView())
-                    NavigationLink("Termos de uso", destination: TermsView())
+                    Link("Termos de uso", destination: AppConfig.web("/termos"))
                     Link("Abrir o site", destination: AppConfig.webAppURL)
                 }
                 Section {
                     Button("Sair", role: .destructive) {
                         Task { await session.signOut() }
+                    }
+                    Button {
+                        router.overlay = .support
+                    } label: {
+                        Label("Suporte", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
             }
@@ -70,10 +76,10 @@ struct ProfileView: View {
         Form {
             if onboarding {
                 Section {
-                    Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão platform-v2.")
+                    Text("O aporte só fica liberado depois de CPF, telefone, cidade, endereço e data de nascimento. Os termos de uso estão na versão \(LegalCopy.termsVersion).")
                         .font(.footnote)
                         .foregroundStyle(Brand.inkMuted)
-                    NavigationLink("Ler termos de uso", destination: TermsView())
+                    Link("Ler termos de uso", destination: AppConfig.web("/termos"))
                 }
             }
             Section("Conta") {
@@ -187,6 +193,13 @@ struct ReferralsView: View {
 
     private var referralsList: some View {
         List {
+            if (session.profile?.bonusCents ?? 0) > 0 {
+                Section {
+                    ReferralBonusCard(bonusCents: session.profile?.bonusCents ?? 0, hasActiveReservation: true)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                }
+            }
             Section("Seu código") {
                 Text("O bônus é ativado quando o indicado confirma R$ 100,00 em aportes.")
                     .font(.footnote)
@@ -392,12 +405,22 @@ struct HelpView: View {
 }
 
 struct TermsView: View {
+    @Environment(\.openURL) private var openURL
+
     var body: some View {
         ScrollView {
-            Text(LegalCopy.terms)
-                .font(.body)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(20)
+            VStack(alignment: .leading, spacing: 16) {
+                Button {
+                    openURL(AppConfig.web("/termos"))
+                } label: {
+                    Label("Abrir os Termos de Uso no site", systemImage: "safari")
+                }
+                .buttonStyle(PrimaryButtonStyle())
+                Text(LegalCopy.termsAttributed)
+                    .font(.body)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(20)
         }
         .background(Brand.background)
         .navigationTitle("Termos")

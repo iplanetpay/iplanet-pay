@@ -207,44 +207,6 @@ final class CoreTests: XCTestCase {
         XCTAssertEqual(cells[6], "2026-11-01")
         XCTAssertNil(cells[0])
     }
-
-    func testWeatherAdjustsWithGoalHealthAndTheSkyFollowsTheClock() {
-        XCTAssertEqual(WeatherAdjust.wmoKind(0), .clear)
-        XCTAssertEqual(WeatherAdjust.wmoKind(61), .rain)
-        XCTAssertEqual(WeatherAdjust.wmoKind(95), .storm)
-        XCTAssertEqual(WeatherAdjust.wmoKind(86), .blizzard)
-        let pleasant = WeatherAdjust.effective(
-            Forecast(kind: .rain, temperatureC: 22, windKmh: 10, localHour: 15, sunrise: 6, sunset: 18),
-            status: .onTrack
-        )
-        XCTAssertEqual(pleasant.kind, .partlyCloudy)
-        let worse = WeatherAdjust.effective(
-            Forecast(kind: .clear, temperatureC: 22, windKmh: 8, localHour: 15, sunrise: 6, sunset: 18),
-            status: .nearLate
-        )
-        XCTAssertEqual(worse.kind, .partlyCloudy)
-        XCTAssertGreaterThanOrEqual(worse.wind, 0.45)
-        let storm = WeatherAdjust.effective(
-            Forecast(kind: .clear, temperatureC: 20, windKmh: 4, localHour: 15, sunrise: 6, sunset: 18),
-            status: .late
-        )
-        XCTAssertEqual(storm.kind, .storm)
-        XCTAssertEqual(storm.temperatureC, 6)
-        let blizzard = WeatherAdjust.effective(
-            Forecast(kind: .rain, temperatureC: 8, windKmh: 4, localHour: 15, sunrise: 6, sunset: 18),
-            status: .late
-        )
-        XCTAssertEqual(blizzard.kind, .blizzard)
-        let day = SkyMath.compute(hour: 14, sunrise: 6, sunset: 18, kind: .clear)
-        let night = SkyMath.compute(hour: 22, sunrise: 6, sunset: 18, kind: .clear)
-        XCTAssertFalse(day.isNight)
-        XCTAssertGreaterThan(day.sunOpacity, 0.5)
-        XCTAssertTrue(night.isNight)
-        XCTAssertGreaterThan(night.starsOpacity, 0.4)
-        let trail = ClimbSceneMath.portraitTrail()
-        XCTAssertGreaterThan(trail.point(at: 0).y, trail.point(at: 1).y)
-        XCTAssertFalse(ClimbSceneMath.portraitOutline().isEmpty)
-    }
 }
 
 private extension Result where Failure == CoreFailure {
