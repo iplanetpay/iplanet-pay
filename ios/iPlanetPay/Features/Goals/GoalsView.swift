@@ -66,13 +66,19 @@ struct GoalsView: View {
             .navigationTitle("Metas")
             .navigationDestination(item: $selected) { goal in
                 GoalDetail(
-                    goal: goal,
+                    goal: goals.first { $0.id == goal.id } ?? goal,
                     reservation: reservations.first { $0.id == goal.reservationId },
                     contributions: contributions
                 )
             }
             .refreshable { await load() }
             .task { await load() }
+            // A aba Metas fica viva enquanto o cliente paga na Home: recarrega quando um aporte
+            // é confirmado e sempre que a aba volta a aparecer.
+            .onChange(of: router.contributionsVersion) { _, _ in Task { await load() } }
+            .onChange(of: router.selectedTab) { _, tab in
+                if tab == .goals { Task { await load() } }
+            }
             .onChange(of: router.goalID) { _, id in
                 guard let id, let goal = goals.first(where: { $0.id == id }) else { return }
                 selected = goal
@@ -127,6 +133,7 @@ private struct GoalDetail: View {
                         productName: reservation?.product?.name ?? "Produto"
                     ) {
                         guard let reservationId = goal.reservationId else { return }
+                        router.requestPixAmountCents = GoalAporte.prefillCents(installmentCents: goal.installmentCents)
                         router.requestPixReservationID = reservationId
                         router.reservationID = reservationId
                         router.selectedTab = .home

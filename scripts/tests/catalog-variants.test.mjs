@@ -77,4 +77,24 @@ export default function suite(test) {
     assert.match(sql, /v\.product_id = p_product_id/);
     assert.match(sql, /grant execute on function public\.create_reservation\(uuid, uuid, uuid\) to authenticated/);
   });
+
+  test("regression: changing the color changes the price (price per color x storage)", () => {
+    const opts = buildVariantOptions(
+      { color: "Branco", color_hex: null, storage: "256 GB", list_price_cents: 865000 },
+      [
+        { id: "b", product_id: "pm", color: "Bordô", storage: "256 GB", price_cents: 920000 },
+        { id: "a", product_id: "pm", color: "Azul", storage: "256 GB", price_cents: 940000 },
+        { id: "a2", product_id: "pm", color: "Azul", storage: "2 TB", price_cents: 1690000 },
+      ],
+    );
+    const base = opts.variants[0];
+    assert.equal(base.priceCents, 865000);
+    assert.equal(selectColor(opts, base, "Bordô").priceCents, 920000);
+    assert.equal(selectColor(opts, base, "Azul").priceCents, 940000);
+    const azul2tb = selectStorage(opts, selectColor(opts, base, "Azul"), "2 TB");
+    assert.equal(azul2tb.priceCents, 1690000);
+    assert.equal(selectColor(opts, azul2tb, "Branco").storage, "256 GB", "2 TB Branco unavailable -> falls back");
+    assert.equal(isComboAvailable(opts, "Branco", "2 TB"), false);
+    assert.match(source("src/components/catalog/catalog-browser.tsx"), /priceCents=\{hasChoice \? variant\.priceCents/);
+  });
 }

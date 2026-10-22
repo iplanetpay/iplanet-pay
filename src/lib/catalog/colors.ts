@@ -27,6 +27,8 @@ export const FAVORITE_COLORS: ReadonlyArray<{ name: string; hex: string }> = [
   { name: "Amarelo", hex: "#F5E39A" },
   { name: "Vermelho (PRODUCT)RED", hex: "#BA0C2E" },
   { name: "Dourado", hex: "#F4E3C1" },
+  { name: "Laranja cósmico", hex: "#F77E2D" },
+  { name: "Bordô", hex: "#6B2A35" },
 ];
 
 /** Regras por nome, da mais específica para a mais genérica. */
@@ -41,6 +43,7 @@ const NAME_RULES: Array<[RegExp, string]> = [
   [/grafite|graphite/i, "#41424C"],
   [/estelar|starlight/i, "#F0E8DC"],
   [/lavanda|lavender/i, "#C9B8E8"],
+  [/bord[oô]|burgundy/i, "#6B2A35"],
   [/product|vermelho|red/i, "#BA0C2E"],
   [/preto|black|space/i, "#1D1D1F"],
   [/branco|white/i, "#F5F5F0"],
@@ -51,7 +54,7 @@ const NAME_RULES: Array<[RegExp, string]> = [
   [/roxo|purple/i, "#B7A6D8"],
   [/amarelo|yellow/i, "#F5E39A"],
   [/dourado|gold/i, "#F4E3C1"],
-  [/laranja|orange|c[oó]smico/i, "#E07A3D"],
+  [/laranja|orange|c[oó]smico/i, "#F77E2D"],
   [/tit[aâ]nio|titanium/i, "#8D8D92"],
 ];
 

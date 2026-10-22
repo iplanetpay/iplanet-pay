@@ -10,6 +10,7 @@ import { CancelReservationButton } from "@/components/reservations/cancel-button
 import { SwitchDeviceButton } from "@/components/reservations/switch-device-button";
 import { ReservationSimulatorButton } from "@/components/reservations/reservation-simulator-button";
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
+import { parseAporteParam } from "@/lib/goals/aporte-prefill";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
 import { paymentSimulationEnabled } from "@/lib/pix/simulation-guard";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
@@ -62,10 +63,13 @@ export const metadata = { title: "Reserva" };
 
 export default async function ReservaDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ aporte?: string | string[] }>;
 }) {
   const { id } = await params;
+  const aportePrefillCents = parseAporteParam((await searchParams)?.aporte);
   const user = await getCurrentUser();
   const { contributions } = await listContributionsForReservation(id);
   const { reservation, error } = await getReservationById(id);
@@ -291,6 +295,7 @@ export default async function ReservaDetailPage({
           <GerarPixForm
             reservationId={reservation.id}
             remainingCents={effectiveRemaining}
+            prefillCents={aportePrefillCents}
             simulationEnabled={paymentSimulationEnabled()}
           />
         ) : (

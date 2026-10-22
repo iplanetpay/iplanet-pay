@@ -213,6 +213,10 @@ final class AppRouter {
     var reservationID: UUID?
     var goalID: UUID?
     var requestPixReservationID: UUID?
+    /// "Fazer aporte" da meta: parcela da meta (centavos) já preenchida no campo de valor.
+    var requestPixAmountCents: Int?
+    /// Sobe a cada aporte confirmado (Pix real ou "Pago (teste)"); Metas recarrega ao mudar.
+    var contributionsVersion = 0
     var selectedTab: AppTab = .home
     var authMessage: String?
     var overlay: AppOverlay?
