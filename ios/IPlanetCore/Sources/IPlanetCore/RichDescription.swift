@@ -36,7 +36,7 @@ public enum RichDescription {
     private static let localImage = regex(#"^/products/[A-Za-z0-9._\-/]+$"#)
     private static let supabaseHost = regex(#"^[a-z0-9-]+\.supabase\.co$"#)
     private static let boldRe = regex(#"\*\*(.+?)\*\*"#)
-    private static let imageRe = regex(#"^!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)$"#)
+    private static let imageRe = regex(#"^!\[([^\]]*)\]\(\s*(\S+)\s*\)$"#)
     private static let tableSep = regex(#"^\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)*\|?$"#)
     private static let headingRe = regex(#"^(#{2,3})\s+(.+)$"#)
     private static let h1Re = regex(#"^#\s+(.+)$"#)
