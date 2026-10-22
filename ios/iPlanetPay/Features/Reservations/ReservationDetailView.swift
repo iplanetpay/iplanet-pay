@@ -220,7 +220,16 @@ struct ReservationDetailView: View {
                         }
                         if contribution.status == "pending" {
                             SimulatePaidButton(contributionId: contribution.id) { error, ok in
-                                if ok { Task { await checkPendingNow() } } else { info = error }
+                                guard ok else { info = error; return }
+                                // O servidor já confirmou: avança sem depender de nova leitura.
+                                Task {
+                                    if !(await checkPendingNow()) {
+                                        UINotificationFeedbackGenerator().notificationOccurred(.success)
+                                        info = "Aporte confirmado."
+                                        await load()
+                                        await session.refreshProfile()
+                                    }
+                                }
                             }
                         }
                     }
@@ -471,7 +480,8 @@ struct AporteSheet: View {
                     .buttonStyle(SecondaryButtonStyle())
                     if let id = pix.contributionId, message != "Aporte confirmado." {
                         SimulatePaidButton(contributionId: id) { error, ok in
-                            if ok { Task { await checkNow() } } else { message = error; messageIsSuccess = false }
+                            guard ok else { message = error; messageIsSuccess = false; return }
+                            Task { await simulatedPaid() }
                         }
                     }
                 }
@@ -545,6 +555,20 @@ struct AporteSheet: View {
             guard !Task.isCancelled else { return }
             if await checkNow() { return }
         }
+    }
+
+    /// "Pago (teste)": o servidor respondeu ok, então o aporte está confirmado. Um toque basta:
+    /// mostra o sucesso e fecha a folha (a reserva recarrega no onDone), sem precisar do "Fechar".
+    private func simulatedPaid() async {
+        if message != "Aporte confirmado." {
+            watching = nil
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+            message = "Aporte confirmado."
+            messageIsSuccess = true
+            await session.refreshProfile()
+        }
+        try? await Task.sleep(for: .seconds(PixConfirmation.simulatedAutoCloseSeconds))
+        onDone()
     }
 
     /// Mesmo fluxo da detecção automática: pending -> confirmed dispara o sucesso.
