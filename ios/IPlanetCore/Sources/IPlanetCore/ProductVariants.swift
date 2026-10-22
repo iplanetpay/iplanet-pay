@@ -108,6 +108,18 @@ public struct VariantMatrix: Equatable, Sendable {
     }
 }
 
+/// Família do seletor de cor/armazenamento: só o próprio produto (linhas com o mesmo nome),
+/// igual ao site. Agrupar pelo `model` misturava versões diferentes do mesmo aparelho
+/// (ex.: "iPhone 17 Pro Max (eSIM)" e "(Anatel Chip)" têm 256 GB Laranja com preços diferentes)
+/// e a combinação repetida escondia uma delas com o preço errado.
+public enum ProductFamily {
+    public static func members<T>(of product: T, in all: [T], name: (T) -> String) -> [T] {
+        let key = name(product).trimmingCharacters(in: .whitespaces).lowercased()
+        let same = all.filter { name($0).trimmingCharacters(in: .whitespaces).lowercased() == key }
+        return same.isEmpty ? [product] : same
+    }
+}
+
 /// Porte de src/lib/catalog/colors.ts: hex gravado > hex pelo nome > cinza neutro.
 public enum ColorSwatch {
     public static let fallbackHex = "#C7C7CC"
@@ -124,6 +136,7 @@ public enum ColorSwatch {
         (#"grafite|graphite"#, "#41424C"),
         (#"estelar|starlight"#, "#F0E8DC"),
         (#"lavanda|lavender"#, "#C9B8E8"),
+        (#"bord[oô]|burgundy"#, "#6B2A35"),
         (#"product|vermelho|red"#, "#BA0C2E"),
         (#"preto|black|space"#, "#1D1D1F"),
         (#"branco|white"#, "#F5F5F0"),
@@ -134,7 +147,7 @@ public enum ColorSwatch {
         (#"roxo|purple"#, "#B7A6D8"),
         (#"amarelo|yellow"#, "#F5E39A"),
         (#"dourado|gold"#, "#F4E3C1"),
-        (#"laranja|orange|c[oó]smico"#, "#E07A3D"),
+        (#"laranja|orange|c[oó]smico"#, "#F77E2D"),
         (#"tit[aâ]nio|titanium"#, "#8D8D92"),
     ]
 
