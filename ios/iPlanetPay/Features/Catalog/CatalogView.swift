@@ -119,11 +119,9 @@ struct CatalogView: View {
         }
     }
 
-    /// Produtos do mesmo modelo (outras cores/armazenamentos são linhas próprias em `products`).
+    /// Produto do seletor (versões como eSIM/Anatel/CPO são produtos próprios, como no site).
     private func family(of product: Product) -> [Product] {
-        let key = product.model.trimmingCharacters(in: .whitespaces).lowercased()
-        guard !key.isEmpty else { return [product] }
-        return products.filter { $0.model.trimmingCharacters(in: .whitespaces).lowercased() == key && $0.category == product.category }
+        ProductFamily.members(of: product, in: products.filter { $0.category == product.category }, name: \.name)
     }
 
     private var categories: [String] {
