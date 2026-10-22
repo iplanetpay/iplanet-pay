@@ -89,7 +89,7 @@ struct HomeView: View {
         VStack(spacing: 12) {
             shortcut("Atalho", "Catálogo", "Veja modelos disponíveis para nova reserva.", "Abrir catálogo", tab: .catalog)
             shortcut("Ranking", "Fichas & posição", "Acompanhe o ranking de aportes e suas fichas para o sorteio.", "Ver ranking →", tab: nil, overlay: .ranking)
-            shortcut("Carteira", "Saldo & Pix", "Veja aportes Pix confirmados e o extrato da carteira.", "Ir para carteira →", tab: .wallet)
+            shortcut("Wallet", "Saldo & Pix", "Veja aportes Pix confirmados e o extrato da Wallet.", "Ir para a Wallet →", tab: .wallet)
             shortcut("Simulador", "Simulador de aportes", "Calcule o valor de cada aporte e crie a meta do produto.", "Abrir simulador", tab: nil, openSimulator: true)
         }
     }

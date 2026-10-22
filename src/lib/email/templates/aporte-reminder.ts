@@ -22,7 +22,7 @@ export function aporteReminderEmail(opts: {
     <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#5c5c66;">
       Sem pressão — quando quiser, gere um Pix e continue no seu ritmo. Seu aparelho continua reservado.
     </p>
-    <p style="text-align:center;margin:24px 0;">${ctaButton("Gerar Pix / Carteira", href)}</p>
+    <p style="text-align:center;margin:24px 0;">${ctaButton("Gerar Pix / Wallet", href)}</p>
     <p style="text-align:center;margin:0;">
       <a href="${reserva}" style="color:#0071e3;font-weight:600;font-size:14px;text-decoration:none;">Ver reserva</a>
     </p>

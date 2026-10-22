@@ -26,7 +26,7 @@ export function CancelReservationButton({
 
     const ok = window.confirm(
       amountPaidCents > 0
-        ? "Cancelar esta reserva? Os aportes confirmados vão para a carteira e podem ser usados em outro aparelho ou sacados."
+        ? "Cancelar esta reserva? Os aportes confirmados vão para a Wallet e podem ser usados em outro aparelho ou sacados."
         : "Cancelar esta reserva? Esta ação não pode ser desfeita.",
     );
     if (!ok) return;
@@ -65,7 +65,7 @@ export function CancelReservationButton({
       </Button>
       {amountPaidCents > 0 ? (
         <p className="max-w-[240px] text-xs text-[var(--ink-muted)]">
-          {formatCentsBRL(amountPaidCents)} voltam para a carteira.
+          {formatCentsBRL(amountPaidCents)} voltam para a Wallet.
         </p>
       ) : null}
       {message ? (

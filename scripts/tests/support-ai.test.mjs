@@ -15,6 +15,16 @@ import { parseMarkdown } from "../../src/lib/support-ai/markdown.ts";
 
 const source = (path) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
+// Guia publicado = seed da 036 + trocas de nome da 040 (Carteira → Wallet).
+function seededGuide() {
+  return source("supabase/migrations/036_support_ai.sql")
+    .replaceAll('"Carteira"', '"Wallet"')
+    .replaceAll("volta para a Carteira", "volta para a Wallet")
+    .replaceAll("## Carteira", "## Wallet")
+    .replaceAll("A Carteira reúne", "A Wallet reúne")
+    .replaceAll("saldo da Carteira", "saldo da Wallet");
+}
+
 export default function suite(test) {
   test("support chat history keeps user/assistant turns and must end with the user", () => {
     assert.equal(sanitizeHistory("x"), null);
@@ -96,7 +106,7 @@ export default function suite(test) {
     assert.equal(widget.includes("apiKey"), false);
     assert.match(migration, /revoke all on table public\.support_ai_secrets from anon, authenticated/);
     assert.equal(/create policy[^;]*support_ai_secrets/i.test(migration), false);
-    assert.ok(migration.includes(guide.trim()));
+    assert.ok(seededGuide().includes(guide.trim()));
     assert.match(guide, /Nunca\*\* peça senha/);
   });
 
@@ -109,7 +119,7 @@ export default function suite(test) {
     assert.match(saque, /15 dias/);
     assert.match(saque, /aprovação do admin/);
     assert.match(guide, /saque do bônus \*\*só sai com aprovação do admin\*\*/);
-    assert.ok(source("supabase/migrations/036_support_ai.sql").includes(saque.trim()));
+    assert.ok(seededGuide().includes(saque.trim()));
   });
 
   test("customer menu shows Suporte right below Sair", () => {

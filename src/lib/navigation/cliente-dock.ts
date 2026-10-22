@@ -1,7 +1,7 @@
 export const CLIENTE_DOCK = [
   { href: "/app", label: "Início" },
   { href: "/app/catalogo", label: "Catálogo" },
-  { href: "/app/carteira", label: "Carteira" },
+  { href: "/app/carteira", label: "Wallet" },
   { href: "/app/metas", label: "Metas" },
   { href: "/app/indicacoes", label: "Indicações" },
   { href: "/app/configuracoes", label: "Conta" },

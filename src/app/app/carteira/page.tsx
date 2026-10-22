@@ -16,7 +16,7 @@ import { formatCentsBRL } from "@/lib/utils";
 import { Wallet } from "lucide-react";
 import { redirect } from "next/navigation";
 
-export const metadata = { title: "Carteira" };
+export const metadata = { title: "Wallet" };
 
 export default async function CarteiraPage() {
   const user = await getCurrentUser();
@@ -41,7 +41,7 @@ export default async function CarteiraPage() {
       <PageHeader
         showBack
         eyebrow="Financeiro"
-        title="Carteira"
+        title="Wallet"
         description="Extrato de aportes, saldo livre e saque."
       />
 

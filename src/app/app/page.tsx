@@ -113,13 +113,13 @@ export default async function ClienteHomePage() {
           </Link>
         </Card>
         <Card>
-          <Pill tone="accent">Carteira</Pill>
+          <Pill tone="accent">Wallet</Pill>
           <h3 className="mt-3 text-2xl font-bold tracking-tight">Saldo & Pix</h3>
           <p className="mt-2 text-[var(--ink-muted)]">
-            Veja aportes Pix confirmados e o extrato da carteira.
+            Veja aportes Pix confirmados e o extrato da Wallet.
           </p>
           <Link prefetch href="/app/carteira" className="mt-5 inline-block">
-            <Button variant="ghost">Ir para carteira →</Button>
+            <Button variant="ghost">Ir para a Wallet →</Button>
           </Link>
         </Card>
         <Card>

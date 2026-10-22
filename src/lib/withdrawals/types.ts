@@ -77,7 +77,7 @@ export function isMissingColumnError(message: string | null | undefined): boolea
 
 export const WITHDRAWAL_SOURCE_LABEL: Record<WithdrawalSource, string> = {
   reserva: "Reserva",
-  carteira: "Carteira",
+  carteira: "Wallet",
   bonus: "Bônus de indicação",
 };
 
