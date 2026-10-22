@@ -10,6 +10,7 @@ import { CancelReservationButton } from "@/components/reservations/cancel-button
 import { SwitchDeviceButton } from "@/components/reservations/switch-device-button";
 import { ReservationSimulatorButton } from "@/components/reservations/reservation-simulator-button";
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
+import { parseAporteParam } from "@/lib/goals/aporte-prefill";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
 import { paymentSimulationEnabled } from "@/lib/pix/simulation-guard";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
@@ -20,6 +21,9 @@ import {
   tradeInCashCents,
   tradeInCreditSummary,
   tradeInVisual,
+  tradeInProgressSegments,
+  TRADE_IN_EXPIRED_RED,
+  TRADE_IN_YELLOW,
 } from "@/lib/trade-in/offer-state";
 import { syncTradeInExpiry } from "@/lib/trade-in/workflow";
 import { listUsedDeviceOffersForReservation } from "@/lib/trade-in/queries";
@@ -59,10 +63,13 @@ export const metadata = { title: "Reserva" };
 
 export default async function ReservaDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ aporte?: string | string[] }>;
 }) {
   const { id } = await params;
+  const aportePrefillCents = parseAporteParam((await searchParams)?.aporte);
   const user = await getCurrentUser();
   const { contributions } = await listContributionsForReservation(id);
   const { reservation, error } = await getReservationById(id);
@@ -111,12 +118,11 @@ export default async function ReservaDetailPage({
   const tradeCents = tradeSummary.activeCents;
   const expiredTradeCents = tradeSummary.expiredCents;
   const cashCents = tradeInCashCents(paidCents, usedDeviceOffers);
-  const cashProgress = reservation.list_price_cents
-    ? Math.max(0, Math.min(100, Math.round((cashCents / reservation.list_price_cents) * 100)))
-    : 0;
-  const tradeProgress = reservation.list_price_cents
-    ? Math.max(0, Math.min(100, Math.round((tradeCents / reservation.list_price_cents) * 100)))
-    : 0;
+  const { cashPct: cashProgress, tradePct: tradeProgress } = tradeInProgressSegments(
+    reservation.list_price_cents,
+    cashCents,
+    tradeCents,
+  );
   const canOfferUsedDevice =
     isOwner &&
     reservation.status === "ativa" &&
@@ -258,7 +264,9 @@ export default async function ReservaDetailPage({
 
 
         <ProgressRing
-          value={Math.min(100, effectiveProgress)}
+          value={cashProgress}
+          secondaryValue={tradeProgress}
+          secondaryColor={TRADE_IN_YELLOW}
           label="Aportes"
         />
         <div className="grid gap-3 text-sm text-[var(--ink-muted)] sm:grid-cols-2">
@@ -266,12 +274,12 @@ export default async function ReservaDetailPage({
           <p>
             Pago: {formatCentsBRL(cashCents)}
             {tradeCents > 0 ? (
-              <span className="font-semibold text-[#e0a100]">
+              <span className="font-semibold" style={{ color: TRADE_IN_YELLOW }}>
                 {" "}+ {formatCentsBRL(tradeCents)}
               </span>
             ) : null}
             {expiredTradeCents > 0 ? (
-              <span className="font-semibold text-[#e11d48]">
+              <span className="font-semibold" style={{ color: TRADE_IN_EXPIRED_RED }}>
                 {" "}+ {formatCentsBRL(expiredTradeCents)}
               </span>
             ) : null}
@@ -287,6 +295,7 @@ export default async function ReservaDetailPage({
           <GerarPixForm
             reservationId={reservation.id}
             remainingCents={effectiveRemaining}
+            prefillCents={aportePrefillCents}
             simulationEnabled={paymentSimulationEnabled()}
           />
         ) : (

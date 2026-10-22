@@ -39,6 +39,15 @@ enum CivilDay {
 }
 
 enum DatesPT {
+    /// dd/MM/yyyy, como `toLocaleDateString("pt-BR")` no site.
+    static func short(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "pt_BR")
+        formatter.timeZone = CivilDay.zone
+        formatter.dateFormat = "dd/MM/yyyy"
+        return formatter.string(from: date)
+    }
+
     static func medium(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "pt_BR")

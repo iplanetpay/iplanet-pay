@@ -18,12 +18,14 @@ struct ReservationDetailView: View {
     @State private var info: String?
     @State private var loading = true
     @State private var showAporte = false
+    @State private var aportePrefillCents: Int?
     @State private var showTradeIn = false
     @State private var showWithdraw = false
     @State private var showSwitch = false
     @State private var showSimulator = false
     @State private var showPickup = false
     @State private var goals: [PaymentGoal] = []
+    @State private var cancelStep: CancelConfirm.Step = .idle
 
     var body: some View {
         ScrollView {
@@ -53,10 +55,33 @@ struct ReservationDetailView: View {
             openPixIfRequested(id)
         }
         .onAppear { openPixIfRequested(router.requestPixReservationID) }
+        .alert(CancelConfirm.warnTitle, isPresented: cancelAlertBinding(.warn)) {
+            Button(CancelConfirm.keep, role: .cancel) { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            Button(CancelConfirm.continueLabel, role: .destructive) {
+                cancelStep = CancelConfirm.next(cancelStep, .continue)
+            }
+        } message: {
+            if let paid = reservation?.amountPaidCents, paid > 0 {
+                Text("\(Money.format(cents: paid)) em aportes voltam para a Wallet. \(CancelConfirm.warnWithAportes)")
+            } else {
+                Text(CancelConfirm.warnNoAportes)
+            }
+        }
+        .alert(CancelConfirm.finalTitle, isPresented: cancelAlertBinding(.final)) {
+            Button(CancelConfirm.back, role: .cancel) { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            Button(CancelConfirm.confirm, role: .destructive) {
+                guard CancelConfirm.shouldSubmit(cancelStep, .confirm) else { return }
+                cancelStep = CancelConfirm.next(cancelStep, .confirm)
+                Task { await cancel() }
+            }
+        } message: {
+            Text(CancelConfirm.finalBody)
+        }
         .sheet(isPresented: $showAporte) {
             if let reservation {
-                AporteSheet(reservation: reservation) {
+                AporteSheet(reservation: reservation, prefillCents: aportePrefillCents) {
                     showAporte = false
+                    aportePrefillCents = nil
                     Task { await load() }
                 }
             }
@@ -121,12 +146,26 @@ struct ReservationDetailView: View {
             .foregroundStyle(Brand.inkMuted)
         Text(reservation.store?.name ?? "Loja")
             .font(.subheadline)
-        ProgressRing(percent: reservation.progress * 100, caption: "Aportes")
+        let credits = offers.map(\.credit)
+        let trade = TradeInCredit.summary(credits)
+        let cash = TradeInCredit.cashCents(amountPaidCents: reservation.amountPaidCents, offers: credits)
+        let seg = TradeInCredit.segments(
+            listPriceCents: reservation.listPriceCents, cashCents: cash, tradeCents: trade.activeCents
+        )
+        ProgressRing(percent: Double(seg.cashPct), caption: "Aportes", secondaryPercent: Double(seg.tradePct))
         Text("Total: \(Money.format(cents: reservation.listPriceCents))")
-        Text("Pago: \(Money.format(cents: reservation.amountPaidCents))")
+        (
+            Text("Pago: \(Money.format(cents: cash))")
+            + (trade.activeCents > 0
+                ? Text(" + \(Money.format(cents: trade.activeCents))").foregroundColor(TradeInTone.yellow)
+                : Text(""))
+            + (trade.expiredCents > 0
+                ? Text(" + \(Money.format(cents: trade.expiredCents))").foregroundColor(TradeInTone.expiredRed)
+                : Text(""))
+        )
             .font(.headline)
             .contentTransition(.numericText())
-        Text("Restante: \(Money.format(cents: reservation.remainingCents))")
+        Text("Restante: \(Money.format(cents: max(0, reservation.listPriceCents - cash - trade.activeCents)))")
             .foregroundStyle(Brand.inkMuted)
             .contentTransition(.numericText())
         if let created = reservation.createdAt {
@@ -148,9 +187,10 @@ struct ReservationDetailView: View {
                     .font(.footnote)
                     .foregroundStyle(Brand.inkMuted)
             }
-            Button("Cancelar reserva", role: .destructive) {
-                Task { await cancel() }
+            Button(cancelStep == .submitting ? CancelConfirm.submitting : "Cancelar reserva", role: .destructive) {
+                cancelStep = CancelConfirm.next(cancelStep, .open)
             }
+            .disabled(cancelStep == .submitting)
             .frame(minHeight: 44)
             .frame(maxWidth: .infinity)
         }
@@ -255,6 +295,20 @@ struct ReservationDetailView: View {
                         Text(offer.statusLabel)
                         Text("Esperado \(Money.format(cents: offer.expectedValueCents))")
                             .font(.subheadline)
+                        if offer.status == "approved", let credit = offer.approvedValueCents, !offer.credit.isDiscarded {
+                            Text("Crédito aplicado: \(Money.format(cents: credit))")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(Brand.accent)
+                        }
+                        if let days = TradeInCredit.daysRemaining(offer.credit), days > 0,
+                           !offer.credit.isMarkedExpired, let expires = TradeInCredit.expiresAt(offer.credit) {
+                            Text("Expira em \(days) \(days == 1 ? "dia" : "dias") · \(DatesPT.short(expires))")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(TradeInTone.chipText)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(TradeInTone.chipBackground, in: Capsule())
+                        }
                         if offer.isCounterOffer, let proposed = offer.approvedValueCents {
                             Text("Contra-proposta: \(Money.format(cents: proposed))")
                                 .font(.subheadline.weight(.semibold))
@@ -351,6 +405,7 @@ struct ReservationDetailView: View {
         guard !PixConfirmation.newlyConfirmed(before: before, after: after).isEmpty else { return false }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         info = "Aporte confirmado."
+        router.contributionsVersion += 1
         reservation = try? await Repository.reservation(id: reservationID)
         await session.refreshProfile()
         return true
@@ -358,6 +413,8 @@ struct ReservationDetailView: View {
 
     private func openPixIfRequested(_ id: UUID?) {
         guard id == reservationID else { return }
+        aportePrefillCents = router.requestPixAmountCents
+        router.requestPixAmountCents = nil
         showAporte = true
         router.requestPixReservationID = nil
     }
@@ -380,12 +437,23 @@ struct ReservationDetailView: View {
         }
     }
 
+    /// Binding de cada alerta da dupla confirmação; fechar pelo sistema conta como "dismiss".
+    private func cancelAlertBinding(_ step: CancelConfirm.Step) -> Binding<Bool> {
+        Binding(
+            get: { cancelStep == step },
+            set: { shown in
+                if !shown, cancelStep == step { cancelStep = CancelConfirm.next(cancelStep, .dismiss) }
+            })
+    }
+
     private func cancel() async {
         do {
             try await Repository.cancelReservation(id: reservationID)
+            cancelStep = CancelConfirm.next(cancelStep, .done)
             info = "Reserva cancelada."
             await load()
         } catch {
+            cancelStep = CancelConfirm.next(cancelStep, .failed)
             self.error = describeError(error)
         }
     }
@@ -441,8 +509,10 @@ struct ReservationDetailView: View {
 
 struct AporteSheet: View {
     let reservation: ReservationRow
+    var prefillCents: Int? = nil
     var onDone: () -> Void
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @State private var amount = ""
     @State private var message: String?
     @State private var messageIsSuccess = false
@@ -508,6 +578,14 @@ struct AporteSheet: View {
                 }
             }
             .task(id: watching) { await watch() }
+            .onAppear {
+                if amount.isEmpty, let text = GoalAporte.amountText(
+                    prefillCents: prefillCents,
+                    remainingCents: reservation.remainingCents
+                ) {
+                    amount = text
+                }
+            }
         }
     }
 
@@ -565,6 +643,7 @@ struct AporteSheet: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             message = "Aporte confirmado."
             messageIsSuccess = true
+            router.contributionsVersion += 1
             await session.refreshProfile()
         }
         try? await Task.sleep(for: .seconds(PixConfirmation.simulatedAutoCloseSeconds))
@@ -581,6 +660,7 @@ struct AporteSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         message = "Aporte confirmado."
         messageIsSuccess = true
+        router.contributionsVersion += 1
         await session.refreshProfile()
         return true
     }

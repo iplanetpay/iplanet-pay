@@ -22,6 +22,13 @@ struct ProgressRing: View {
     var tint: Color = Brand.accent
     var size: CGFloat = 112
     var numberColor: Color = Brand.ink
+    /// Segunda fatia (crédito de usado avaliado, amarelo), desenhada logo após `percent`.
+    var secondaryPercent: Double = 0
+    var secondaryTint: Color = TradeInTone.yellow
+
+    private var primary: Double { max(0, min(100, percent)) }
+    private var secondary: Double { max(0, min(100 - primary, secondaryPercent)) }
+    private var total: Double { primary + secondary }
 
     private var line: CGFloat { max(3, size * 0.08) }
 
@@ -29,12 +36,18 @@ struct ProgressRing: View {
         ZStack {
             Circle()
                 .stroke(Brand.line, lineWidth: line)
+            if secondary > 0 {
+                Circle()
+                    .trim(from: 0, to: total / 100)
+                    .stroke(secondaryTint, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+            }
             Circle()
-                .trim(from: 0, to: max(0, min(1, percent / 100)))
+                .trim(from: 0, to: primary / 100)
                 .stroke(tint, style: StrokeStyle(lineWidth: line, lineCap: .round))
                 .rotationEffect(.degrees(-90))
             VStack(spacing: 2) {
-                Text("\(Int(percent.rounded()))%")
+                Text("\(Int(total.rounded()))%")
                     .font(size < 48.0 ? .caption2.weight(.bold) : .title3.weight(.bold))
                     .foregroundStyle(numberColor)
                     .contentTransition(.numericText())
@@ -46,9 +59,9 @@ struct ProgressRing: View {
             }
         }
         .frame(width: size, height: size)
-        .animation(.spring(response: 0.7, dampingFraction: 0.85), value: percent)
+        .animation(.spring(response: 0.7, dampingFraction: 0.85), value: total)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(caption), \(Int(percent.rounded())) por cento")
+        .accessibilityLabel("\(caption), \(Int(total.rounded())) por cento")
     }
 }
 
@@ -318,5 +331,29 @@ struct PickupSheet: View {
         } catch {
             message = describeError(error)
         }
+    }
+}
+
+/// Tons do crédito de usado — mesmos hex do site (#e0a100 / #e11d48).
+enum TradeInTone {
+    static let yellow = Color(hex: TradeInCredit.yellowHex)
+    static let expiredRed = Color(hex: TradeInCredit.expiredRedHex)
+    static let chipBackground = Color(hex: 0xFFF6DF)
+    static let chipText = Color(hex: 0x9A6B00)
+}
+
+extension Color {
+    init(hex: UInt32) {
+        self.init(
+            red: Double((hex >> 16) & 0xFF) / 255,
+            green: Double((hex >> 8) & 0xFF) / 255,
+            blue: Double(hex & 0xFF) / 255
+        )
+    }
+}
+
+extension UsedDeviceOffer {
+    var credit: TradeInCredit.Offer {
+        .init(status: status, adminMessage: adminMessage, approvedValueCents: approvedValueCents, reviewedAt: reviewedAt)
     }
 }
