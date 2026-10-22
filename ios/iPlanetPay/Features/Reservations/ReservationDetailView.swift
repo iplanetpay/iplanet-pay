@@ -18,6 +18,7 @@ struct ReservationDetailView: View {
     @State private var info: String?
     @State private var loading = true
     @State private var showAporte = false
+    @State private var aportePrefillCents: Int?
     @State private var showTradeIn = false
     @State private var showWithdraw = false
     @State private var showSwitch = false
@@ -55,8 +56,9 @@ struct ReservationDetailView: View {
         .onAppear { openPixIfRequested(router.requestPixReservationID) }
         .sheet(isPresented: $showAporte) {
             if let reservation {
-                AporteSheet(reservation: reservation) {
+                AporteSheet(reservation: reservation, prefillCents: aportePrefillCents) {
                     showAporte = false
+                    aportePrefillCents = nil
                     Task { await load() }
                 }
             }
@@ -351,6 +353,7 @@ struct ReservationDetailView: View {
         guard !PixConfirmation.newlyConfirmed(before: before, after: after).isEmpty else { return false }
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         info = "Aporte confirmado."
+        router.contributionsVersion += 1
         reservation = try? await Repository.reservation(id: reservationID)
         await session.refreshProfile()
         return true
@@ -358,6 +361,8 @@ struct ReservationDetailView: View {
 
     private func openPixIfRequested(_ id: UUID?) {
         guard id == reservationID else { return }
+        aportePrefillCents = router.requestPixAmountCents
+        router.requestPixAmountCents = nil
         showAporte = true
         router.requestPixReservationID = nil
     }
@@ -441,8 +446,10 @@ struct ReservationDetailView: View {
 
 struct AporteSheet: View {
     let reservation: ReservationRow
+    var prefillCents: Int? = nil
     var onDone: () -> Void
     @Environment(SessionStore.self) private var session
+    @Environment(AppRouter.self) private var router
     @State private var amount = ""
     @State private var message: String?
     @State private var messageIsSuccess = false
@@ -508,6 +515,14 @@ struct AporteSheet: View {
                 }
             }
             .task(id: watching) { await watch() }
+            .onAppear {
+                if amount.isEmpty, let text = GoalAporte.amountText(
+                    prefillCents: prefillCents,
+                    remainingCents: reservation.remainingCents
+                ) {
+                    amount = text
+                }
+            }
         }
     }
 
@@ -565,6 +580,7 @@ struct AporteSheet: View {
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             message = "Aporte confirmado."
             messageIsSuccess = true
+            router.contributionsVersion += 1
             await session.refreshProfile()
         }
         try? await Task.sleep(for: .seconds(PixConfirmation.simulatedAutoCloseSeconds))
@@ -581,6 +597,7 @@ struct AporteSheet: View {
         UINotificationFeedbackGenerator().notificationOccurred(.success)
         message = "Aporte confirmado."
         messageIsSuccess = true
+        router.contributionsVersion += 1
         await session.refreshProfile()
         return true
     }

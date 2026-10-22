@@ -3,7 +3,7 @@
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ContributionCalendar } from "@/components/reservations/contribution-calendar";
 import { EmptyState } from "@/components/ui/empty-state";
 import { selectClimbGoal, type ClimbGoalEntry } from "@/lib/goals/climb/goal-cards";
@@ -72,6 +72,22 @@ export function MetasScreen({ entries }: { entries: ClimbGoalEntry[] }) {
   const [trackedMeta, setTrackedMeta] = useState(metaId);
   const [time, setTime] = useState<TimeOfDayPreset>(() => readTime(params.get("hora")));
   const initialView = readView(params.get("visao"));
+
+  // O cache do roteador (staleTimes.dynamic = 60s + prefetch do dock) podia mostrar a meta
+  // antiga logo depois de um aporte confirmado. Sempre busca o progresso atual ao abrir
+  // Metas e ao voltar para a aba/janela.
+  useEffect(() => {
+    router.refresh();
+    const onVisible = () => {
+      if (document.visibilityState === "visible") router.refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
+  }, [router]);
 
   if (trackedMeta !== metaId) {
     setTrackedMeta(metaId);

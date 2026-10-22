@@ -1,3 +1,4 @@
+import { goalDepositHref } from "@/lib/goals/aporte-prefill";
 import { climbGoalFromPlan } from "@/lib/goals/climb/adapter";
 import { isClimbableGoal, type ClimbGoalEntry } from "@/lib/goals/climb/goal-cards";
 import { buildGoalSchedule } from "@/lib/goals/goal-calendar";
@@ -41,7 +42,7 @@ async function entryFor(goal: PaymentGoal): Promise<ClimbGoalEntry | null> {
       today,
     });
     return {
-      depositHref: `/app/reserva/${reservationId}`,
+      depositHref: goalDepositHref(reservationId, goal.installment_cents),
       calendar: schedule.calendar,
       today,
       goal: climbGoalFromPlan({
@@ -70,3 +71,4 @@ function confirmedMarks(contributions: Contribution[]) {
   }
   return marks;
 }
+
