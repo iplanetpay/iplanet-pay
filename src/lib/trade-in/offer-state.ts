@@ -110,3 +110,19 @@ export function tradeInCreditSummary(
 export function tradeInCashCents(amountPaidCents: number, offers: UsedDeviceOffer[], now = Date.now()) {
   return Math.max(0, amountPaidCents - tradeInCreditSummary(offers, now).inPaidCents);
 }
+
+/** Tons usados no detalhe da reserva para o crédito de usado (iOS usa os mesmos hex). */
+export const TRADE_IN_YELLOW = "#e0a100";
+export const TRADE_IN_EXPIRED_RED = "#e11d48";
+
+/**
+ * Fatias do anel de progresso: aportes em dinheiro (azul) + crédito de usado avaliado (amarelo).
+ * Cada fatia é arredondada e limitada; a soma nunca passa de 100.
+ */
+export function tradeInProgressSegments(listPriceCents: number, cashCents: number, tradeCents: number) {
+  if (!listPriceCents) return { cashPct: 0, tradePct: 0 };
+  const pct = (v: number) => Math.max(0, Math.min(100, Math.round((v / listPriceCents) * 100)));
+  const cashPct = pct(cashCents);
+  const tradePct = Math.min(100 - cashPct, pct(tradeCents));
+  return { cashPct, tradePct };
+}

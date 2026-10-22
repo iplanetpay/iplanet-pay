@@ -180,3 +180,12 @@ export default function suite(test) {
     assert.match(tooMany.error, /Limite/);
   });
 }
+
+// Anel da reserva: azul = aportes em dinheiro, amarelo = usado avaliado (igual ao iOS TradeInCredit.segments).
+{
+  const { tradeInProgressSegments, TRADE_IN_YELLOW } = await import("../../src/lib/trade-in/offer-state.ts");
+  assert.equal(TRADE_IN_YELLOW, "#e0a100");
+  assert.deepEqual(tradeInProgressSegments(1_000_000, 300_000, 200_000), { cashPct: 30, tradePct: 20 });
+  assert.deepEqual(tradeInProgressSegments(1_000_000, 900_000, 300_000), { cashPct: 90, tradePct: 10 });
+  assert.deepEqual(tradeInProgressSegments(0, 1, 1), { cashPct: 0, tradePct: 0 });
+}

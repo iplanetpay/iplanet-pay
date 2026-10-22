@@ -6,6 +6,9 @@ interface ProgressRingProps {
   stroke?: number;
   className?: string;
   label?: string;
+  /** Segunda fatia (ex.: crédito de usado em amarelo), desenhada logo após `value`. */
+  secondaryValue?: number;
+  secondaryColor?: string;
 }
 
 export function ProgressRing({
@@ -14,11 +17,14 @@ export function ProgressRing({
   stroke = 10,
   className,
   label,
+  secondaryValue = 0,
+  secondaryColor,
 }: ProgressRingProps) {
-  const clamped = Math.max(0, Math.min(100, value));
+  const primary = Math.max(0, Math.min(100, value));
+  const secondary = Math.max(0, Math.min(100 - primary, secondaryValue));
+  const clamped = primary + secondary;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (clamped / 100) * circumference;
 
   return (
     <div
@@ -34,6 +40,20 @@ export function ProgressRing({
           stroke="var(--bg-subtle)"
           strokeWidth={stroke}
         />
+        {secondary > 0 && secondaryColor ? (
+          <circle
+            cx={size / 2}
+            cy={size / 2}
+            r={radius}
+            fill="none"
+            stroke={secondaryColor}
+            strokeWidth={stroke}
+            strokeLinecap="round"
+            strokeDasharray={circumference}
+            strokeDashoffset={circumference - (clamped / 100) * circumference}
+            data-testid="progresso-usado"
+          />
+        ) : null}
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -43,7 +63,7 @@ export function ProgressRing({
           strokeWidth={stroke}
           strokeLinecap="round"
           strokeDasharray={circumference}
-          strokeDashoffset={offset}
+          strokeDashoffset={circumference - (primary / 100) * circumference}
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
