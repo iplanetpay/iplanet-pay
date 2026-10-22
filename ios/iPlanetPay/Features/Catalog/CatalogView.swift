@@ -217,8 +217,8 @@ struct ProductReserveSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
-                    RemoteImage(url: AppConfig.media(product.imageUrl))
-                        .id(product.imageUrl ?? product.id.uuidString)
+                    ProductGallery(urls: product.galleryURLs.compactMap { AppConfig.media($0) })
+                        .id(product.id)
                         .transition(.opacity.combined(with: .scale(scale: 0.96)))
                     Text(product.name).font(.title.weight(.bold))
                     Text(subtitle).foregroundStyle(Brand.inkMuted)
@@ -227,8 +227,10 @@ struct ProductReserveSheet: View {
                         .font(.title2.weight(.bold))
                         .contentTransition(.numericText())
                     variantPickers
-                    if let description = product.description, !description.isEmpty {
-                        Text(description)
+                    if let blocks = RichDescription.blocksOrNil(product.descriptionMd) {
+                        RichDescriptionView(blocks: blocks)
+                    } else if let description = product.description?.trimmingCharacters(in: .whitespacesAndNewlines), !description.isEmpty {
+                        Text(verbatim: description).foregroundStyle(Brand.inkMuted)
                     }
                     Text("Loja de retirada")
                         .font(.headline)
