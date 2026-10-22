@@ -451,7 +451,8 @@ enum WebAPI {
 
     /// Teste: pede ao servidor que simule o pagamento do Pix
     /// (`POST /api/dev/simulate-payment`, protegido por flag de ambiente e checagem admin/teste no web).
-    /// O app nunca grava pagamento direto; 403/404 = simulação desativada neste servidor.
+    /// O app nunca grava pagamento direto; só 404 = simulação desativada neste servidor
+    /// (403 = aporte de outra conta, 401 = sessão: viram erro visível, não escondem o botão).
     static func simulatePayment(contributionId: UUID) async throws -> SimulationResult {
         struct Body: Encodable { var contributionId: UUID }
         var request = URLRequest(url: AppConfig.web("/api/dev/simulate-payment"))
@@ -463,7 +464,7 @@ enum WebAPI {
         request.httpBody = try AppCoding.encoder.encode(Body(contributionId: contributionId))
         let (data, response) = try await URLSession.shared.data(for: request)
         let status = (response as? HTTPURLResponse)?.statusCode ?? 0
-        if status == 403 || status == 404 { return .disabled }
+        if PixConfirmation.simulationDisabled(httpStatus: status) { return .disabled }
         let reply = try? AppCoding.decoder.decode(StatusResponse.self, from: data)
         guard (200..<300).contains(status), reply?.ok != false else {
             throw Failure(message: reply?.error ?? "Não foi possível simular o pagamento (HTTP \(status)).")

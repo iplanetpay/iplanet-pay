@@ -102,7 +102,7 @@ export function GerarPixForm({
       const res = await fetch("/api/dev/simulate-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pixId: payment.contributionId }),
+        body: JSON.stringify({ contribution_id: payment.contributionId }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {

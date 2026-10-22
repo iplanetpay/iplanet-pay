@@ -69,4 +69,21 @@ export default function suite(test) {
     assert.equal(form.includes("Avançar"), false);
     assert.match(source("src/app/app/reserva/[id]/page.tsx"), /simulationEnabled=\{paymentSimulationEnabled\(\)\}/);
   });
+
+  test("one-tap 'Pago (teste)': web and iOS advance with a single tap, no dialogs, one working button", () => {
+    const form = source("src/components/pix/gerar-pix-form.tsx");
+    assert.match(form, /fetch\("\/api\/dev\/simulate-payment"/);
+    assert.match(form, /contribution_id: payment\.contributionId/);
+    assert.equal(/\bconfirm\(|window\.confirm|alert\(/.test(form), false, "sem diálogo de confirmação");
+    assert.equal(form.includes("/api/pix/simulate\""), false, "UI não chama a rota antiga");
+    assert.equal(/Avançar/.test(form), false, "sem botão Avançar duplicado");
+    assert.match(form, /setConfirmed\(true\)[\s\S]*router\.refresh\(\)/);
+    const detail = source("ios/iPlanetPay/Features/Reservations/ReservationDetailView.swift");
+    assert.match(detail, /Task \{ await simulatedPaid\(\) \}/);
+    assert.match(detail, /private func simulatedPaid\(\) async \{[\s\S]*?onDone\(\)/);
+    assert.equal(/confirmationDialog|\.alert\(/.test(detail.slice(detail.indexOf("struct SimulatePaidButton"))), false);
+    const api = source("ios/iPlanetPay/Services/WebAPI.swift");
+    assert.match(api, /PixConfirmation\.simulationDisabled\(httpStatus: status\)/);
+    assert.equal(api.includes("status == 403 || status == 404"), false, "403 não pode esconder o botão");
+  });
 }

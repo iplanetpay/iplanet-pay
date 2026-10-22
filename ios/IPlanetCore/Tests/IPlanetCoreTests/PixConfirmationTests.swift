@@ -19,4 +19,17 @@ final class PixConfirmationTests: XCTestCase {
             after: [1: "confirmed", 2: "pending", 3: "confirmed", 4: "confirmed"])
         XCTAssertEqual(ids, [1])
     }
+
+    /// Regressão: 403 (aporte de outra conta) escondia o botão como se a simulação estivesse desligada.
+    func testOnlyNotFoundMeansSimulationDisabled() {
+        XCTAssertTrue(PixConfirmation.simulationDisabled(httpStatus: 404))
+        XCTAssertFalse(PixConfirmation.simulationDisabled(httpStatus: 403))
+        XCTAssertFalse(PixConfirmation.simulationDisabled(httpStatus: 401))
+        XCTAssertFalse(PixConfirmation.simulationDisabled(httpStatus: 200))
+    }
+
+    func testSimulatedSuccessClosesQuickly() {
+        XCTAssertGreaterThan(PixConfirmation.simulatedAutoCloseSeconds, 0)
+        XCTAssertLessThanOrEqual(PixConfirmation.simulatedAutoCloseSeconds, 2)
+    }
 }
