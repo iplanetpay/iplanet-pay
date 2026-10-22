@@ -11,6 +11,7 @@ import { SwitchDeviceButton } from "@/components/reservations/switch-device-butt
 import { ReservationSimulatorButton } from "@/components/reservations/reservation-simulator-button";
 import { ConfirmRetiradaButton } from "@/components/reservations/confirm-retirada-button";
 import { GerarPixForm } from "@/components/pix/gerar-pix-form";
+import { paymentSimulationEnabled } from "@/lib/pix/simulation-guard";
 import { UsedDeviceOfferStatus } from "@/components/trade-in/used-device-offer-status";
 import { MAX_TRADE_IN_DEVICES } from "@/lib/trade-in/devices";
 import {
@@ -286,6 +287,7 @@ export default async function ReservaDetailPage({
           <GerarPixForm
             reservationId={reservation.id}
             remainingCents={effectiveRemaining}
+            simulationEnabled={paymentSimulationEnabled()}
           />
         ) : (
           <p className="text-sm text-[var(--ink-muted)]">

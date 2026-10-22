@@ -17,10 +17,13 @@ export function GerarPixForm({
   reservationId,
   remainingCents,
   disabled,
+  simulationEnabled = false,
 }: {
   reservationId: string;
   remainingCents: number;
   disabled?: boolean;
+  /** Servidor: ALLOW_PAYMENT_SIMULATION=true ou modo mock. Mostra "Pago (teste)". */
+  simulationEnabled?: boolean;
 }) {
   const router = useRouter();
   const defaultBrl = Math.min(50, Math.max(5, remainingCents / 100));
@@ -80,8 +83,8 @@ export function GerarPixForm({
       if (data.pix?.copy_paste) setPix(data.pix);
       setMessage(
         data.amount_cents
-          ? `Aporte de ${formatCentsBRL(data.amount_cents)} criado. Avance para confirmar o pagamento de teste.`
-          : "Aporte criado. Avance para confirmar o pagamento de teste.",
+          ? `Aporte de ${formatCentsBRL(data.amount_cents)} criado. Pague o Pix para confirmar.`
+          : "Aporte criado. Pague o Pix para confirmar.",
       );
       router.refresh();
     } catch {
@@ -96,10 +99,10 @@ export function GerarPixForm({
     setAdvancing(true);
     setMessage(null);
     try {
-      const res = await fetch("/api/pix/simulate", {
+      const res = await fetch("/api/dev/simulate-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contribution_id: payment.contributionId }),
+        body: JSON.stringify({ pixId: payment.contributionId }),
       });
       const data = (await res.json()) as { ok?: boolean; error?: string };
       if (!res.ok || !data.ok) {
@@ -163,13 +166,15 @@ export function GerarPixForm({
       {payment ? (
         <div className="space-y-3 rounded-2xl border border-[var(--line)] bg-[var(--bg-subtle)] p-4">
           <p className="text-sm font-semibold text-[var(--ink)]">
-            Pagamento de teste
+            Pix do aporte
             {payment.amountCents
               ? ` · ${formatCentsBRL(payment.amountCents)}`
               : ""}
           </p>
           <p className="text-xs text-[var(--ink-muted)]">
-            Sem Pix real. Avance para lançar este aporte como pago.
+            {pix?.copy_paste
+              ? "Escaneie o QR Code ou copie o código no app do seu banco. A confirmação chega sozinha."
+              : "O Pix ainda não foi gerado no gateway."}
           </p>
           {pix?.qr_base64 ? (
             // eslint-disable-next-line @next/next/no-img-element
@@ -193,15 +198,18 @@ export function GerarPixForm({
               {copied ? "Copiado!" : "Copiar código Pix"}
             </Button>
           ) : null}
-          <Button
-            type="button"
-            variant="accent"
-            fullWidth
-            disabled={advancing}
-            onClick={() => void advancePayment()}
-          >
-            {advancing ? "Confirmando..." : "Avançar"}
-          </Button>
+          {simulationEnabled ? (
+            <Button
+              type="button"
+              variant="accent"
+              fullWidth
+              disabled={advancing}
+              data-testid="pix-simulate-paid"
+              onClick={() => void advancePayment()}
+            >
+              {advancing ? "Confirmando..." : "Pago (teste)"}
+            </Button>
+          ) : null}
         </div>
       ) : null}
     </div>

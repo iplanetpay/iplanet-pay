@@ -1,5 +1,6 @@
 import { createServiceClient } from "@/lib/supabase/admin";
 import { fetchMercadoPagoPayment } from "@/lib/pix/mercadopago";
+import { confirmContributionAsWebhook } from "@/lib/pix/confirm";
 
 export type WebhookProcessResult = {
   ok: boolean;
@@ -165,20 +166,17 @@ export async function processPixWebhook(params: {
     };
   }
 
-  const { data: confirmData, error: confirmError } = await supabase.rpc(
-    "confirm_contribution",
-    { p_contribution_id: contributionId },
-  );
+  const confirmed = await confirmContributionAsWebhook(supabase, contributionId);
 
-  if (confirmError) {
+  if (!confirmed.ok) {
     await supabase.rpc("mark_webhook_processed", {
       p_inbox_id: inboxRow.id,
       p_status: "error",
-      p_error: confirmError.message,
+      p_error: confirmed.error,
     });
     return {
       ok: false,
-      message: confirmError.message,
+      message: confirmed.error,
       contribution_id: contributionId,
       inbox_id: inboxRow.id,
     };
@@ -189,41 +187,7 @@ export async function processPixWebhook(params: {
     p_status: "processed",
     p_error: null,
   });
-
-  const already = Boolean(
-    (confirmData as { already_confirmed?: boolean } | null)?.already_confirmed,
-  );
-  if (!already) {
-    try {
-      const { notifyAporteConfirmado } = await import("@/lib/email/notify");
-      void notifyAporteConfirmado(contributionId);
-    } catch {
-      /* non-fatal */
-    }
-    try {
-      const { notifyFirstAporteWhatsapp } = await import(
-        "@/lib/whatsapp/notify"
-      );
-      void notifyFirstAporteWhatsapp(contributionId);
-    } catch {
-      /* non-fatal */
-    }
-    try {
-      const { data: contrib } = await supabase
-        .from("contributions")
-        .select("reservation_id")
-        .eq("id", contributionId)
-        .maybeSingle();
-      if (contrib?.reservation_id) {
-        const { maybeNotifyAdminContributionMilestones } = await import(
-          "@/lib/milestones/admin-whatsapp"
-        );
-        void maybeNotifyAdminContributionMilestones(contrib.reservation_id);
-      }
-    } catch {
-      /* non-fatal */
-    }
-  }
+  const already = confirmed.alreadyConfirmed;
 
   return {
     ok: true,
