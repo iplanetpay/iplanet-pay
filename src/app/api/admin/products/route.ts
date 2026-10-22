@@ -37,6 +37,7 @@ export async function POST(request: Request) {
     image_url: body.image_url != null ? String(body.image_url) : null,
     product_images: parseProductImages(body) ?? undefined,
     description: body.description != null ? String(body.description) : null,
+    description_md: body.description_md != null ? String(body.description_md) : null,
     active: body.active !== false,
     category_id: body.category_id ? String(body.category_id) : null,
     new_category_name: body.new_category_name
@@ -90,6 +91,7 @@ export async function PATCH(request: Request) {
     image_url: body.image_url != null ? String(body.image_url) : null,
     product_images: parseProductImages(body) ?? undefined,
     description: body.description != null ? String(body.description) : null,
+    description_md: body.description_md != null ? String(body.description_md) : null,
     active: body.active !== false,
     category_id: body.category_id ? String(body.category_id) : null,
     new_category_name: body.new_category_name

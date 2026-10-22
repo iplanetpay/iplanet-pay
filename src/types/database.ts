@@ -31,6 +31,8 @@ export interface Product {
   list_price_cents: number;
   image_url: string | null;
   description?: string | null;
+  /** Descrição rica em Markdown restrito (migração 039). Ver docs/api-contract.md. */
+  description_md?: string | null;
   product_images?: string[] | null;
   active: boolean;
   category?: string;

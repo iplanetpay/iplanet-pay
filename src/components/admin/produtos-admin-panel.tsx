@@ -16,6 +16,8 @@ import type { ProductCategory } from "@/types/database";
 import { ProductVariantsPanel } from "@/components/admin/product-variants-panel";
 import { ColorPicker } from "@/components/admin/color-picker";
 import { hexFromColorName, swatchHex } from "@/lib/catalog/colors";
+import { RichDescriptionEditor } from "@/components/admin/rich-description-editor";
+import { uploadProductImage } from "@/lib/catalog/product-image-upload";
 import { ImportRulesButton, ProductsTransferBar } from "@/components/admin/products-transfer";
 
 const NEW_CAT = "__new__";
@@ -34,6 +36,7 @@ type FormState = {
   /** Extra gallery URLs; first cover is image_url */
   product_images: string[];
   description: string;
+  description_md: string;
   active: boolean;
   category_id: string;
   new_category_name: string;
@@ -51,6 +54,7 @@ const emptyForm = (): FormState => ({
   image_url: "",
   product_images: [],
   description: "",
+  description_md: "",
   active: true,
   category_id: "",
   new_category_name: "",
@@ -79,6 +83,7 @@ export function ProdutosAdminPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [galleryUploading, setGalleryUploading] = useState(false);
   const [filter, setFilter] = useState("");
   const [catName, setCatName] = useState("");
   const [catLoading, setCatLoading] = useState(false);
@@ -118,10 +123,31 @@ export function ProdutosAdminPanel({
       image_url: p.image_url ?? "",
       product_images: (p.product_images ?? []).filter(Boolean),
       description: p.description ?? "",
+      description_md: p.description_md ?? "",
       active: p.active,
       category_id: p.category_id ?? "",
       new_category_name: "",
     });
+  }
+
+  async function uploadGallery(files: FileList | null) {
+    if (!files?.length) return;
+    setGalleryUploading(true);
+    setError(null);
+    const urls: string[] = [];
+    for (const file of Array.from(files)) {
+      const res = await uploadProductImage(file, form.slug || form.name);
+      if (res.url) urls.push(res.url);
+      else setError(res.error ?? "Falha no upload.");
+    }
+    setGalleryUploading(false);
+    if (urls.length) {
+      setForm((f) =>
+        f.image_url.trim()
+          ? { ...f, product_images: [...f.product_images.filter(Boolean), ...urls] }
+          : { ...f, image_url: urls[0], product_images: [...f.product_images.filter(Boolean), ...urls.slice(1)] },
+      );
+    }
   }
 
   function resetForm() {
@@ -155,6 +181,7 @@ export function ProdutosAdminPanel({
         .filter((u) => u !== (form.image_url || "").trim())
         .filter((u, i, arr) => arr.indexOf(u) === i),
       description: form.description || null,
+      description_md: form.description_md || null,
       active: form.active,
       category_id: creatingNewCat ? null : form.category_id || null,
       new_category_name: creatingNewCat ? form.new_category_name : null,
@@ -396,6 +423,7 @@ export function ProdutosAdminPanel({
                   </Button>
                 </div>
               ))}
+<div className="flex flex-wrap gap-2">
               <Button
                 type="button"
                 variant="outline"
@@ -410,15 +438,32 @@ export function ProdutosAdminPanel({
               >
                 Adicionar imagem
               </Button>
+                <label className="inline-flex cursor-pointer items-center rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[var(--ink)] hover:bg-[var(--bg-subtle)]">
+                  {galleryUploading ? "Enviando…" : "Enviar foto"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    className="hidden"
+                    disabled={galleryUploading}
+                    onChange={(e) => void uploadGallery(e.target.files)}
+                  />
+                </label>
+              </div>
             </div>
             <Textarea
-              label="Descrição"
+              label="Resumo (texto curto)"
               value={form.description}
               onChange={(e) =>
                 setForm((f) => ({ ...f, description: e.target.value }))
               }
               placeholder="Copy de marketing em português…"
-              hint="Exibida no modal do catálogo (pt-BR)"
+              hint="Usado quando não há descrição completa e em listagens"
+            />
+            <RichDescriptionEditor
+              value={form.description_md}
+              slug={form.slug || form.name}
+              onChange={(next) => setForm((f) => ({ ...f, description_md: next }))}
             />
 
             <Select

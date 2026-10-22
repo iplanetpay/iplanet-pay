@@ -1,3 +1,4 @@
+import { RICH_DESCRIPTION_MAX_CHARS } from "@/lib/catalog/rich-description";
 import { hexFromColorName } from "@/lib/catalog/colors";
 import { USE_MOCK_AUTH } from "@/lib/auth/mock";
 import { getCurrentUser } from "@/lib/auth/session";
@@ -74,6 +75,7 @@ export async function listAllProducts(): Promise<{
         list_price_cents,
         image_url,
         description,
+        description_md,
         product_images,
         active,
         category,
@@ -110,6 +112,7 @@ export type ProductInput = {
   list_price_cents: number;
   image_url?: string | null;
   description?: string | null;
+  description_md?: string | null;
   product_images?: string[] | null;
   active?: boolean;
   category_id?: string | null;
@@ -167,6 +170,10 @@ export async function createProduct(
   const color_hex = color ? (input.color_hex ?? hexFromColorName(color)) : null;
   const image_url = input.image_url?.trim() || null;
   const description = input.description?.trim() || null;
+  const description_md = input.description_md?.trim() || null;
+  if (description_md && description_md.length > RICH_DESCRIPTION_MAX_CHARS) {
+    return { ok: false, error: `Descrição completa passa de ${RICH_DESCRIPTION_MAX_CHARS} caracteres.` };
+  }
   const product_images = input.product_images ?? [];
   const active = input.active ?? true;
 
@@ -185,6 +192,7 @@ export async function createProduct(
         list_price_cents: input.list_price_cents,
         image_url,
         description,
+        description_md,
         product_images,
         active,
         category: resolved.category ?? "Nova",
@@ -208,6 +216,7 @@ export async function createProduct(
       list_price_cents: Math.round(input.list_price_cents),
       image_url,
       description,
+      description_md,
       product_images,
       active,
       category_id: resolved.category_id,
@@ -220,7 +229,7 @@ export async function createProduct(
       .select(
         `
         id, name, slug, brand, model, storage, color, color_hex,
-        list_price_cents, image_url, description, product_images, active, category, category_id, created_at
+        list_price_cents, image_url, description, description_md, product_images, active, category, category_id, created_at
       `,
       )
       .single();
@@ -284,6 +293,10 @@ export async function updateProduct(
   const color_hex = color ? (input.color_hex ?? hexFromColorName(color)) : null;
   const image_url = input.image_url?.trim() || null;
   const description = input.description?.trim() || null;
+  const description_md = input.description_md?.trim() || null;
+  if (description_md && description_md.length > RICH_DESCRIPTION_MAX_CHARS) {
+    return { ok: false, error: `Descrição completa passa de ${RICH_DESCRIPTION_MAX_CHARS} caracteres.` };
+  }
   const product_images = input.product_images ?? [];
   const active = input.active ?? true;
 
@@ -302,6 +315,7 @@ export async function updateProduct(
         list_price_cents: input.list_price_cents,
         image_url,
         description,
+        description_md,
         product_images,
         active,
         category: resolved.category ?? "Nova",
@@ -325,6 +339,7 @@ export async function updateProduct(
       list_price_cents: Math.round(input.list_price_cents),
       image_url,
       description,
+      description_md,
       product_images,
       active,
       category_id: resolved.category_id,
@@ -338,7 +353,7 @@ export async function updateProduct(
       .select(
         `
         id, name, slug, brand, model, storage, color, color_hex,
-        list_price_cents, image_url, description, product_images, active, category, category_id, created_at
+        list_price_cents, image_url, description, description_md, product_images, active, category, category_id, created_at
       `,
       )
       .single();

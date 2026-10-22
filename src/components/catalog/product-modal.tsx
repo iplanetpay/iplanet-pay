@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { formatCentsBRL } from "@/lib/utils";
 import type { Product } from "@/types/database";
+import { RichDescription } from "@/components/catalog/rich-description";
 
 const DRAFT_KEY = "iplanet_goal_draft";
 
@@ -275,8 +276,12 @@ export function ProductModal({
         <p className="mt-2 text-xl font-semibold text-[var(--ink)]">
           {formatCentsBRL(price)}
         </p>
-        {product.description ? (
-          <p className="mt-4 text-[15px] leading-relaxed text-[var(--ink-muted)]">
+        {product.description_md?.trim() ? (
+          <div className="mt-4">
+            <RichDescription source={product.description_md} />
+          </div>
+        ) : product.description ? (
+          <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed text-[var(--ink-muted)]">
             {product.description}
           </p>
         ) : null}
