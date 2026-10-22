@@ -69,9 +69,22 @@ struct Product: Codable, Identifiable, Hashable, Sendable {
     var listPriceCents: Int
     var imageUrl: String?
     var description: String?
+    /// Migração 039: descrição rica (Markdown restrito). Ausente antes da 039.
+    var descriptionMd: String?
+    /// Galeria extra (a capa é `imageUrl`).
+    var productImages: [String]?
     var active: Bool
     var category: String?
     var categoryId: UUID?
+
+    /// Capa + galeria, sem vazios nem repetidas, na ordem do site.
+    var galleryURLs: [String] {
+        var seen = Set<String>()
+        return ([imageUrl] + (productImages ?? []).map(Optional.some)).compactMap { raw in
+            guard let v = raw?.trimmingCharacters(in: .whitespacesAndNewlines), !v.isEmpty, seen.insert(v).inserted else { return nil }
+            return v
+        }
+    }
 
     var subtitle: String {
         [storage, color].compactMap { value in

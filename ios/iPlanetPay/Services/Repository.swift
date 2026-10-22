@@ -44,21 +44,32 @@ enum Repository {
     }
 
     static func products() async throws -> [Product] {
-        func load(_ withHex: Bool) async throws -> [Product] {
+        func load(hex: Bool, rich: Bool) async throws -> [Product] {
             try await client
                 .from("products")
-                .select("id, name, slug, brand, model, storage, color, \(withHex ? "color_hex, " : "")list_price_cents, image_url, description, active, category, category_id")
+                .select("id, name, slug, brand, model, storage, color, \(hex ? "color_hex, " : "")list_price_cents, image_url, description, \(rich ? "description_md, product_images, " : "")active, category, category_id")
                 .eq("active", value: true)
                 .order("list_price_cents", ascending: true)
                 .execute()
                 .value
         }
-        do {
-            return try await load(true)
-        } catch where isMissingColorHex(error) {
-            // Banco ainda sem a migração 035: segue sem o hex (cai no mapa por nome), como no site.
-            return try await load(false)
+        var hex = true, rich = true
+        // Banco sem a 039 (description_md) ou sem a 035 (color_hex): tenta de novo sem a coluna, como no site.
+        for _ in 0..<3 {
+            do {
+                return try await load(hex: hex, rich: rich)
+            } catch where rich && isMissingColumn(error, ["description_md", "product_images"]) {
+                rich = false
+            } catch where hex && isMissingColorHex(error) {
+                hex = false
+            }
         }
+        return try await load(hex: hex, rich: rich)
+    }
+
+    private static func isMissingColumn(_ error: Error, _ names: [String]) -> Bool {
+        let text = String(describing: error) + error.localizedDescription
+        return names.contains { text.contains($0) }
     }
 
     private static func isMissingColorHex(_ error: Error) -> Bool {
