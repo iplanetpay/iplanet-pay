@@ -4,6 +4,7 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { initialAporteBrl } from "@/lib/goals/aporte-prefill";
 import { formatCentsBRL } from "@/lib/utils";
 
 type PixPayload = {
@@ -16,20 +17,20 @@ type PixPayload = {
 export function GerarPixForm({
   reservationId,
   remainingCents,
+  prefillCents = 0,
   disabled,
   simulationEnabled = false,
 }: {
   reservationId: string;
   remainingCents: number;
+  /** "Fazer aporte" da meta: parcela da meta em centavos (?aporte=). Editável. */
+  prefillCents?: number;
   disabled?: boolean;
   /** Servidor: ALLOW_PAYMENT_SIMULATION=true ou modo mock. Mostra "Pago (teste)". */
   simulationEnabled?: boolean;
 }) {
   const router = useRouter();
-  const defaultBrl = Math.min(50, Math.max(5, remainingCents / 100));
-  const [amountBrl, setAmountBrl] = useState(
-    Number.isFinite(defaultBrl) ? defaultBrl.toFixed(2) : "5.00",
-  );
+  const [amountBrl, setAmountBrl] = useState(() => initialAporteBrl(prefillCents, remainingCents));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [pix, setPix] = useState<PixPayload | null>(null);

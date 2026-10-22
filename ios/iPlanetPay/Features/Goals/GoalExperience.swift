@@ -25,13 +25,15 @@ enum GoalLinks {
     ) -> GoalSchedule? {
         let frequency = ContributionFrequency(rawValue: goal.frequency ?? "monthly") ?? .monthly
         let start = goal.planStartDate ?? today
+        // Só os aportes da reserva desta meta contam (antes somava os de todas as reservas).
+        let own = GoalAporte.contributions(contributions, reservationId: goal.reservationId) { $0.reservationId }
         return try? GoalScheduleMath.build(
             name: goal.name,
             amountCents: goal.amountCents,
             startDate: start,
             targetDate: goal.targetDate,
             frequency: frequency,
-            contributions: paid(contributions),
+            contributions: paid(own),
             today: today
         )
     }

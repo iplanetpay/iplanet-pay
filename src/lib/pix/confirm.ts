@@ -20,6 +20,7 @@ export async function confirmContributionAsWebhook(
   if (error) return { ok: false, error: error.message };
 
   const already = Boolean((data as { already_confirmed?: boolean } | null)?.already_confirmed);
+  revalidateAporteViews();
   if (!already) {
     try {
       const { notifyAporteConfirmado } = await import("@/lib/email/notify");
@@ -50,4 +51,26 @@ export async function confirmContributionAsWebhook(
     }
   }
   return { ok: true, alreadyConfirmed: already };
+}
+
+/** Telas que mostram progresso de aporte (Metas lê contributions confirmadas). */
+export const APORTE_VIEWS = ["/app/metas", "/app/reservas", "/app/carteira", "/app"] as const;
+
+function revalidateAporteViews() {
+  void import("next/cache")
+    .then(({ revalidatePath }) => {
+      for (const path of APORTE_VIEWS) {
+        try {
+          revalidatePath(path);
+        } catch {
+          /* fora de um request do Next (scripts/testes) */
+        }
+      }
+      try {
+        revalidatePath("/app/reserva/[id]", "page");
+      } catch {
+        /* idem */
+      }
+    })
+    .catch(() => {});
 }
