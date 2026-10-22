@@ -96,6 +96,31 @@ GET /rest/v1/products?select=id,name,storage,color,color_hex,list_price_cents,pr
 
 A reserva grava `reservations.variant_id` (nulo sem variante). Admin: `POST /api/admin/products/{id}/variants` aceita `color_hex?`; `PATCH` com `variant_id`, `color_hex?`, `color?`, `active?`; `POST`/`PATCH /api/admin/products` aceitam `color_hex?`. Hex inválido → `400 { ok: false, error: "Cor inválida: use o formato #RRGGBB." }`.
 
+## Descrição rica de produto
+
+Migração 039. `products.description_md` (texto ou `null`, até 20.000 caracteres) é a descrição completa da tela do aparelho. `products.description` continua como resumo curto: use-o só quando `description_md` vier vazio. Leia com `select=...,description,description_md,product_images`.
+
+Formato (Markdown restrito, igual ao parser `src/lib/catalog/rich-description.ts`, que é a referência). O app iOS deve renderizar os mesmos blocos e ignorar o resto:
+
+| Bloco | Sintaxe | Render |
+|---|---|---|
+| Seção | `## Título` (`# ` vale como `## `) | título de seção |
+| Subtítulo | `### Título` | título menor |
+| Parágrafo | linhas seguidas; linha em branco separa | texto |
+| Lista | `- item` (também `* ` ou `• `) | marcadores |
+| Negrito | `**texto**` dentro de parágrafo/lista | peso semibold |
+| Imagem | `![legenda](url)` sozinha na linha | imagem largura total, `contain`, fundo branco; legenda abaixo se houver |
+| Tabela | `\| A \| B \|` + linha `\|---\|---\|` + linhas | tabela; 1ª coluna em destaque |
+
+Regras de segurança (iguais nos dois apps):
+- Nunca interpretar HTML. `<tag>` aparece como texto.
+- Imagem só é exibida se a URL for `https://<projeto>.supabase.co/storage/v1/object/public/product-images/...` ou `/products/...` do site. Outras são descartadas.
+- Links, código e cabeçalhos `####` não são suportados e saem como texto.
+
+Seções usadas no conteúdo: Destaques, Versão e condição, Tela, Câmera, Desempenho e chip, Bateria, Conectividade, O que vem na caixa, Ficha técnica.
+
+Fotos: bucket público `product-images`. O admin envia pelo painel (policy `product_images_admin_insert`, só `role = admin`), caminho `produtos/<slug>/<timestamp>-<nome>.<jpg|png|webp>`, até 5 MB. A galeria (`image_url` + `product_images[]`) não tem limite de quantidade; a 1ª é a capa.
+
 ## Pix
 
 Não há aceite de contrato por aporte. O contrato de aporte faz parte dos Termos de Uso (`/termos#contrato-de-aporte`, versão `platform-v3`), aceitos no cadastro. O app não deve abrir tela de contrato antes do Pix.

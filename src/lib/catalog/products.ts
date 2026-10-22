@@ -104,6 +104,7 @@ const PRODUCT_COLUMNS = `
         list_price_cents,
         image_url,
         description,
+        description_md,
         product_images,
         active,
         category,
