@@ -42,6 +42,14 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   images: {
     qualities: [75, 85],
+    // Fotos de produto ficam no Storage do Supabase (bucket product-images).
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "*.supabase.co",
+        pathname: "/storage/v1/object/public/**",
+      },
+    ],
   },
   // Vendored Framer marketplace JS (THREE / USD parsers) ships as plain ESM.
   turbopack: {
