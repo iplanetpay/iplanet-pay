@@ -218,6 +218,11 @@ struct ReservationDetailView: View {
                                 .frame(maxWidth: 220)
                                 .accessibilityLabel("QR Code do Pix")
                         }
+                        if contribution.status == "pending" {
+                            SimulatePaidButton(contributionId: contribution.id) { error, ok in
+                                if ok { Task { await checkPendingNow() } } else { info = error }
+                            }
+                        }
                     }
                     if session.isAdmin && contribution.status == "pending" {
                         Button("Confirmar aporte") {
@@ -323,22 +328,23 @@ struct ReservationDetailView: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
-            guard let fresh = try? await Repository.contributions(reservationId: reservationID) else { continue }
-            let wasPending = Set(contributions.filter { $0.status == "pending" }.map(\.id))
-            let nowConfirmed = fresh.contains { wasPending.contains($0.id) && $0.status == "confirmed" }
-            contributions = fresh
-            if nowConfirmed {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                info = "Aporte confirmado."
-                if let userId = session.profile?.id {
-                    reservation = try? await Repository.reservation(id: reservationID)
-                    _ = userId
-                } else {
-                    reservation = try? await Repository.reservation(id: reservationID)
-                }
-                return
-            }
+            if await checkPendingNow() { return }
         }
+    }
+
+    /// pending -> confirmed: atualiza reserva (saldo/meta/foguete) e perfil, como na confirmação real.
+    @discardableResult
+    private func checkPendingNow() async -> Bool {
+        guard let fresh = try? await Repository.contributions(reservationId: reservationID) else { return false }
+        let before = Dictionary(contributions.map { ($0.id, $0.status) }, uniquingKeysWith: { a, _ in a })
+        let after = Dictionary(fresh.map { ($0.id, $0.status) }, uniquingKeysWith: { a, _ in a })
+        contributions = fresh
+        guard !PixConfirmation.newlyConfirmed(before: before, after: after).isEmpty else { return false }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        info = "Aporte confirmado."
+        reservation = try? await Repository.reservation(id: reservationID)
+        await session.refreshProfile()
+        return true
     }
 
     private func openPixIfRequested(_ id: UUID?) {
@@ -463,6 +469,11 @@ struct AporteSheet: View {
                         UIPasteboard.general.string = code
                     }
                     .buttonStyle(SecondaryButtonStyle())
+                    if let id = pix.contributionId, message != "Aporte confirmado." {
+                        SimulatePaidButton(contributionId: id) { error, ok in
+                            if ok { Task { await checkNow() } } else { message = error; messageIsSuccess = false }
+                        }
+                    }
                 }
                 if let message {
                     Text(message).foregroundStyle(messageIsSuccess ? Brand.success : Brand.danger)
@@ -532,14 +543,22 @@ struct AporteSheet: View {
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(4))
             guard !Task.isCancelled else { return }
-            guard let rows = try? await Repository.contributions(reservationId: reservation.id) else { continue }
-            if rows.contains(where: { $0.id == watching && $0.status == "confirmed" }) {
-                UINotificationFeedbackGenerator().notificationOccurred(.success)
-                message = "Aporte confirmado."
-                messageIsSuccess = true
-                return
-            }
+            if await checkNow() { return }
         }
+    }
+
+    /// Mesmo fluxo da detecção automática: pending -> confirmed dispara o sucesso.
+    @discardableResult
+    private func checkNow() async -> Bool {
+        guard let watching, message != "Aporte confirmado." else { return false }
+        guard let rows = try? await Repository.contributions(reservationId: reservation.id) else { return false }
+        let current = rows.first { $0.id == watching }?.status
+        guard PixConfirmation.triggersSuccess(previous: "pending", current: current) else { return false }
+        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        message = "Aporte confirmado."
+        messageIsSuccess = true
+        await session.refreshProfile()
+        return true
     }
 }
 
@@ -972,3 +991,78 @@ struct PickedPhoto: Transferable {
         }
     }
 }
+
+/// Botão "Pago (teste)": aparece em DEBUG ou quando o servidor informa simulação ligada
+/// (ALLOW_PAYMENT_SIMULATION, desligado ao entrar chave de produção do Mercado Pago). Pede ao servidor para simular o pagamento;
+/// a confirmação chega pelo mesmo fluxo da detecção automática do Pix.
+struct SimulatePaidButton: View {
+    let contributionId: UUID
+    var onResult: (String?, Bool) -> Void
+    @State private var busy = false
+    @State private var visible = PaymentSimulation.forcedVisible
+
+    var body: some View {
+        Group {
+            if visible { button }
+        }
+        .task {
+            if !visible { visible = await PaymentSimulation.serverEnabled() }
+        }
+    }
+
+    private var button: some View {
+        Button {
+            Task { await run() }
+        } label: {
+            HStack(spacing: 8) {
+                Text(busy ? "Simulando…" : "Pago (teste)")
+                Text("Somente teste")
+                    .font(.caption2.weight(.bold))
+                    .padding(.horizontal, 6).padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.2))
+                    .foregroundStyle(Color.orange)
+                    .clipShape(Capsule())
+            }
+        }
+        .buttonStyle(SecondaryButtonStyle())
+        .disabled(busy)
+        .accessibilityHint("Simula o pagamento do Pix. Disponível apenas em builds de teste.")
+    }
+
+    private func run() async {
+        busy = true
+        defer { busy = false }
+        do {
+            switch try await WebAPI.simulatePayment(contributionId: contributionId) {
+            case .ok: onResult(nil, true)
+            case .disabled:
+                PaymentSimulation.markDisabled()
+                if !PaymentSimulation.forcedVisible { visible = false }
+                onResult("Simulação desativada neste servidor.", false)
+            }
+        } catch {
+            onResult(describeError(error), false)
+        }
+    }
+}
+
+/// Visibilidade do botão de simulação. Em DEBUG sempre; fora dele, só com o servidor ligado.
+@MainActor
+enum PaymentSimulation {
+    #if DEBUG
+    static let forcedVisible = true
+    #else
+    static let forcedVisible = false
+    #endif
+    private static var cached: Bool?
+
+    static func serverEnabled() async -> Bool {
+        if let cached { return cached }
+        let enabled = await WebAPI.paymentSimulationEnabled()
+        cached = enabled
+        return enabled
+    }
+
+    static func markDisabled() { cached = false }
+}
+

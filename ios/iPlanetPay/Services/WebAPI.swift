@@ -447,6 +447,45 @@ enum WebAPI {
         _ = try await SupabaseService.client.auth.setSession(accessToken: access, refreshToken: refresh)
     }
 
+    enum SimulationResult: Sendable { case ok, disabled }
+
+    /// Teste: pede ao servidor que simule o pagamento do Pix
+    /// (`POST /api/dev/simulate-payment`, protegido por flag de ambiente e checagem admin/teste no web).
+    /// O app nunca grava pagamento direto; 403/404 = simulação desativada neste servidor.
+    static func simulatePayment(contributionId: UUID) async throws -> SimulationResult {
+        struct Body: Encodable { var contributionId: UUID }
+        var request = URLRequest(url: AppConfig.web("/api/dev/simulate-payment"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let session = try await SupabaseService.client.auth.session
+        request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        request.httpBody = try AppCoding.encoder.encode(Body(contributionId: contributionId))
+        let (data, response) = try await URLSession.shared.data(for: request)
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+        if status == 403 || status == 404 { return .disabled }
+        let reply = try? AppCoding.decoder.decode(StatusResponse.self, from: data)
+        guard (200..<300).contains(status), reply?.ok != false else {
+            throw Failure(message: reply?.error ?? "Não foi possível simular o pagamento (HTTP \(status)).")
+        }
+        return .ok
+    }
+
+    /// `GET /api/dev/simulate-payment/status` → `{enabled: true}` só quando o servidor tem
+    /// ALLOW_PAYMENT_SIMULATION ligado (o guard real). 403/404 ou erro = desativado.
+    static func paymentSimulationEnabled() async -> Bool {
+        struct Reply: Decodable { var enabled: Bool? }
+        var request = URLRequest(url: AppConfig.web("/api/dev/simulate-payment/status"))
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let session = try? await SupabaseService.client.auth.session {
+            request.setValue("Bearer \(session.accessToken)", forHTTPHeaderField: "Authorization")
+        }
+        guard let (data, response) = try? await URLSession.shared.data(for: request),
+              (response as? HTTPURLResponse)?.statusCode == 200,
+              let reply = try? AppCoding.decoder.decode(Reply.self, from: data) else { return false }
+        return reply.enabled == true
+    }
+
     private struct EmptyBody: Encodable, Sendable {}
 
     private static func post<Body: Encodable, Response: Decodable & APIReply>(
